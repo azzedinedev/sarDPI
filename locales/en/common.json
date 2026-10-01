@@ -41,6 +41,7 @@
   "errors.errors.network": "Errors network",
   "errors.errors.notFound": "Errors notFound",
   "errors.errors.rateLimited": "Errors rateLimited",
+  "errors.errors.csrf": "تعذّر التحقق من رمز الحماية. أعد تحميل الصفحة.",
   "errors.errors.server": "Errors server",
   "errors.errors.unauthorized": "Errors unauthorized",
   "errors.errors.uploadTooLarge": "Errors uploadTooLarge",

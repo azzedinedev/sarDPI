@@ -10,6 +10,7 @@
   "errors.uploadTooLarge": "ملف كبير (أقصى {mb} م.ب).",
   "errors.badFileType": "نوع الملف غير مسموح.",
   "errors.invalidToken": "رابط/رمز غير صالح.",
+  "errors.csrf": "رمز الحماية مفقود أو منتهي. أعد تحميل الصفحة ثم أعد المحاولة.",
   "errorBoundary.title": "حدث خطأ في هذا القسم.",
   "errorBoundary.reset": "إعادة تحميل القسم",
   "errorBoundary.detail": "تفصيل تقني"

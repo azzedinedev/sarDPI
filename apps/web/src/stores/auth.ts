@@ -4,7 +4,7 @@
  */
 'use client';
 import { create } from 'zustand';
-import { bindApi, ApiError } from '@/lib/api';
+import { bindApi, rememberCsrf, ApiError } from '@/lib/api';
 import { can, type ActionKey } from '@sardpi/shared';
 
 export interface MeUser {
@@ -71,6 +71,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         }
         const j = (await r.json()) as { accessToken: string; csrfToken?: string };
         set({ accessToken: j.accessToken, csrf: j.csrfToken ?? null, status: 'authenticating' });
+        rememberCsrf(j.csrfToken ?? null);
         const meRes = await fetch('/api/v1/auth/me', { headers: { authorization: `Bearer ${j.accessToken}` }, credentials: 'include' });
         if (!meRes.ok) {
           set({ status: 'anonymous', accessToken: null });
@@ -122,6 +123,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         return;
       }
       set({ accessToken: j.accessToken, csrf: j.csrfToken, status: 'authed' });
+      rememberCsrf(j.csrfToken);
       await get().refreshNow();
     } catch (e) {
       set({ status: 'anonymous' });
@@ -134,6 +136,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
     } finally {
       set({ accessToken: null, user: null, perms: [], status: 'anonymous', totpPending: false });
+      rememberCsrf(null);
       window.location.href = '/login';
     }
   },

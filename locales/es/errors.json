@@ -10,6 +10,7 @@
   "errors.uploadTooLarge": "Archivo demasiado grande (máx. {mb} MB).",
   "errors.badFileType": "Tipo de archivo no permitido.",
   "errors.invalidToken": "Enlace o token inválido.",
+  "errors.csrf": "Token de seguridad ausente o caducado. Recargue la página e inténtelo de nuevo.",
   "errorBoundary.title": "Esta sección encontró un problema.",
   "errorBoundary.reset": "Recargar sección",
   "errorBoundary.detail": "Detalle técnico"

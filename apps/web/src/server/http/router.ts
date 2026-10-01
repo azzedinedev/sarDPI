@@ -48,6 +48,8 @@ export interface RouteDef {
   cacheable?: boolean;
   /** skip rate-limit global (login gère le sien) */
   noRate?: boolean;
+  /** désactive la garde CSRF double-submit (routes publiques d'amorçage de session uniquement) */
+  csrf?: boolean;
   /** permis même avec licence expirée */
   licenseFree?: boolean;
 }
@@ -107,11 +109,16 @@ export async function handleApi(req: NextRequest, pathAfter: string): Promise<Ne
       if (!can(user.perms, def.perm[0], def.perm[1])) throw new ApiError(403, 'errors.forbidden');
     }
 
-    // CSRF (uniquement pour les flux s'appuyant sur les cookies ; Bearer ⇒ exempt)
-    if (method !== 'GET' && method !== 'HEAD' && !req.headers.get('authorization')) {
+    // CSRF (uniquement pour les flux s'appuyant sur les cookies ; Bearer ⇒ exempt).
+    // Le client renvoie dans x-csrf-token la valeur du cookie sardpi_csrf (double-submit,
+    // cookie non HttpOnly par conception). La garde n'a de sens qu'une fois le cookie posé :
+    // les routes d'amorçage (login/refresh/forgot/reset) qui le posent pour la 1re fois sont exemptes.
+    if (def.csrf !== false && method !== 'GET' && method !== 'HEAD' && !req.headers.get('authorization')) {
       const cookie = req.cookies.get('sardpi_csrf')?.value;
-      const header = req.headers.get('x-csrf-token');
-      if (cookie && cookie !== header) throw new ApiError(403, 'errors.csrf');
+      if (cookie) {
+        const header = req.headers.get('x-csrf-token');
+        if (cookie !== header) throw new ApiError(403, 'errors.csrf');
+      }
     }
 
     // Garde licence (admin > Licence ; trial = toujours OK, expiré = bloqué hors licence/auth)

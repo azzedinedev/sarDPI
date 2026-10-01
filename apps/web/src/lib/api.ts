@@ -28,6 +28,15 @@ type CsrfGetter = () => string | null;
 let getToken: TokenGetter = () => null;
 let refresh: Refresher = async () => null;
 let getCsrf: CsrfGetter = () => null;
+/** Jeton CSRF mémorisé en mémoire (réponse login/refresh ou /auth/csrf) — fallback si le store n'a rien. */
+let csrfMemory: string | null = null;
+export function rememberCsrf(token: string | null): void { csrfMemory = token; }
+export async function refreshCsrf(): Promise<void> {
+  const res = await fetch('/api/v1/auth/csrf', { credentials: 'include', cache: 'no-store' });
+  if (!res.ok) return;
+  const j = (await res.json().catch(() => null)) as { csrfToken?: string } | null;
+  csrfMemory = j?.csrfToken ?? csrfMemory;
+}
 
 export function bindApi(hooks: { getToken: TokenGetter; refresh: Refresher; getCsrf: CsrfGetter }): void {
   getToken = hooks.getToken;
@@ -41,11 +50,19 @@ async function doFetch(path: string, init: RequestInit, retried = false): Promis
   if (token) headers.set('authorization', `Bearer ${token}`);
   const method = (init.method ?? 'GET').toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') {
-    const csrf = getCsrf();
+    const csrf = getCsrf() ?? csrfMemory;
     if (csrf) headers.set('x-csrf-token', csrf);
     if (!(init.body instanceof FormData) && init.body !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
   }
   const res = await fetch(`/api/v1${path}`, { ...init, headers, credentials: 'include', cache: 'no-store' });
+  if (res.status === 403 && !retried && method !== 'GET' && method !== 'HEAD') {
+    // Jeton absent/périmé (nouvel onglet, cookie expiré…) : on ré-amorce le double-submit puis on rejoue une fois.
+    const j = (await res.clone().json().catch(() => null)) as { error?: { code?: string } } | null;
+    if (j?.error?.code === 'errors.csrf') {
+      await refreshCsrf();
+      return doFetch(path, init, retried);
+    }
+  }
   if (res.status === 401 && !retried) {
     const fresh = await refresh();
     if (fresh) return doFetch(path, init, true);

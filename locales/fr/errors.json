@@ -10,6 +10,7 @@
   "errors.uploadTooLarge": "Fichier trop volumineux (max {mb} Mo).",
   "errors.badFileType": "Type de fichier non autorisé.",
   "errors.invalidToken": "Lien ou jeton invalide.",
+  "errors.csrf": "Jeton de sécurité manquant ou périmé. Rechargez la page puis réessayez.",
   "errorBoundary.title": "Cette section a rencontré un problème.",
   "errorBoundary.reset": "Recharger la section",
   "errorBoundary.detail": "Détail technique"

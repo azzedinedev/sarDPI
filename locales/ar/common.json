@@ -41,6 +41,7 @@
   "errors.errors.network": "errors network",
   "errors.errors.notFound": "errors notFound",
   "errors.errors.rateLimited": "errors rateLimited",
+  "errors.errors.csrf": "Security token mismatch. Refresh the page.",
   "errors.errors.server": "errors server",
   "errors.errors.unauthorized": "errors unauthorized",
   "errors.errors.uploadTooLarge": "errors uploadTooLarge",

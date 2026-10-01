@@ -23,9 +23,10 @@ import { encryptField, decryptField } from '../security/crypto';
 const REFRESH_COOKIE = 'sardpi_rt';
 const CSRF_COOKIE = 'sardpi_csrf';
 
-function cookieSet(name: string, value: string, maxAgeSec: number, path = '/'): string {
+function cookieSet(name: string, value: string, maxAgeSec: number, path = '/', httpOnly = true): string {
   const secure = env.isProd && process.env.APP_URL?.startsWith('https');
-  return `${name}=${value}; Path=${path}; Max-Age=${maxAgeSec}; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+  // Le cookie CSRF est lu par le client (double-submit) ⇒ non HttpOnly par nature ; ce n'est pas un secret de session.
+  return `${name}=${value}; Path=${path}; Max-Age=${maxAgeSec};${httpOnly ? ' HttpOnly;' : ''} SameSite=Lax${secure ? '; Secure' : ''}`;
 }
 
 /** Response JSON + plusieurs Set-Cookie (non supporté par l'objet headers simple). */
@@ -35,12 +36,26 @@ function jsonCookies(data: unknown, cookies: string[], status = 200): Response {
   return res;
 }
 
-/** POST /auth/login */
+/** Routes d'authentification : login / refresh / logout + amorçage CSRF + forgot / reset. */
 export function registerAuth(): void {
+  // GET /auth/csrf — amorçage du jeton CSRF (pré-login, forgot, reset : pas encore de cookie côté client).
+  // Le jeton est un anti-CSRF double-submit publiquement lisible par le client, pas un secret de session.
+  route({
+    method: 'GET',
+    path: '/auth/csrf',
+    auth: false,
+    licenseFree: true,
+    async handler() {
+      const csrf = publicToken(12);
+      return jsonCookies({ csrfToken: csrf }, [cookieSet(CSRF_COOKIE, csrf, env.refreshTokenTtlDays * 86_400, '/', false)]);
+    },
+  });
+
   route({
     method: 'POST',
     path: '/auth/login',
     auth: false,
+    csrf: false,
     licenseFree: true,
     noRate: true,
     async handler(ctx: Ctx) {
@@ -119,7 +134,7 @@ export function registerAuth(): void {
           csrfToken: csrf,
           user: { id: Number(u.id), username: u.username, email: u.email, fullName: u.full_name, locale: u.locale, theme: u.theme, density: u.density, nav: u.nav, mustChangePassword: Boolean(Number(u.must_change_password)) },
         },
-        [cookieSet(REFRESH_COOKIE, refresh, env.refreshTokenTtlDays * 86_400), cookieSet(CSRF_COOKIE, csrf, env.refreshTokenTtlDays * 86_400)],
+        [cookieSet(REFRESH_COOKIE, refresh, env.refreshTokenTtlDays * 86_400), cookieSet(CSRF_COOKIE, csrf, env.refreshTokenTtlDays * 86_400, '/', false)],
       );
     },
   });
@@ -129,6 +144,7 @@ export function registerAuth(): void {
     method: 'POST',
     path: '/auth/refresh',
     auth: false,
+    csrf: false,
     licenseFree: true,
     async handler(ctx: Ctx) {
       const db = await getDb();
@@ -160,7 +176,7 @@ export function registerAuth(): void {
       await db.update('sessions', Number(sess.id), { revoked_at: new Date().toISOString(), replaced_by: sha256(fresh) });
       const accessToken = await signAccessToken({ uid: Number(user.id), sid: Number(newSess.id), role: String(user.role_id), locale: String(user.locale ?? 'fr') });
       const csrf = publicToken(12);
-      return jsonCookies({ accessToken, csrfToken: csrf }, [cookieSet(REFRESH_COOKIE, fresh, env.refreshTokenTtlDays * 86_400), cookieSet(CSRF_COOKIE, csrf, env.refreshTokenTtlDays * 86_400)]);
+      return jsonCookies({ accessToken, csrfToken: csrf }, [cookieSet(REFRESH_COOKIE, fresh, env.refreshTokenTtlDays * 86_400), cookieSet(CSRF_COOKIE, csrf, env.refreshTokenTtlDays * 86_400, '/', false)]);
     },
   });
 
@@ -174,7 +190,7 @@ export function registerAuth(): void {
       const db = await getDb();
       const token = ctx.req.cookies.get(REFRESH_COOKIE)?.value;
       if (token) await db.updateWhere('sessions', { refresh_hash: sha256(token) }, { revoked_at: new Date().toISOString() });
-      return jsonCookies({ ok: true }, [cookieSet(REFRESH_COOKIE, '', 0)]);
+      return jsonCookies({ ok: true }, [cookieSet(REFRESH_COOKIE, '', 0), cookieSet(CSRF_COOKIE, '', 0, '/', false)]);
     },
   });
 
@@ -262,6 +278,7 @@ export function registerAuth(): void {
     method: 'POST',
     path: '/auth/forgot',
     auth: false,
+    csrf: false,
     licenseFree: true,
     noRate: true,
     async handler(ctx: Ctx) {
@@ -297,6 +314,7 @@ export function registerAuth(): void {
     method: 'POST',
     path: '/auth/reset',
     auth: false,
+    csrf: false,
     licenseFree: true,
     async handler(ctx: Ctx) {
       const input = await ctx.body(z.object({ token: z.string().min(10).max(64), password: passwordPolicyZ }));
