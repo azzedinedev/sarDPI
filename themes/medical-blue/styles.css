@@ -1,0 +1,10 @@
+/* Thème externe « medical-blue » — uniquement des surcharges CSS.
+ * Les variables de couleur proviennent de theme.json (injectées par le service de thèmes). */
+.sardpi-shell .glass-card {
+  border: 1px solid color-mix(in srgb, rgb(var(--c-line)) 70%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, rgb(var(--c-primary)) 6%, transparent), transparent 55%),
+    rgb(var(--c-glass));
+}
+.sardpi-login .bg-blob.blob-1 { background: radial-gradient(circle, rgba(14, 165, 183, 0.5), transparent 65%); }
+.sardpi-login .bg-blob.blob-2 { background: radial-gradient(circle, rgba(52, 199, 123, 0.4), transparent 65%); }

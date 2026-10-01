@@ -1,0 +1,13 @@
+{
+  "cardio.title": "أمراض القلب",
+  "cardio.ecg": "تخطيط القلب",
+  "cardio.echo": "إيكو القلب",
+  "cardio.holterEcg": "هولتر نظم",
+  "cardio.holterBp": "هولتر الضغط",
+  "cardio.stress": "اختبار الجهد",
+  "cardio.bp": "ضغط الدم",
+  "cardio.sys": "انقباضي",
+  "cardio.dia": "انبساطي",
+  "cardio.hr": "معدل القلب",
+  "cardo.importTrace": "استيراد تخطيط"
+}

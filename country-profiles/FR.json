@@ -1,0 +1,17 @@
+{
+  "code": "FR",
+  "enabled": false,
+  "name": { "fr": "France", "ar": "فرنسا", "es": "Francia", "en": "France" },
+  "currency": { "code": "EUR", "symbol": "€", "symbolAfter": false, "decimals": 2, "intl": "eur" },
+  "timezone": "Europe/Paris",
+  "dialCode": "+33",
+  "phone": { "pattern": "^(\\+33|0)[1-9][0-9]{8}$", "patternHint": { "fr": "0X XX XX XX XX" } },
+  "dates": { "firstDayOfWeek": 1, "weekendDays": [0, 6], "gregorianFormat": "dd/MM/yyyy", "hijri": { "enabledByDefault": false } },
+  "address": { "administrativeDivision": { "enabled": true, "levels": [ { "key": "departement", "name": { "fr": "Département" } }, { "key": "commune", "name": { "fr": "Commune" } } ], "importable": true } },
+  "identifiers": {
+    "patient": [ { "key": "nin", "label": { "fr": "N° sécurité sociale (NIR)", "en": "SSN (NIR)" }, "optional": true } ],
+    "practitioner": [ { "key": "order_number", "label": { "fr": "N° Conseil de l'Ordre" }, "optional": true } ]
+  },
+  "documents": { "defaultBilingual": false, "languages": ["fr"], "numbering": ["latn"] },
+  "legal": { "dataProtectionLaw": "RGPD", "retentionYearsDefault": 20 }
+}

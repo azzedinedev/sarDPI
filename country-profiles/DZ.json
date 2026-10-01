@@ -1,0 +1,84 @@
+{
+  "code": "DZ",
+  "enabled": true,
+  "name": { "fr": "Algérie", "ar": "الجزائر", "es": "Argelia", "en": "Algeria" },
+  "currency": { "code": "DZD", "symbol": "دج", "symbolAfter": true, "decimals": 2, "intl": "dzd" },
+  "timezone": "Africa/Algiers",
+  "dialCode": "+213",
+  "phone": {
+    "pattern": "^(\\+213|0)(5|6|7)[0-9]{8}$",
+    "patternHint": {
+      "fr": "Mobile : 0X XX XX XX XX (05/06/07) ou +213…",
+      "ar": "المحمول: 0X XX XX XX XX (05/06/07) أو +213…",
+      "es": "Móvil: 0X XX XX XX XX (05/06/07) o +213…",
+      "en": "Mobile: 0X XX XX XX XX (05/06/07) or +213…"
+    }
+  },
+  "dates": {
+    "firstDayOfWeek": 6,
+    "weekendDays": [5, 6],
+    "gregorianFormat": "dd/MM/yyyy",
+    "hijri": { "enabledByDefault": true, "calendar": "islamic-umalqura", "locale": "ar-DZ-u-ca-islamic-umalqura" },
+    "numberingSystem": "latn"
+  },
+  "address": {
+    "administrativeDivision": {
+      "enabled": true,
+      "levels": [
+        { "key": "wilaya", "name": { "fr": "Wilaya", "ar": "ولاية", "es": "Wilaya", "en": "Wilaya" }, "cardinality": 58 },
+        { "key": "daira", "name": { "fr": "Daïra", "ar": "دائرة", "es": "Daira", "en": "Daira" }, "optional": true },
+        { "key": "commune", "name": { "fr": "Commune", "ar": "بلدية", "es": "Comuna", "en": "Commune" }, "optional": true }
+      ],
+      "importable": true
+    }
+  },
+  "identifiers": {
+    "patient": [
+      { "key": "nin", "label": { "fr": "NIN (n° identification nationale)", "ar": "رقم التعريف الوطني", "es": "NIN (identificación nacional)", "en": "National ID (NIN)" }, "pattern": "^[0-9]{18}$", "optional": true },
+      { "key": "cnas_fund", "label": { "fr": "Organisme sécurité sociale", "ar": "ضمان اجتماعي", "es": "Organismo SS", "en": "Social security body" }, "type": "list", "options": ["CNAS", "CASNOS", "CNMA"], "optional": true },
+      { "key": "ss_number", "label": { "fr": "N° sécurité sociale", "ar": "رقم الضمان الاجتماعي", "es": "Nº seguridad social", "en": "SS number" }, "optional": true },
+      { "key": "chifa_number", "label": { "fr": "N° carte Chifa", "ar": "رقم بطاقة الشفاء", "es": "Nº tarjeta Chifa", "en": "Chifa card number" }, "optional": true },
+      { "key": "having_right", "label": { "fr": "Ayant droit", "ar": "ذو حق", "es": "Derechohabiente", "en": "Dependent rights" }, "type": "bool", "optional": true },
+      { "key": "third_party", "label": { "fr": "Tiers payant", "ar": "الطرف الثالث", "es": "Tercero pagador", "en": "Third-party payer" }, "type": "bool", "optional": true }
+    ],
+    "practitioner": [
+      { "key": "order_number", "label": { "fr": "N° d'inscription à l'Ordre (CNOM)", "ar": "رقم التسجيل في جدول الأطباء", "es": "Nº de colegiación", "en": "Medical council number" }, "optional": true },
+      { "key": "speciality", "label": { "fr": "Spécialité", "ar": "التخصص", "es": "Especialidad", "en": "Speciality" }, "optional": true },
+      { "key": "stamp", "label": { "fr": "Cachet", "ar": "الختم", "es": "Sello", "en": "Stamp" }, "type": "file", "optional": true },
+      { "key": "signature", "label": { "fr": "Signature", "ar": "التوقيع", "es": "Firma", "en": "Signature" }, "type": "file", "optional": true }
+    ]
+  },
+  "documents": {
+    "defaultBilingual": true,
+    "languages": ["ar", "fr"],
+    "numbering": ["latn", "arab"]
+  },
+  "medication": {
+    "searchByDci": true,
+    "nomenclature": "importable",
+    "reimbursementFlag": true
+  },
+  "vaccination": {
+    "nationalCalendar": "paramétrable (settings.vaccination.calendar)",
+    "defaultSchedule": [
+      { "code": "BCG", "at": "birth", "label": { "fr": "BCG (tuberculose)", "ar": "BCG (السل)", "es": "BCG (tuberculosis)", "en": "BCG (tuberculosis)" } },
+      { "code": "PENTA1", "at": "W6", "label": { "fr": "Pentavalent 1", "ar": "خماسي 1", "es": "Pentavalente 1", "en": "Pentavalent 1" } },
+      { "code": "PENTA2", "at": "W10", "label": { "fr": "Pentavalent 2", "ar": "خماسي 2", "es": "Pentavalente 2", "en": "Pentavalent 2" } },
+      { "code": "PENTA3", "at": "W14", "label": { "fr": "Pentavalent 3", "ar": "خماسي 3", "es": "Pentavalente 3", "en": "Pentavalent 3" } },
+      { "code": "PCV13-1", "at": "W6", "label": { "fr": "Pneumocoque 1", "ar": "مكورة رئوية 1", "es": "Neumococo 1", "en": "Pneumococcus 1" } },
+      { "code": "PCV13-2", "at": "W14", "label": { "fr": "Pneumocoque 2", "ar": "مكورة رئوية 2", "es": "Neumococo 2", "en": "Pneumococcus 2" } },
+      { "code": "ROTA1", "at": "W6", "label": { "fr": "Rotavirus 1", "ar": "روتافيروس 1", "es": "Rotavirus 1", "en": "Rotavirus 1" } },
+      { "code": "ROTA2", "at": "W10", "label": { "fr": "Rotavirus 2", "ar": "روتافيروس 2", "es": "Rotavirus 2", "en": "Rotavirus 2" } },
+      { "code": "OPV/IPV1", "at": "W6", "label": { "fr": "Poliomyélite 1", "ar": "شلل الأطفال 1", "es": "Poliomielitis 1", "en": "Polio 1" } },
+      { "code": "MEASLES1", "at": "M9", "label": { "fr": "Rougeole 9 mois", "ar": "حصبة 9 أشهر", "es": "Sarampión 9 meses", "en": "Measles at 9 months" } },
+      { "code": "MMR1", "at": "M18", "label": { "fr": "ROR 1", "ar": "ثلاثي 1", "es": "SRP 1", "en": "MMR 1" } },
+      { "code": "MMR2", "at": "Y6", "label": { "fr": "ROR 2 (6 ans)", "ar": "ثلاثي 2 (6 سنوات)", "es": "SRP 2 (6 años)", "en": "MMR 2 (6 yo)" } },
+      { "code": "DTCAP", "at": "Y6", "label": { "fr": "Rappel DTC-Polio 6 ans", "ar": "جرعة منشطة 6 سنوات", "es": "Refuerzo 6 años", "en": "Booster 6 yo" } }
+    ]
+  },
+  "legal": {
+    "dataProtectionLaw": "Loi 18-07 (Algérie) — autorité ANPDP",
+    "dataResidency": "local only — aucun transfert hors pays obligatoire",
+    "retentionYearsDefault": 15
+  }
+}

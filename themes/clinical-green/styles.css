@@ -1,0 +1,6 @@
+/* Thème externe « clinical-green » — accent menthe, sphères de fond plus douces. */
+.sardpi-shell .glass-card {
+  background:
+    linear-gradient(150deg, color-mix(in srgb, rgb(var(--c-mint)) 8%, transparent), transparent 60%),
+    rgb(var(--c-glass));
+}

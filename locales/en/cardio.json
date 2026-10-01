@@ -1,0 +1,13 @@
+{
+  "cardio.title": "Cardiology",
+  "cardio.ecg": "ECG",
+  "cardio.echo": "Echocardiography",
+  "cardio.holterEcg": "Holter ECG",
+  "cardio.holterBp": "ABPM",
+  "cardio.stress": "Stress test",
+  "cardio.bp": "Blood pressure",
+  "cardio.sys": "Systolic",
+  "cardio.dia": "Diastolic",
+  "cardio.hr": "Heart rate",
+  "cardo.importTrace": "Import trace (PDF/image)"
+}

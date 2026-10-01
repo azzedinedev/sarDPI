@@ -1,0 +1,14 @@
+{
+  "radio.title": "Radiología",
+  "radio.modality": "Modalidad",
+  "radio.xray": "Radiografía",
+  "radio.ct": "TAC",
+  "radio.mri": "RMN",
+  "radio.ultrasound": "Ecografía",
+  "radio.mammo": "Mamografía",
+  "radio.pano": "Ortopantomografía",
+  "radio.images": "Imágenes",
+  "radio.compare": "Comparar estudios",
+  "radio.viewer": "Visor",
+  "radio.dicomNote": "DICOM (fase posterior): el visor muestra JPG/PNG subidos."
+}

@@ -1,0 +1,14 @@
+{
+  "radio.title": "Radiologie / Imagerie",
+  "radio.modality": "Modalité",
+  "radio.xray": "Radiographie",
+  "radio.ct": "Scanner",
+  "radio.mri": "IRM",
+  "radio.ultrasound": "Échographie",
+  "radio.mammo": "Mammographie",
+  "radio.pano": "Panoramique dentaire",
+  "radio.images": "Images",
+  "radio.compare": "Comparer les examens",
+  "radio.viewer": "Visionneuse",
+  "radio.dicomNote": "Support DICOM (phase ultérieure) : le viewer affiche les images JPG/PNG uploadées."
+}

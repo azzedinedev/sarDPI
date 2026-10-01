@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev server",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "runOptions": { "instanceLimit": 1 }
+    },
+    { "label": "Migrate DB", "type": "shell", "command": "npm run db:migrate", "problemMatcher": [] },
+    { "label": "Seed démo", "type": "shell", "command": "npm run seed", "problemMatcher": [] },
+    { "label": "Seed démo (reset --force — LOCAL UNIQUEMENT)", "type": "shell", "command": "npm run seed -- --force", "problemMatcher": [] },
+    { "label": "Export DB", "type": "shell", "command": "npm run db:export", "problemMatcher": [] },
+    { "label": "Régénérer polices", "type": "shell", "command": "npm run fonts", "problemMatcher": [] },
+    { "label": "Régénérer locales", "type": "shell", "command": "npm run locales", "problemMatcher": [] },
+    { "label": "Tests", "type": "shell", "command": "npm test", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Typecheck", "type": "shell", "command": "npm run typecheck", "problemMatcher": ["$tsc"] },
+    { "label": "Build", "type": "npm", "script": "build", "group": "build", "problemMatcher": ["$tsc"] }
+  ]
+}

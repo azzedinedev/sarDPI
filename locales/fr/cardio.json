@@ -1,0 +1,13 @@
+{
+  "cardio.title": "Cardiologie",
+  "cardio.ecg": "ECG",
+  "cardio.echo": "Échocardiographie",
+  "cardio.holterEcg": "Holter ECG",
+  "cardio.holterBp": "Holter tensionnel",
+  "cardio.stress": "Épreuve d’effort",
+  "cardio.bp": "Tension artérielle",
+  "cardio.sys": "Systolique",
+  "cardio.dia": "Diastolique",
+  "cardio.hr": "Fréquence cardiaque",
+  "cardo.importTrace": "Importer tracé (PDF/image)"
+}

@@ -1,0 +1,16 @@
+{
+  "errors.network": "Red no disponible.",
+  "errors.unauthorized": "Sesión caducada. Vuelva a entrar.",
+  "errors.forbidden": "Acción no permitida para su rol.",
+  "errors.notFound": "Recurso no encontrado.",
+  "errors.conflict": "Conflicto de datos.",
+  "errors.validation": "Datos no válidos.",
+  "errors.server": "Error del servidor: {id}",
+  "errors.rateLimited": "Demasiadas peticiones, espere {seconds} s.",
+  "errors.uploadTooLarge": "Archivo demasiado grande (máx. {mb} MB).",
+  "errors.badFileType": "Tipo de archivo no permitido.",
+  "errors.invalidToken": "Enlace o token inválido.",
+  "errorBoundary.title": "Esta sección encontró un problema.",
+  "errorBoundary.reset": "Recargar sección",
+  "errorBoundary.detail": "Detalle técnico"
+}
