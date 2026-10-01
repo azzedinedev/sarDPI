@@ -33,25 +33,13 @@ const nextConfig = {
   },
   async headers() {
     // En-têtes de sécurité "style helmet" (le paquet helmet est prévu pour le serveur séparé optionnel).
-    // CSP : 'unsafe-inline' pour les styles est un compromis assumé (Radix/Framer posent du style inline) ;
-    // les scripts inline sont interdits, les workers/blob autorisés pour l'aperçu PDF.
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com https://hcaptcha.com https://www.google.com",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self'",
-      "connect-src 'self'",
-      "frame-ancestors 'self'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ');
+    // ⚠ La CSP n'est PAS ici : elle exige un NONCE par requête (scripts inline du App Router/streaming
+    // RSC) → construite dans src/middleware.ts (+ src/lib/csp.ts). Un header statique ne peut pas porter
+    // de nonce et bloquerait l'hydratation (et en dev, tout HMR). Les autres en-têtes restent statiques.
     return [
       {
         source: '/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: csp },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'same-origin' },

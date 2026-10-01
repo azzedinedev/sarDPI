@@ -49,6 +49,19 @@ sarDPI/
 → validation Zod du corps → handler(tx si code) → audit chaîné → réponse` — les réponses privées sortent en
 `no-store` ; les GET référentiels publics ont un `ETag` + cache court ; jamais de PII dans un cache partagé.
 
+## En-têtes de sécurité & CSP à nonce
+- **`src/middleware.ts` + `src/lib/csp.ts`** : la Content-Security-Policy est construite PAR REQUÊTE avec
+  un nonce frais (`x-nextjs-csp-nonce`) — Next pose l'attribut `nonce=` sur tous ses scripts, y compris les
+  scripts INLINE du stream RSC ; un header statique (next.config `headers()`) ne le peut pas et bloquait
+  l'hydratation. En DEV la CSP ajoute `'unsafe-inline'` + `ws:`/`wss:` (HMR) ; en PROD elle est stricte :
+  `'nonce-…' 'strict-dynamic'`, pas d'`unsafe-inline`. `frame-src` couvre les iframes Turnstile/hCaptcha/reCAPTCHA.
+- Le reste des en-têtes (nosniff, XFO SAMEORIGIN, Referrer-Policy same-origin, Permissions-Policy, COOP) vit
+  dans `next.config » headers()` ; `no-store` HTML est posé par le middleware, les en-têtes API (no-store +
+  CSP-aware) par le routeur applicatif. Le matcher edge exclut `/api/`, `/_next/` et les assets à cache long
+  (fonts, icônes) pour ne pas casser leur immutabilité.
+- Un `page.tsx` Next n'exporte QUE `default` + config (`dynamic`, `metadata`…) : les sous-composants d'une
+  page vivent en fonctions locales ou dans `components/` (sinon `next build` échoue — validé au build CI-like).
+
 ## CrudModule (une implémentation, toutes les entités)
 
 Côté serveur, `registerCrud(cfg)` fournit liste paginée (tri, recherche globale OR, filtres avancés JSON,

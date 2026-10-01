@@ -572,7 +572,8 @@ function GedUpload({ pid, onDone }: { pid: number; onDone: () => void }): React.
 }
 
 /* ------------------------------------------------ Enregistrements (liste toutes catégories) */
-export function PatientRecords({ pid }: { pid: number }): React.ReactElement {
+/** Bloc « Fiches » du dossier patient — export NON public : un page.tsx Next ne doit exporter que default + config de page. */
+function PatientRecords({ pid }: { pid: number }): React.ReactElement {
   const { t } = useT('patient');
   const { t: tc } = useT('common');
   const router = useRouter();
