@@ -103,10 +103,10 @@ if (!env.authSecret) {
   (env as { authSecret: string }).authSecret = process.env.SARDPI_DEV_SECRET || 'dev-only-insecure-secret-change-me-0123456789abcdef0123456789abcdef';
 }
 
-let bootWarned = false;
+const gBoot = globalThis as unknown as { __sardpiBootWarned?: boolean };
 export function assertBootConfig() {
-  if (bootWarned) return;
-  bootWarned = true;
+  if (gBoot.__sardpiBootWarned) return;
+  gBoot.__sardpiBootWarned = true;
   const log = createLogger();
   if (env.adapter === 'json' || env.adapter === 'memory') {
     log.warn(`Adaptateur « ${env.adapter} » : mode démo / hors-ligne / mono-utilisateur. Utilisez DATA_ADAPTER=mysql pour la production.`);

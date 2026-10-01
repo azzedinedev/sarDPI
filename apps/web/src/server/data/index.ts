@@ -140,32 +140,43 @@ async function ensureMysqlDatabase(cfg: MysqlConfig): Promise<void> {
 
 /* ------------------------------------------------------------------ factory */
 
+/** En dev, Next ré-évalue les modules serveur à chaque recompilation de page : on ne log chaque
+ *  branchement d'adaptateur QU'une fois par processus (sinon le terminal devient illisible). */
+const gLogged = globalThis as unknown as { __sardpiDataLogged?: Set<string> };
+if (!gLogged.__sardpiDataLogged) gLogged.__sardpiDataLogged = new Set<string>();
+function logOnceInfo(msg: string, fields: Record<string, unknown> = {}): void {
+  const key = msg + JSON.stringify(fields);
+  if (gLogged.__sardpiDataLogged!.has(key)) return;
+  gLogged.__sardpiDataLogged!.add(key);
+  log.info(fields, msg);
+}
+
 async function build(cfg: DbConfig): Promise<DataAdapter> {
   switch (cfg.adapter) {
     case 'json': {
       const a = new JsonAdapter(dataDir());
       await a.init();
-      log.info({ dir: dataDir() }, 'adaptateur JSON (mode démo — auto-incrément ÉMULÉ, mono-poste)');
+      logOnceInfo('adaptateur JSON (mode démo — auto-incrément ÉMULÉ, mono-poste)', { dir: dataDir() });
       return a;
     }
     case 'memory': {
       const dir = path.join(os.tmpdir(), `sardpi-mem-${process.pid}`);
       const a = new JsonAdapter(dir, { inMemory: true });
       await a.init();
-      log.info('adaptateur MEMORY (volatile — tests/échauffement uniquement, aucune donnée persistée)');
+      logOnceInfo('adaptateur MEMORY (volatile — tests/échauffement uniquement, aucune donnée persistée)');
       return a;
     }
     case 'mysql': {
       await ensureMysqlDatabase(cfg.mysql);
       const a = new MySqlAdapter(cfg.mysql);
       await a.init(); // SELECT 1 + DDL généré depuis schema.ts (IF NOT EXISTS)
-      log.info({ db: cfg.mysql.database }, 'adaptateur MySQL prêt');
+      logOnceInfo('adaptateur MySQL prêt', { db: cfg.mysql.database });
       return a;
     }
     case 'postgres': {
       const a = new PostgresAdapter(cfg.postgres);
       await a.init();
-      log.info('adaptateur Postgres prêt');
+      logOnceInfo('adaptateur Postgres prêt');
       return a;
     }
     default:

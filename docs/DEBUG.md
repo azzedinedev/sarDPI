@@ -44,6 +44,11 @@ npm run db:migrate && npm run seed -- --force   # repartir d’une démo propre 
 - Le routeur API exige le runtime `nodejs` (déjà posé dans `app/api/v1/[...path]/route.ts`).
 - En mode JSON, plusieurs serveurs simultanés sur le même `data/` se marchent dessus → mono-processus
   (c’est signalé dans l’UI, bandeau « mode démo »).
+- **Accents « cassés » dans le terminal Windows** (d├®mo, ÔÇö…) : c'est l'encodage de la console
+  (cp850), pas l'app — les fichiers et les logs sont en UTF-8. PowerShell :
+  `[Console]::OutputEncoding=[Text.Encoding]::UTF8` (ou `chcp 65001` en cmd, ou Windows Terminal par défaut).
+  Sous VS Code, le terminal intégré hérite du profil : ajouter `"terminal.integrated.defaultProfile.windows"`
+  vers « PowerShell » et le one-liner ci-dessus dans `$PROFILE` si besoin.
 - **Port 3000 occupé** : les scripts `dev`/`start` ne forcent plus le port — le CLI Next lit `PORT`
   (et, en dev sans `PORT`, rebascule automatiquement sur 3001, 3002…). Pour imposer : bash/zsh
   `PORT=3100 npm run dev`, PowerShell `$env:PORT='3100'; npm run dev`, cmd `set PORT=3100 && npm run dev`.

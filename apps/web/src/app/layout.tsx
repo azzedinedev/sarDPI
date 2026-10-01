@@ -38,7 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const manifest = getLanguages();
   const languages = manifest.languages;
   const entry = languages.find((l) => l.code === lang) ?? languages[0]!;
-  const dicts = await fetchNamespaceDicts(entry.code, ['common', 'errors']);
+  const dicts = await fetchNamespaceDicts(entry.code, ['common', 'errors', 'auth']);
   const themeCss = await activeThemeCss().catch(() => null);
   const activeProfile = await getActiveProfile().catch(() => null);
   const profile = activeProfile?.profile ?? null;

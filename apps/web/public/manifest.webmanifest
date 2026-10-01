@@ -1,0 +1,17 @@
+{
+  "name": "sarDPI — Dossier Patient Informatisé",
+  "short_name": "sarDPI",
+  "description": "DPI / mini-EMR on-premise pour l'Algérie (loi 18-07) — arabe RTL, français, espagnol, anglais.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#155e75",
+  "lang": "fr",
+  "dir": "auto",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
