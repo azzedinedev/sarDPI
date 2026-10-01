@@ -44,3 +44,9 @@ npm run db:migrate && npm run seed -- --force   # repartir d’une démo propre 
 - Le routeur API exige le runtime `nodejs` (déjà posé dans `app/api/v1/[...path]/route.ts`).
 - En mode JSON, plusieurs serveurs simultanés sur le même `data/` se marchent dessus → mono-processus
   (c’est signalé dans l’UI, bandeau « mode démo »).
+- **Port 3000 occupé** : les scripts `dev`/`start` ne forcent plus le port — le CLI Next lit `PORT`
+  (et, en dev sans `PORT`, rebascule automatiquement sur 3001, 3002…). Pour imposer : bash/zsh
+  `PORT=3100 npm run dev`, PowerShell `$env:PORT='3100'; npm run dev`, cmd `set PORT=3100 && npm run dev`.
+  Penser à aligner `APP_URL` (QR codes / liens signés). Pour tuer l’occupant : PowerShell
+  `Get-NetTCPConnection -LocalPort 3000 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`,
+  Linux/macOS `lsof -ti :3000 | xargs kill`.

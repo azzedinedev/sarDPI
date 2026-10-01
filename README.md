@@ -15,6 +15,11 @@ npm run seed         # jeu de démo algérien : 58 wilayas, 14 catégories, pati
 npm run dev          # http://localhost:3000
 ```
 
+> **Port** : 3000 par défaut, sans forçage — occupez-le et le serveur dev rebascule seul sur 3001, ou
+> imposez-le : `PORT=3100 npm run dev` (bash/zsh) · PowerShell `$env:PORT='3100'; npm run dev` ·
+> cmd `set PORT=3100 && npm run dev`. Renseignez alors `APP_URL` à l'identique dans `apps/web/.env.local`
+> (les QR codes et liens signés incorporent cette URL).
+
 Connexion de démo (à changer immédiatement) : `admin` / `Admin!2026-dz` — aussi
 `dr.merabet`/`Medecin!2026-dz`, `labo`/`Labo!2026-dz`, `accueil`/`Accueil!2026-dz`.
 Le mot de passe d’admin peut être imposé via `SARDPI_ADMIN_PASSWORD` avant `npm run seed`.
