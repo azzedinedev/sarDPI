@@ -87,7 +87,7 @@ export function buildPatientCode(seq: number, cfg: Pick<CodificationConfig, 'pat
   return `${cfg.patientPrefix}${cfg.separator}${pad(seq, cfg.patientPadding)}`;
 }
 
-/** {CODE_PATIENT}-{AAAAMMJJ}-{PRÉFIXE}-{NN} — ex. PAT-00001-20260930-LAB-01. */
+/** {PRÉFIXE}-{AAAAMMJJ}-{SEQ}-{CODE_PATIENT} — ex. LAB-20260930-01-PAT-00001 (depuis 2026-10 : le préfixe de catégorie en tête, le code patient en fin). */
 export function buildRecordCode(
   patientCode: string,
   dateCompact: string,
@@ -95,7 +95,7 @@ export function buildRecordCode(
   seq: number,
   cfg: Pick<CodificationConfig, 'separator' | 'recordSeqPadding'> = DEFAULT_CODIFICATION,
 ): string {
-  return `${patientCode}${cfg.separator}${dateCompact}${cfg.separator}${catPrefix}${cfg.separator}${pad(seq, cfg.recordSeqPadding)}`;
+  return `${catPrefix}${cfg.separator}${dateCompact}${cfg.separator}${pad(seq, cfg.recordSeqPadding)}${cfg.separator}${patientCode}`;
 }
 
 /** {PFX}-{NNNNNN} (GED) ou {PFX}-{NNNNN} (intervenants, lieux…) — même mécanique. */
@@ -124,15 +124,19 @@ export function compactDate(d: Date, tz: string, pattern: CodificationConfig['da
 export const PREFIX_RE = /^[A-Z]{2,5}$/;
 /** Code patient : PAT-00001 (préfixe configurable, padding extensible). */
 export const PATIENT_CODE_RE = /^[A-Z]{1,6}-\d{4,8}$/;
-/** Code de fiche médicale combiné (padding date et seq souples). */
-export const RECORD_CODE_RE = /^[A-Z]{1,6}-\d{4,8}-\d{6,8}-[A-Z]{2,5}-\d{2,3}$/;
+/** Code de fiche médicale combiné, format courant (padding date et seq souples). */
+export const RECORD_CODE_RE = /^[A-Z]{2,5}-\d{6,8}-\d{2,3}-[A-Z]{1,6}-\d{4,8}$/;
+/** Ancien format {CODE_PATIENT}-{AAAAMMJJ}-{PRÉFIXE}-{SEQ} — codes immuables déjà émis : restent lisibles (vérification QR, recherche). */
+export const RECORD_CODE_LEGACY_RE = /^[A-Z]{1,6}-\d{4,8}-\d{6,8}-[A-Z]{2,5}-\d{2,3}$/;
 /** Code suffixé (GED, intervenant, lieu, rdv, message…). */
 export const SUFFIX_CODE_RE = /^[A-Z]{2,5}-\d{3,8}$/;
 
-/** Extrait le code patient d'un code de fiche combiné (recherche par scan). */
+/** Extrait le code patient d'un code de fiche combiné (nouveau format : suffixe ; ancien : préfixe). */
 export function patientCodeFromRecord(code: string): string | null {
-  const m = /^(.+?-\d{4,8})-\d{6,8}-[A-Z]{2,5}-\d{2,3}$/.exec(code);
-  return m ? (m[1] as string) : null;
+  const neuve = /^[A-Z]{2,5}-\d{6,8}-\d{2,3}-([A-Z]{1,6}-\d{4,8})$/.exec(code);
+  if (neuve) return neuve[1] as string;
+  const ancienne = /^(.+?-\d{4,8})-\d{6,8}-[A-Z]{2,5}-\d{2,3}$/.exec(code);
+  return ancienne ? (ancienne[1] as string) : null;
 }
 
 /** Scope unique du compteur pour chaque famille de codes (table code_sequences). */

@@ -60,7 +60,7 @@ export async function allocatePatientCode(tx?: DataAdapter, clinicId: number | n
 }
 
 /**
- * Code combiné de fiche médicale : PAT-00001-20260930-LAB-01.
+ * Code combiné de fiche médicale : LAB-20260930-01-PAT-00001 (PRÉFIXE-{date}-SEQ-{patient}).
  * SEQ propre à (patient, date de l'acte, préfixe catégorie) — anti-collision.
  * `dateInput` : date/heure locale ISO ; convertie en date du fuseau du profil pays.
  */

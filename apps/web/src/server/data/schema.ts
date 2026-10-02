@@ -436,7 +436,7 @@ const TABLE_DEFS: TableSpec[] = [
     comment: 'Fiche médicale générique pilotée par intervention_types — code combiné PAT-…-DATE-PFX-NN',
     cols: [
       pk(),
-      code('ex. PAT-00007-20260930-LAB-02'),
+      code('ex. LAB-20260930-02-PAT-00007'),
       c('patient_id', 'big!i'),
       c('type_id', 'big!i'),
       c('category_prefix', 'str10!i'),

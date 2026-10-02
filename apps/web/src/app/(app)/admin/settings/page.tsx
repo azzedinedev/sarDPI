@@ -135,7 +135,7 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
       `MED${sep}${String(7).padStart(n('practitionerPadding', 5), '0')}`,
       `LOC${sep}${String(3).padStart(n('locationPadding', 3), '0')}`,
       `ANL${sep}${String(42).padStart(n('gedPadding', 6), '0')}`,
-      `PAT${sep}00001${sep}${s('datePattern') === 'DDMMYYYY' ? '31122026' : '20261231'}${sep}LAB${sep}${String(5).padStart(n('recordSeqPadding', 2), '0')}`,
+      `LAB${sep}${s('datePattern') === 'DDMMYYYY' ? '31122026' : '20261231'}${sep}${String(5).padStart(n('recordSeqPadding', 2), '0')}${sep}PAT${sep}00001`,
     ];
   }, [section, data]);
 

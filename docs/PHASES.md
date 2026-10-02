@@ -52,7 +52,7 @@ sans MySQL/Postgres (le mode JSON est mono-poste).
 **en base, éditables** (couleur, icône, module de permission) ; types d’intervention 100 % déclaratifs
 (champs typés, vues, statuts, modèle PDF, token public optionnel) — **aucun code pour ajouter une section** ;
 formulaire auto-généré + vue liste/cartes par catégorie ; fiche = code combiné
-`{PAT}-{AAAAMMJJ}-{PREFIXE}-{SEQ}` sous verrou ; résultats LAB avec bornes âge/sexe + drapeaux
+`{PREFIXE}-{AAAAMMJJ}-{SEQ}-{PAT}` sous verrou ; résultats LAB avec bornes âge/sexe + drapeaux
 normal/bas/haut/**critique** (seuils en base, panneau référentiel) ; GED par type (`ANL-000001` etc.,
 préfixes et longueurs configurables), versions horodatées + nommage `<CODE>_vN.ext`, upload validé
 (magic bytes, taille, sha256) ; imports externes (sources API avec mapping JSON, test 6 s, job `import.source`,

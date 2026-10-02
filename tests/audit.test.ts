@@ -61,7 +61,7 @@ describe('flux patient → fiche → vérification publique (adapters JSON)', ()
       return r.id;
     });
     const rec = await db.findOne<Record<string, unknown>>('medical_records', { id: Number(recId) });
-    expect(String(rec!.code)).toBe(`${pat.code}-20260930-CON-01`);
+    expect(String(rec!.code)).toBe(`CON-20260930-01-${pat.code}`);
     expect(token.length).toBeGreaterThanOrEqual(22); // jeton aléatoire — l’id de la fiche n’y figure JAMAIS (pas de lien direct id → ressource)
     expect(token).not.toBe(String(recId));
     await db.insert('verify_tokens', { token, entity_type: 'record', entity_id: Number(recId), entity_code: String(rec!.code), meta_json: { kind: 'CON' }, issued_at: new Date().toISOString(), expires_at: null, revoked: 0 });

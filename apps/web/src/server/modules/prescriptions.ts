@@ -1,6 +1,6 @@
 /**
  * MODULE ORDONNANCES (§8.5) — éditeur visuel + contrôle interactions/allergies (avertissements non bloquants),
- * code combiné …-{ORD}-NN, template, QR de vérification, rendu PDF via gabarit partagé avec la page d'impression.
+ * code combiné {ORD}-{AAAAMMJJ}-{SEQ}-{PAT}, template, QR de vérification, rendu PDF via gabarit partagé avec la page d'impression.
  * Médicaments : recherche DCI + nom commercial (nomenclature importable, drapeau remboursement).
  */
 import { z } from 'zod';

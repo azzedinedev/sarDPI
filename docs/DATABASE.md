@@ -45,7 +45,8 @@ UPDATE code_sequences SET last_value=last_value+1, updated_at=NOW() WHERE …;
 - code **immuable**, non réutilisé même si la ligne est supprimée (testé) ;
 - formats : `PAT-00001` (sans année), praticiens `MED-00001` (préfixes MED/DEN/PHR/INF/TLB/RDG/RDL/SEC/ADM/INT),
   GED `<TYPE>-000001` (ANL, RAD, CPT… 6 chiffres par défaut), `LOC-001`, `RDV-00001`, `MOV-00001`, `MSG-00001`,
-  fiches & ordonnances combinées `{CODE_PATIENT}-{AAAAMMJJ}-{PREFIXE}-{SEQ}` ex. `PAT-00001-20260930-LAB-01`.
+  fiches & ordonnances combinées `{PREFIXE}-{AAAAMMJJ}-{SEQ}-{CODE_PATIENT}` ex. `LAB-20260930-01-PAT-00001`
+  (ancien format émis `{CODE_PATIENT}-{AAAAMMJJ}-{PREFIXE}-{SEQ}` — codes immuables, toujours acceptés en lecture).
 
 ## ERD (logique, simplifié)
 
@@ -80,7 +81,7 @@ erDiagram
   medical_records }o--|| patients : "patient_id"
   medical_records }o--|| intervention_types : "type_id"
   medical_records {
-    bigint id PK, varchar code UK "PAT-00001-20260930-LAB-01",
+    bigint id PK, varchar code UK "LAB-20260930-01-PAT-00001",
     varchar status, json fields_json, json icd10_json,
     varchar verify_token "QR public"
   }
