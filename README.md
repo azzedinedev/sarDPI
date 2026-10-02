@@ -12,6 +12,8 @@ npm install          # workspaces : apps/web + packages/shared
 npm run fonts        # génère public/fonts (IBM Plex WOFF2 auto-hébergés, zéro CDN)
 npm run db:migrate   # initialise data/*.json (adaptateur JSON) — ou le schéma MySQL si DATA_ADAPTER=mysql
 npm run seed         # jeu de démo algérien : 58 wilayas, 14 catégories, patients, fiches, stock, RDV…
+npm run db:sync      # (après mise à jour du code) charge les NOUVELLES données de référence (catégories,
+                     # types, réglages par défaut) dans la base existante — aucune donnée modifiée, idempotent
 npm run dev          # http://localhost:3000
 ```
 
@@ -48,6 +50,7 @@ Le mot de passe d’admin peut être imposé via `SARDPI_ADMIN_PASSWORD` avant `
 | `npm run dev` / `build` / `start` | app Next (API incluse sous `/api/v1`) |
 | `npm run db:migrate` | DDL expand-only (jamais de DROP) + `migrations/*.sql` si présents |
 | `npm run seed` | démo algérienne 4 langues (`-- --force` en démo seule) |
+| `npm run db:sync` | ajout incrémental des nouvelles données de référence/réglages par défaut dans une base existante (sans toucher aux données) |
 | `npm run db:export` | export JSON portatif → `backups/` (importable via Admin » Base de données) |
 | `npm run locales` | régénère `/locales/{lang}/{ns}.json` depuis `scripts/gen-locales.mjs` (source unique) |
 | `npm run fonts` | extrait & sous-ensemble les WOFF2 IBM Plex (latin/arabe/mono) dans `public/fonts` |

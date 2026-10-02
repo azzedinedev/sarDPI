@@ -88,13 +88,19 @@ export function Textarea({ className, rows = 4, ...rest }: React.TextareaHTMLAtt
 
 export function Select({ className, options, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement> & { options: { value: string; label: string }[] }): React.ReactElement {
   return (
-    <select className={cn('field appearance-none pe-8 bg-[length:0]', className)} {...rest}>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <span className="relative block">
+      <select className={cn('field appearance-none pe-8 bg-[length:0]', className)} {...rest}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {/* flèche maison, logique (côté fin) — le chevron natif est invisible en apparence:none */}
+      <svg aria-hidden viewBox="0 0 16 16" className="pointer-events-none absolute inset-y-0 end-2.5 my-auto h-3.5 w-3.5 text-[rgb(var(--c-muted))]">
+        <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 

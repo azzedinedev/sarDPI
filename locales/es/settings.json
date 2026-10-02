@@ -231,5 +231,7 @@
   "settings.sections.medicalRefs": "Referenciales médicos",
   "settings.medicalRefs.blood": "Grupos sanguíneos",
   "settings.medicalRefs.funds": "Cajas de seguridad social",
-  "settings.medicalRefs.hint": "El código (p. ej. A+, CNAS) se guarda tal cual; los textos traducidos se muestran según el idioma activo. Las filas desactivadas siguen siendo legibles en los expedientes antiguos."
+  "settings.medicalRefs.hint": "El código (p. ej. A+, CNAS) se guarda tal cual; los textos traducidos se muestran según el idioma activo. Las filas desactivadas siguen siendo legibles en los expedientes antiguos.",
+  "settings.dateDisplay": "Formato de fechas",
+  "settings.timeDisplay": "Mostrar la hora con las fechas"
 }

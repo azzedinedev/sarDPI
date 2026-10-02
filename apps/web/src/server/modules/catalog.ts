@@ -5,8 +5,8 @@
  * (un type modifié ne réécrit pas les codes existants).
  */
 import { z } from 'zod';
-import { interventionTypeBaseZ, isValidPrefix, DEFAULT_CATEGORIES, DEFAULT_GED_TYPES } from '@sardpi/shared';
-import { route } from '../http/router';
+import { interventionTypeBaseZ, isValidPrefix, DEFAULT_CATEGORIES, DEFAULT_GED_TYPES, pickLabel } from '@sardpi/shared';
+import { route, type Ctx } from '../http/router';
 import { registerCrud } from '../http/crud';
 import { ApiError } from '../http/errors';
 import { getDb } from '../data';
@@ -169,6 +169,59 @@ export function registerCatalog(): void {
   });
 
   /** Pays disponibles = profils déposés dans /country-profiles (aucune donnée personnelle). */
+  // Préférences d'affichage (formats de date, libellés des étapes du suivi) — non-PHI.
+  route({
+    method: 'GET',
+    path: '/refs/display',
+    auth: true,
+    licenseFree: true,
+    async handler(ctx: Ctx) {
+      const general = await getSection('general');
+      const wf = (await getSection('workflowSteps')) as unknown as { steps?: { key: string; order?: number; label?: Record<string, string> }[] };
+      const lang = ctx.user?.locale ?? 'fr';
+      return {
+        ok: true,
+        dateDisplay: (general as { dateDisplay?: string }).dateDisplay ?? 'DD/MM/YYYY',
+        timeDisplay: (general as { timeDisplay?: boolean }).timeDisplay !== false,
+        steps: [...(wf.steps ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s) => ({ key: s.key, label: s.label?.[lang] ?? s.label?.fr ?? s.key })),
+      };
+    },
+  }),
+  // Libellés des préfixes de codes métier (LAB, CAR, ORD, PAT, MOV…) — infobulles côté client.
+  route({
+    method: 'GET',
+    path: '/refs/prefixes',
+    auth: true,
+    licenseFree: true,
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const lang = ctx.user?.locale ?? 'fr';
+      const out: Record<string, string> = {};
+      try {
+        const cats = await db.find<Record<string, unknown>>('intervention_categories', {});
+        for (const c of cats) out[String(c.prefix)] = pickLabel((c.label_json ?? {}) as Record<string, string>, lang) ?? String(c.prefix);
+      } catch {
+        /* table absente (mini-JSON sans seed) — préfixes supplémentaires ci-dessous */
+      }
+      const ged = (await getSection('gedTypes')) as unknown as { types?: { prefix: string; label?: Record<string, string> }[] };
+      for (const t of ged.types ?? []) if (t.label) out[t.prefix] = t.label[lang] ?? t.label.fr ?? t.prefix;
+      const pra = (await getSection('practitionerTypes')) as unknown as { types?: { prefix: string; label?: Record<string, string> }[] };
+      for (const t of pra.types ?? []) if (t.label) out[t.prefix] = t.label[lang] ?? t.label.fr ?? t.prefix;
+      const extra: Record<string, [string, string, string, string]> = {
+        PAT: ['Fiche patient (code patient)', 'بطاقة المريض', 'Ficha de paciente', 'Patient record code'],
+        ORD: ['Ordonnance', 'وصفة طبية', 'Prescripción', 'Prescription'],
+        MOV: ['Mouvement / transfert du patient', 'تنقل المريض', 'Desplazamiento del paciente', 'Patient movement'],
+        RDV: ['Rendez-vous', 'موعد', 'Cita', 'Appointment'],
+        CAS: ['Dossier de suivi (workflow)', 'ملف المتابعة', 'Expediente de seguimiento', 'Care record'],
+        LOC: ['Emplacement (lit, salle, service)', 'موقع', 'Ubicación', 'Location'],
+        MSG: ['Message interne', 'رسالة داخلية', 'Mensaje interno', 'Internal message'],
+        GED: ['Document (GED)', 'وثيقة', 'Documento', 'Document'],
+        DRG: ['Médicament du catalogue', 'دواء', 'Medicamento', 'Catalog drug'],
+      };
+      for (const [p, v] of Object.entries(extra)) if (!out[p]) out[p] = lang === 'ar' ? v[1] : lang === 'es' ? v[2] : lang === 'en' ? v[3] : v[0];
+      return { ok: true, prefixes: out };
+    },
+  }),
   route({
     method: 'GET',
     path: '/refs/countries',

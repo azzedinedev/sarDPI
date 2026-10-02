@@ -19,6 +19,9 @@ export const generalZ = z.object({
   orgEmail: z.string().max(120).default('contact@clinique-demo.dz'),
   legalNotice: z.string().max(600).default('Données protégées — loi 18-07 (Algérie), autorité ANPDP.'),
   country: z.string().length(2).default('DZ'),
+  // Format d'affichage des dates (les valeurs stockées restent ISO 8601 ; PDF/exports CSV bruts gardent l'ISO).
+  dateDisplay: z.enum(['DD/MM/YYYY', 'DD-MM-YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).default('DD/MM/YYYY'),
+  timeDisplay: z.boolean().default(true),
   footerNote: z.string().max(200).default(''),
 });
 export const uiZ = z.object({

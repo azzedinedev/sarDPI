@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Drawer } from '@/components/dialogs';
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/components/ui';
 import { RichEditor } from '@/components/rich-editor';
+import { Autocomplete, Multiselect, StringList } from '@/components/combo';
 import { richListFromLines } from '@sardpi/shared';
 import { useT } from '@/lib/i18n';
 import type { FieldDef, RowData } from './types';
@@ -48,7 +49,12 @@ export function initValue(fields: FieldDef[], row: RowData | null): Record<strin
     else if (f.kind === 'number') out[f.key] = raw === null || raw === '' ? '' : Number(raw);
     else if (f.kind === 'richtext') out[f.key] = typeof raw === 'string' ? raw : Array.isArray(raw) ? richListFromLines(raw.map(String)) : raw == null ? '' : JSON.stringify(raw, null, 2);
     else if (f.kind === 'json') out[f.key] = typeof raw === 'string' ? raw : raw === null || raw === undefined ? '' : JSON.stringify(raw, null, 2);
-    else if (f.kind === 'multiselect' || Array.isArray(raw)) out[f.key] = Array.isArray(raw) ? raw.join(', ') : (raw ?? '');
+    // sélecteurs multiples / listes de textes : tableaux côté formulaire (plus de jointure « , »)
+    else if (f.kind === 'multiselect' || f.kind === 'stringlist') {
+      if (Array.isArray(raw)) out[f.key] = raw.map(String);
+      else if (raw && typeof raw === 'object') out[f.key] = [];
+      else out[f.key] = String(raw ?? '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+    } else if (f.kind === 'autocomplete') out[f.key] = raw == null ? '' : String(raw);
     else out[f.key] = raw ?? (f.kind === 'select' && f.options?.length ? '' : '');
   }
   return out;
@@ -92,7 +98,7 @@ export function CrudForm({
     for (const [k, v] of Object.entries(values)) {
       if (v === '') {
         const f = fields.find((x) => x.key === k);
-        if (f && (f.kind === 'number' || f.kind === 'date' || f.kind === 'datetime' || f.kind === 'time' || f.kind === 'json' || f.kind === 'richtext' || f.kind === 'multiselect')) {
+        if (f && (f.kind === 'number' || f.kind === 'date' || f.kind === 'datetime' || f.kind === 'time' || f.kind === 'json' || f.kind === 'richtext' || f.kind === 'multiselect' || f.kind === 'autocomplete')) {
           clean[k] = null;
           continue;
         }
@@ -178,7 +184,11 @@ function renderInput(f: FieldDef, register: ReturnType<typeof useForm>['register
     case 'checkbox':
       return <Checkbox label={f.label ?? f.key} {...register(f.key)} />;
     case 'multiselect':
-      return <Input {...register(f.key)} placeholder={f.placeholder ?? (f.options ?? []).map((o) => o.label).join(', ')} disabled={f.disabled} />;
+      return <Multiselect name={f.key} options={(f.options ?? []).map((o) => ({ value: String(o.value), label: o.label }))} disabled={f.disabled} placeholder={f.placeholder} />;
+    case 'autocomplete':
+      return <Autocomplete name={f.key} options={(f.options ?? []).map((o) => ({ value: String(o.value), label: o.label }))} disabled={f.disabled} placeholder={f.placeholder} />;
+    case 'stringlist':
+      return <StringList name={f.key} disabled={f.disabled} placeholder={f.placeholder} />;
     case 'code':
       return <Input readOnly disabled {...register(f.key)} className="font-mono" />;
     default:

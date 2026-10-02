@@ -4,7 +4,7 @@ import type React from 'react';
 import type { z } from 'zod';
 import type { FilterGroup } from '@sardpi/shared';
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'time' | 'select' | 'multiselect' | 'checkbox' | 'tel' | 'email' | 'password' | 'code' | 'json' | 'richtext';
+export type FieldKind = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'time' | 'select' | 'multiselect' | 'autocomplete' | 'stringlist' | 'checkbox' | 'tel' | 'email' | 'password' | 'code' | 'json' | 'richtext';
 
 export interface FieldDef {
   key: string; // nom du champ côté API (camelCase)
@@ -67,7 +67,9 @@ export interface CrudProps {
   initialQ?: string; // recherche préremplie (querystring global)
   transformCreate?: (values: Record<string, unknown>) => Record<string, unknown>;
   transformUpdate?: (values: Record<string, unknown>, row: RowData) => Record<string, unknown>;
-  rowHref?: (row: RowData) => string; // clic ligne → page
+  rowHref?: (row: RowData) => string;
+  /** détails repliables sous la ligne (chevron ▸) — vue table uniquement */
+  expand?: (row: RowData) => React.ReactNode; // clic ligne → page
   detail?: (row: RowData) => React.ReactNode; // aperçu dans le tiroir « voir »
   cardTitle?: (row: RowData) => React.ReactNode;
   cardSubtitle?: (row: RowData) => React.ReactNode;

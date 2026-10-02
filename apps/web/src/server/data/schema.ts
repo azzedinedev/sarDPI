@@ -580,13 +580,13 @@ const TABLE_DEFS: TableSpec[] = [
   {
     name: 'case_steps',
     comment: 'Étapes d’un circuit — statut + horodatage, l’ordre suit le workflow configuré',
-    cols: [pk(), c('case_id', 'big!i'), c('step_key', 'str40!'), c('seq', 'int!~0'), c('status', 'str16~pending', 'pending | in_progress | done | skipped'), c('started_at', 'dt'), c('done_at', 'dt'), c('note', 'txt'), ...tsCols()],
+    cols: [pk(), c('case_id', 'big!i'), c('step_key', 'str40!'), c('seq', 'int!~0'), c('status', 'str16~pending', 'pending | in_progress | done | skipped'), c('planned_at', 'dt'), c('started_at', 'dt'), c('done_at', 'dt'), c('location_id', 'big'), c('practitioners_json', 'json', 'ids praticiens requis'), c('documents_json', 'json', 'codes documents GED requis'), c('note', 'txt'), ...tsCols()],
     indexes: [{ name: 'ux_casestep', cols: ['case_id', 'step_key'], unique: true }],
   },
   {
     name: 'patient_movements',
     comment: 'Déplacements entre lieux (accueil → salle → labo…) — historique de parcours',
-    cols: [pk(), code('CPT-000001'), c('patient_id', 'big!i'), c('from_location_id', 'big'), c('to_location_id', 'big'), c('at', 'dt!i'), c('reason', 'str160'), c('by_user', 'big'), ...tsCols()],
+    cols: [pk(), code('CPT-000001'), c('patient_id', 'big!i'), c('from_location_id', 'big'), c('to_location_id', 'big'), c('at', 'dt!i'), c('status', 'str16~pending', 'pending | in_transit | arrived'), c('reason', 'str160'), c('by_user', 'big'), c('responsible_practitioner_id', 'big'), ...tsCols()],
   },
   {
     name: 'appointments',

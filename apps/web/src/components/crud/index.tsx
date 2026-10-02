@@ -19,7 +19,7 @@ import {
 } from '@tanstack/react-table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Archive, ArrowLeft, Boxes, ChevronLeft, ChevronRight, Columns3, Download, Eye, LayoutGrid, MoreVertical, Pencil, Plus, RotateCcw, Rows3, Search, SlidersHorizontal, Table2, Trash2, X } from 'lucide-react';
+import { Archive, ArrowLeft, Boxes, ChevronDown, ChevronLeft, ChevronRight, Columns3, Download, Eye, FolderOpen, LayoutGrid, MoreVertical, Pencil, Plus, RotateCcw, Rows3, Search, SlidersHorizontal, Table2, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useT, useI18n } from '@/lib/i18n';
 import { Badge, Button, Checkbox, EmptyState, Input, Skeleton, Switch } from '@/components/ui';
@@ -28,6 +28,7 @@ import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { BizCode } from '@/components/biz-code';
 import { PopMenu, usePop } from '@/components/popover';
+import { fmtDisplay, looksLikeDate, useDisplayCfg, type DisplayCfg } from '@/lib/display';
 import { CrudForm } from './form';
 import { FilterBuilder } from './filters';
 import type { CrudProps, RowData } from './types';
@@ -36,7 +37,9 @@ import type { FilterGroup } from '@sardpi/shared';
 const EMPTY_GROUP: FilterGroup = { combinator: 'AND', items: [] };
 
 export function CrudModule(props: CrudProps): React.ReactElement {
-  const { resource, columns, fields = [], schema, extraQuery, softDelete = true, rowHref, detail } = props;
+  const { resource, columns, fields = [], schema, extraQuery, softDelete = true, rowHref, detail, expand } = props;
+  const disp = useDisplayCfg();
+  const [expId, setExpId] = useState<number | null>(null);
   const router = useRouter();
   const toast = useToast();
   const { t } = useT('common');
@@ -162,9 +165,24 @@ export function CrudModule(props: CrudProps): React.ReactElement {
       {
         id: '__select',
         size: 34,
-        header: ({ table }) => (
-          <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--c-primary))]" checked={table.getIsAllPageRowsSelected()} onChange={table.getToggleAllPageRowsSelectedHandler()} aria-label="tout" />
-        ),
+        // « tout sélectionner » = lignes de la PAGE courante, dans NOTRE état `selected`
+        // (la sélection TanStack n'est pas branchée ici — l'ancien handler ne faisait rien).
+        header: () => {
+          const ids = rows.map((r) => r.id as number);
+          const sel = ids.filter((id) => selected.includes(id));
+          const all = ids.length > 0 && sel.length === ids.length;
+          return (
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[rgb(var(--c-primary))]"
+              ref={(el) => { if (el) el.indeterminate = sel.length > 0 && !all; }}
+              checked={all}
+              disabled={!ids.length}
+              onChange={() => setSelected((s) => (all ? s.filter((x) => !ids.includes(x)) : [...new Set([...s, ...ids])]))}
+              aria-label="tout"
+            />
+          );
+        },
         cell: ({ row }) => (
           <input
             type="checkbox"
@@ -181,8 +199,27 @@ export function CrudModule(props: CrudProps): React.ReactElement {
         enableSorting: c.sortable !== false,
         size: c.width ? parseInt(c.width, 10) : undefined,
         header: () => <span>{c.label}</span>,
-        cell: ({ row }: { row: { original: RowData } }) => (c.render ? c.render(row.original, { t, lang: tctx.lang, dir: tctx.dir }) : formatCell(row.original[c.key])),
+        cell: ({ row }: { row: { original: RowData } }) => (c.render ? c.render(row.original, { t, lang: tctx.lang, dir: tctx.dir }) : formatCell(row.original[c.key], disp)),
       })),
+      ...(expand
+        ? [{
+            id: '__exp',
+            size: 30,
+            enableSorting: false,
+            header: () => null,
+            cell: ({ row }: { row: { original: RowData } }) => (
+              <button
+                type="button"
+                className="grid h-7 w-7 place-items-center rounded-lg text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface))]"
+                onClick={() => setExpId((v) => (v === row.original.id ? null : (row.original.id as number)))}
+                aria-expanded={expId === row.original.id}
+                title="détails"
+              >
+                <ChevronDown size={15} className={cn('transition-transform', expId === row.original.id && 'rotate-180')} />
+              </button>
+            ),
+          }]
+        : []),
       {
         id: '__actions',
         size: 40,
@@ -193,7 +230,7 @@ export function CrudModule(props: CrudProps): React.ReactElement {
     ];
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columns, selected, t, tctx.lang, tctx.dir]);
+  }, [columns, selected, t, tctx.lang, tctx.dir, expId, disp, expand]);
 
   const table = useReactTable({
     data: rows,
@@ -408,8 +445,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
               </thead>
               <tbody>
                 {table.getRowModel().rows.map((r, i) => (
+                  <React.Fragment key={r.id}>
                   <motion.tr
-                    key={r.id}
                     initial={{ opacity: reduce ? 1 : 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: reduce ? 0 : Math.min(i, 12) * 0.012 }}
@@ -427,6 +464,14 @@ export function CrudModule(props: CrudProps): React.ReactElement {
                       </td>
                     ))}
                   </motion.tr>
+                  {expand && expId === r.original.id ? (
+                    <tr className="bg-[rgb(var(--c-surface)/0.45)]">
+                      <td colSpan={r.getVisibleCells().length} className="px-3 pb-3">
+                        <div className="animate-[fadeIn_0.18s_ease]">{expand(r.original)}</div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -552,6 +597,17 @@ function RowActions({ row, props, setDrawer, setConfirm, t, softDelete, detail, 
   return (
     <div className="relative flex justify-end" ref={ref}>
       <div className="flex gap-0.5">
+        {rowHrefGuard(props, row) ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="btn-icon !min-h-8 !min-w-8 text-[rgb(var(--c-primary))] hover:opacity-100"
+            onClick={() => router.push(rowHrefGuard(props, row) as string)}
+            title={t('open')}
+          >
+            <FolderOpen size={15} />
+          </Button>
+        ) : null}
         {(props.canUpdate !== false || detail) && (props.canUpdate !== false || Boolean(detail)) ? (
           <Button
             size="sm"
@@ -632,11 +688,13 @@ export function fmtVal(v: unknown): string {
   if (typeof v === 'boolean') return v ? '✓' : '—';
   return String(v);
 }
-function formatCell(v: unknown): React.ReactNode {
+function formatCell(v: unknown, disp?: DisplayCfg): React.ReactNode {
   if (v === null || v === undefined || v === '') return <span className="text-[rgb(var(--c-muted)/0.5)]">—</span>;
   if (typeof v === 'object') return <span className="font-mono text-[12.5px]">{JSON.stringify(v)}</span>;
   if (typeof v === 'boolean') return v ? <Badge tone="ok">✓</Badge> : <Badge>—</Badge>;
   const s = String(v);
+  // horodatages ISO → format des réglages (jamais le brut « 2026-09-28T11:10 »)
+  if (disp && looksLikeDate(s)) return <span dir="ltr" className="tabular-nums">{fmtDisplay(s, disp)}</span>;
   if (/^(PAT|MED|DEN|PHR|INF|TLB|RDG|RDL|SEC|ADM|INT|LOC|RDV|MOV|MSG|DRG|CAS|LAB|PHA|DIA|CAR|RAD|CON|SPE|GYP|CHI|SOI|ANA|REE|CER|ORD|ANL|IMG|DOC|RPV|ADM|FIC)-[A-Z0-9-]+$/.test(s)) return <BizCode code={s} />;
   return <span title={s.length > 60 ? s : undefined} className="block max-w-[560px] truncate align-middle">{s}</span>;
 }

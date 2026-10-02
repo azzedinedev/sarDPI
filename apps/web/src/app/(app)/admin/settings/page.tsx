@@ -62,6 +62,9 @@ function SectionEditor({ section }: { section: Section }): React.ReactElement {
       toast.success(tc('saved'));
       void qc.invalidateQueries({ queryKey: ['settings', section] });
       void qc.invalidateQueries({ queryKey: ['perm-matrix'] });
+      // formats d'affichage & libellés de préfixes recalculés immédiatement (lists, infobulles)
+      void qc.invalidateQueries({ queryKey: ['refs', 'display'] });
+      void qc.invalidateQueries({ queryKey: ['refs', 'prefixes'] });
     },
     onError: (e: unknown) => {
       const x = e as { details?: Record<string, string>; code?: string };
@@ -151,6 +154,10 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
           <Field label={t('settings.orgEmail')}><Input value={s('orgEmail')} onChange={(e) => set('orgEmail', e.target.value)} /></Field>
           <Field label={t('settings.legal')} className="col-span-2"><Textarea rows={2} value={s('legalNotice')} onChange={(e) => set('legalNotice', e.target.value)} /></Field>
           <Field label={t('settings.footer')} className="col-span-2"><Input value={s('footerNote')} onChange={(e) => set('footerNote', e.target.value)} /></Field>
+          <Field label={t('settings.dateDisplay')}>
+            <Select value={s('dateDisplay')} onChange={(e) => set('dateDisplay', e.target.value)} options={[{ value: 'DD/MM/YYYY', label: '31/12/2026' }, { value: 'DD-MM-YYYY', label: '31-12-2026' }, { value: 'MM/DD/YYYY', label: '12/31/2026' }, { value: 'YYYY-MM-DD', label: '2026-12-31' }]} />
+          </Field>
+          <Row label={t('settings.timeDisplay')} on={Boolean(data.timeDisplay)} onChange={(v) => set('timeDisplay', v)} />
           <SaveBar onSave={onSave} saving={saving} />
         </div>
       );

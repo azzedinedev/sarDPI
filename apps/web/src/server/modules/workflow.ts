@@ -106,6 +106,36 @@ export function registerWorkflow(): void {
     },
   });
 
+  // Créer le dossier de suivi d'un patient (workflow à la demande — un seul dossier ouvert par patient).
+  route({
+    method: 'POST',
+    path: '/cases',
+    perm: ['patient_case', 'create'],
+    audit: { action: 'case.create', entity: 'patient_cases' },
+    async handler(ctx: Ctx) {
+      const input = await ctx.body(z.object({ patientId: z.number().int().positive(), firstStep: z.string().max(30).optional() }));
+      const db = ctx.db;
+      const pat = await db.findOne<Record<string, unknown>>('patients', { id: input.patientId });
+      if (!pat) throw notFound();
+      const open = await db.findOne<Record<string, unknown>>('patient_cases', { patient_id: input.patientId, status: 'open' });
+      if (open) {
+        ctx.resultId = Number(open.id);
+        return { ok: true, id: Number(open.id), code: String(open.code), alreadyOpen: true };
+      }
+      const defs = await steps();
+      const first = defs.find((d) => d.key === input.firstStep)?.key ?? defs[0]?.key;
+      if (!first) throw new ApiError(500, 'errors.config', 'Aucune étape configurée (workflowSteps)');
+      const code = (await allocateSuffixed('case', 'CAS')).code;
+      const now = new Date().toISOString();
+      const ins = await db.insert('patient_cases', { code, patient_id: input.patientId, status: 'open', current_step: first, opened_at: now, created_at: now, updated_at: now });
+      const id = Number((ins as { id?: number }).id ?? 0);
+      await db.insert('case_steps', { case_id: id, step_key: first, seq: defs.findIndex((d) => d.key === first) + 1, status: 'in_progress', started_at: now, created_at: now, updated_at: now });
+      ctx.resultId = id;
+      await pushHistory(ctx.user!.uid, { patientId: input.patientId, kind: 'case', refId: id, refCode: code, summary: { fr: 'Dossier de suivi ouvert', ar: 'تم فتح ملف المتابعة', en: 'Care record opened' }, detail: null });
+      return { ok: true, id, code, alreadyOpen: false };
+    },
+  });
+
   /** Réouvrir un dossier clôturé (transitions configurables — ici : toute étape peut être remise en cours). */
   route({
     method: 'POST',

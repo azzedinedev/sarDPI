@@ -231,5 +231,7 @@
   "settings.sections.medicalRefs": "Référentiels médicaux",
   "settings.medicalRefs.blood": "Groupes sanguins",
   "settings.medicalRefs.funds": "Caisses de sécurité sociale",
-  "settings.medicalRefs.hint": "Le code (ex. A+, CNAS) est stocké tel quel et affiché partout ; les libellés traduits s’affichent selon la langue active. Les lignes désactivées restent lisibles dans les anciens dossiers."
+  "settings.medicalRefs.hint": "Le code (ex. A+, CNAS) est stocké tel quel et affiché partout ; les libellés traduits s’affichent selon la langue active. Les lignes désactivées restent lisibles dans les anciens dossiers.",
+  "settings.dateDisplay": "Format des dates",
+  "settings.timeDisplay": "Afficher l’heure à côté des dates"
 }

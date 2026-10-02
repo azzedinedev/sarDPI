@@ -73,14 +73,31 @@ export async function decoratePatients(rows: Record<string, unknown>[]): Promise
   const attendingIds = [...new Set(rows.map((r) => r.attending_practitioner_id).filter(Boolean).map(Number))];
   const practs = attendingIds.length ? await db.find<Record<string, unknown>>('practitioners', { where: { id: attendingIds } }) : [];
   const practById = new Map(practs.map((p) => [Number(p.id), p]));
+  // Étape de suivi courante (workflow) par patient — préférence au dossier ouvert, sinon le plus récent.
+  const pids = rows.map((r) => Number(r.id)).filter(Boolean);
+  const caseByPat = new Map<number, Record<string, unknown>>();
+  if (pids.length) {
+    const cases = await db.find<Record<string, unknown>>('patient_cases', { where: { patient_id: pids }, orderBy: [['id', 'desc']] });
+    for (const k of cases) {
+      const pid = Number(k.patient_id);
+      if (k.status === 'open' || !caseByPat.has(pid)) caseByPat.set(pid, k);
+    }
+  }
   return rows.map((r) => {
     const w = r.wilaya_code != null ? wilayas.get(Number(r.wilaya_code)) : undefined;
+    const kase = caseByPat.get(Number(r.id));
     const attending = r.attending_practitioner_id ? practById.get(Number(r.attending_practitioner_id)) : undefined;
     return {
       ...r,
       age: ageFromBirth(r.birth_date ? String(r.birth_date).slice(0, 10) : null),
       wilaya_label: w ? `${Number(r.wilaya_code)}. ${w.fr}` : null,
       wilaya_label_ar: w ? `${Number(r.wilaya_code)}. ${w.ar}` : null,
+      wilaya_name: w?.fr ?? null,
+      wilaya_name_ar: w?.ar ?? null,
+      wf_case_id: kase ? Number(kase.id) : null,
+      wf_case_code: kase ? String(kase.code) : null,
+      wf_step: kase?.current_step != null ? String(kase.current_step) : null,
+      wf_status: kase?.status != null ? String(kase.status) : null,
       attending_name: attending ? `${attending.last_name} ${attending.first_name}` : null,
       full_name: `${String(r.last_name ?? '').toUpperCase()} ${r.first_name ?? ''}`,
       full_name_ar: r.last_name_ar ? `${r.first_name_ar ?? ''} ${r.last_name_ar}` : null,

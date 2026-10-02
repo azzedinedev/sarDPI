@@ -20,6 +20,9 @@ import { CrudModule, Card, fmtVal } from '@/components/crud';
 import { useToast } from '@/components/toast';
 import { useAuth } from '@/stores/auth';
 import { age } from '@/lib/format';
+import { FormProvider, useForm } from 'react-hook-form';
+import { useFmtDate } from '@/lib/display';
+import { Multiselect } from '@/components/combo';
 
 export default function PatientPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +36,7 @@ export default function PatientPage(): React.ReactElement {
   const [qrOpen, setQrOpen] = useState(false);
   const has = useAuth((s) => s.has);
   const qc = useQueryClient();
+  const fmt = useFmtDate();
 
   const patient = useQuery({ queryKey: ['patient', pid], queryFn: () => api.get<Record<string, unknown>>(`/patients/${pid}`) });
   const consent = (patient.data?.consent_json as { granted?: boolean; scopes?: string[] } | undefined) ?? undefined;
@@ -82,7 +86,7 @@ export default function PatientPage(): React.ReactElement {
             </div>
             {p.full_name_ar ? <div dir="rtl" className="mt-0.5 text-[13px] font-semibold text-[rgb(var(--c-muted))]">{fmtVal(p.full_name_ar)}</div> : null}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13.5px] text-[rgb(var(--c-muted))]">
-              <span>🎂 {fmtVal(p.birth_date).slice(0, 10)}{age(p.birth_date as string) !== null ? ` (${age(p.birth_date as string)} ${t('unit.years')})` : ''}</span>
+              <span>🎂 <span dir="ltr" className="tabular-nums">{fmt(p.birth_date, true)}</span>{age(p.birth_date as string) !== null ? ` (${age(p.birth_date as string)} ${t('unit.years')})` : ''}</span>
               <span>🌍 {countries.countryLabel(p.country)}</span>
               <span>📍 {fmtVal(p.wilaya_label)} {p.commune ? `· ${fmtVal(p.commune)}` : ''}</span>
               {p.blood_group ? <Badge tone="warn" title={refs.bloodLabel(p.blood_group)}><DropIcon /> {fmtVal(p.blood_group)}</Badge> : null}
@@ -95,7 +99,7 @@ export default function PatientPage(): React.ReactElement {
             <Button size="sm" variant="ghost" title={t('actions.badge')} onClick={() => setQrOpen(true)}>
               <QrCode size={15} />
             </Button>
-            <Button size="sm" variant="ghost" title={tc('print')} onClick={() => printHistory(p, fullName, { title: t('print.title'), code: tc('code'), birth: t('field.birthDate'), blood: t('field.bloodGroup'), wilaya: t('field.wilaya'), fund: t('field.ssFund'), ss: t('field.ssNumber'), country: t('field.country') }, refs.bloodLabel(p.blood_group), refs.fundLabel(p.ss_fund), countries.countryLabel(p.country))}>
+            <Button size="sm" variant="ghost" title={tc('print')} onClick={() => printHistory(p, fullName, { title: t('print.title'), code: tc('code'), birth: t('field.birthDate'), blood: t('field.bloodGroup'), wilaya: t('field.wilaya'), fund: t('field.ssFund'), ss: t('field.ssNumber'), country: t('field.country') }, refs.bloodLabel(p.blood_group), refs.fundLabel(p.ss_fund), countries.countryLabel(p.country), fmt)}>
               <Printer size={15} />
             </Button>
             <Button size="sm" variant="ghost" title={t('actions.export')} onClick={() => void api.download(`/patients/${pid}/export`, `dossier-${p.code as string}.json`).catch(() => undefined)}>
@@ -146,7 +150,7 @@ export default function PatientPage(): React.ReactElement {
             { key: 'title', label: tc('title'), render: (r) => <span className="font-semibold">{fmtVal(r.title)}</span> },
             { key: 'type_label', label: t('ged.type'), width: '120px', render: (r) => <Badge>{fmtVal(r.type_label ?? r.type_prefix)}</Badge> },
             { key: 'file_size', label: tc('size'), width: '80px', hideByDefault: true, render: (r) => <span className="font-mono text-[12px]">{r.file_size ? `${Math.round(Number(r.file_size) / 1024)} Ko` : '—'}</span> },
-            { key: 'created_at', label: tc('createdAt'), width: '140px', render: (r) => <span className="font-mono text-[11.5px] text-[rgb(var(--c-muted))]">{fmtVal(r.created_at).slice(0, 16)}</span> },
+            { key: 'created_at', label: tc('createdAt'), width: '140px', render: (r) => <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(r.created_at)}</span> },
           ]}
           cardTitle={(r) => fmtVal(r.title)}
           cardSubtitle={(r) => <BizCode code={r.code as string} />}
@@ -173,14 +177,14 @@ export default function PatientPage(): React.ReactElement {
           canExport={false}
           defaultSort={{ id: 'start_at', desc: true }}
           columns={[
-            { key: 'start_at', label: tc('date'), width: '150px', render: (r) => <span className="font-mono text-[12px]">{fmtVal(r.start_at).slice(0, 16).replace('T', ' ')}</span> },
+            { key: 'start_at', label: tc('date'), width: '150px', render: (r) => <span dir="ltr" className="tabular-nums text-[12px]">{fmt(r.start_at)}</span> },
             { key: 'kind', label: t('appt.kind'), width: '110px', render: (r) => <Badge tone="info">{fmtVal(r.kind)}</Badge> },
             { key: 'status', label: t('appt.statusField'), width: '110px', render: (r) => <Badge tone={r.status === 'done' ? 'ok' : r.status === 'cancelled' ? 'danger' : 'warn'}>{fmtVal(r.status)}</Badge> },
             { key: 'practitioner_name', label: t('appt.practitioner'), render: (r) => fmtVal(r.practitioner_name ?? '—') },
             { key: 'location_name', label: t('appt.location'), render: (r) => fmtVal(r.location_name ?? '—') },
             { key: 'notes', label: tc('notes'), hideByDefault: true },
           ]}
-          cardTitle={(r) => `${fmtVal(r.start_at).slice(0, 16).replace('T', ' ')} — ${fmtVal(r.kind)}`}
+          cardTitle={(r) => `${fmt(r.start_at)} — ${fmtVal(r.kind)}`}
           extraQuery={{ from: new Date(Date.now() - 120 * 86_400_000).toISOString() }}
           canCreate={has('calendar', 'create')}
           canDelete={has('calendar', 'delete')}
@@ -216,7 +220,7 @@ export default function PatientPage(): React.ReactElement {
           defaultSort={{ id: 'id', desc: true }}
           columns={[
             { key: 'code', label: tc('code'), width: '170px', render: (r) => <BizCode code={r.code as string} copy /> },
-            { key: 'date', label: tc('date'), width: '100px', render: (r) => <span className="font-mono text-[12px]">{fmtVal(r.date ?? r.created_at).slice(0, 10)}</span> },
+            { key: 'date', label: tc('date'), width: '100px', render: (r) => <span dir="ltr" className="tabular-nums text-[12px]">{fmt(r.date ?? r.created_at, true)}</span> },
             { key: 'status', label: t('rx.status'), width: '100px', render: (r) => <Badge tone={r.status === 'validated' ? 'ok' : r.status === 'cancelled' ? 'danger' : 'warn'}>{fmtVal(r.status)}</Badge> },
             { key: 'practitioner_name', label: t('rx.prescriber'), render: (r) => fmtVal(r.practitioner_name ?? '—') },
             { key: 'lines_count', label: t('rx.lines'), width: '60px', hideByDefault: true, render: (r) => fmtVal((r.lines_json as unknown[])?.length ?? 0) },
@@ -279,11 +283,11 @@ function AllergyAlert({ value, label }: { value: unknown; label: string }): Reac
 }
 
 /** Impression de la fiche réduite (liste — pas de portail, fenêtre dédiée, LTR codes isolés). */
-function printHistory(p: Record<string, unknown>, name: string, L: Record<string, string>, blood: string, fund: string, country: string): void {
+function printHistory(p: Record<string, unknown>, name: string, L: Record<string, string>, blood: string, fund: string, country: string, fmt?: (v: unknown, dateOnly?: boolean) => string): void {
   const esc = (x: string): string => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
   const rows: [string, string][] = [
     [String(p.code ?? ''), L.code ?? 'code'],
-    [String(p.birth_date ?? '').slice(0, 10), L.birth ?? ''],
+    [fmt ? fmt(p.birth_date, true) : String(p.birth_date ?? '').slice(0, 10), L.birth ?? ''],
     [blood, L.blood ?? ''],
     [country, L.country ?? ''],
     [String(p.wilaya_label ?? ''), L.wilaya ?? ''],
@@ -304,6 +308,7 @@ function printHistory(p: Record<string, unknown>, name: string, L: Record<string
 
 /* ------------------------------------------------ Antécédents */
 function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; kind: string; at: string; ref_code: string | null; summary: Record<string, string> | null }[]; loading: boolean }): React.ReactElement {
+  const fmt = useFmtDate();
   const { t } = useT('patient');
   const { lang } = useT('common');
   const qc = useQueryClient();
@@ -345,7 +350,7 @@ function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; k
             <span className="absolute top-3 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full border border-[rgb(var(--c-line))] bg-[rgb(var(--c-surface))] text-[rgb(var(--c-primary))] ltr:left-0 rtl:left-auto rtl:-translate-x-[-50%] rtl:translate-x-1/2 rtl:right-0 rtl:border-e-0">
               {KIND_ICON[ev.kind] ?? <BadgeCheck size={12} />}
             </span>
-            <span className="mt-0.5 shrink-0 font-mono text-[11.5px] text-[rgb(var(--c-muted))]">{fmtVal(ev.at).slice(0, 10)}</span>
+            <span dir="ltr" className="mt-0.5 shrink-0 tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(ev.at, true)}</span>
             <span className="min-w-0 flex-1 text-[13px]">{pickAny(ev.summary, lang)}</span>
             {ev.ref_code ? <BizCode code={ev.ref_code} /> : null}
           </motion.li>
@@ -382,20 +387,75 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
   const { lang } = useT('common');
   const toast = useToast();
   const qc = useQueryClient();
+  const fmt = useFmtDate();
+  const methods = useForm<Record<string, unknown>>({ defaultValues: { status: 'done', at: '', locationId: '', practitionerIds: [], note: '' } });
   const q = useQuery({ queryKey: ['case', pid], queryFn: () => api.get<{ case: { id: number; code: string; status: string; current_step?: string } | null; steps: Step[] }>(`/cases/current?patientId=${pid}`) });
-  const [adv, setAdv] = useState<{ stepKey: string; note: string } | null>(null);
-  const advance = useMutation({
-    mutationFn: () => api.post('/cases/advance', { caseId: q.data?.case?.id, stepKey: adv?.stepKey, status: 'done', note: adv?.note || undefined }),
+  const locations = useQuery({ queryKey: ['locations'], queryFn: () => api.get<{ rows: { id: number; code: string; name: string }[] }>('/locations?pageSize=100') });
+  const practitioners = useQuery({ queryKey: ['practitioners', 'opts'], queryFn: () => api.get<{ rows: Record<string, unknown>[] }>('/practitioners?pageSize=100') });
+  const [fiche, setFiche] = useState<{ stepKey: string; label: string } | null>(null);
+  const createdRef = React.useRef<number | null>(null);
+  const stepLabelOf = (s: Step): string => (typeof s.label === 'string' ? s.label : pickAny(s.label as Record<string, string>, lang) || s.key);
+  const nowLocal = (): string => {
+    const d = new Date();
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  // Le workflow suit le dossier du patient : si aucun circuit n'existe encore, on le crée
+  // (première étape = celle sur laquelle l'utilisateur clique) puis on ouvre la fiche de l'étape.
+  const ensureCase = async (stepKey?: string): Promise<void> => {
+    if (q.data?.case || createdRef.current) return;
+    try {
+      const r = await api.post<{ id: number; alreadyOpen: boolean }>('/cases', { patientId: pid, ...(stepKey ? { firstStep: stepKey } : {}) });
+      createdRef.current = r.id;
+      if (!r.alreadyOpen) toast.success(t('workflow.caseCreated'));
+      await qc.invalidateQueries({ queryKey: ['case', pid] });
+      await qc.invalidateQueries({ queryKey: ['list', 'patients'] });
+    } catch (e) {
+      toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`));
+      throw e;
+    }
+  };
+
+  const openStep = (s: Step): void => {
+    if (!editable || s.status === 'done') return;
+    void (async () => {
+      try {
+        await ensureCase(s.key);
+        methods.reset({ status: 'done', at: nowLocal(), locationId: '', practitionerIds: [], note: s.note ?? '' });
+        setFiche({ stepKey: s.key, label: stepLabelOf(s) });
+      } catch {
+        /* toast déjà émis par ensureCase */
+      }
+    })();
+  };
+
+  const save = useMutation({
+    mutationFn: () => {
+      const v = methods.getValues();
+      return api.post('/cases/advance', {
+        caseId: q.data?.case?.id ?? createdRef.current,
+        stepKey: fiche?.stepKey,
+        status: String(v.status ?? 'done'),
+        note: typeof v.note === 'string' && v.note.trim() ? v.note.trim() : null,
+        locationId: v.locationId ? Number(v.locationId) : null,
+        practitionerIds: Array.isArray(v.practitionerIds) ? (v.practitionerIds as unknown[]).map(Number) : [],
+        at: v.at ? new Date(String(v.at)).toISOString() : null,
+      });
+    },
     onSuccess: () => {
       toast.success(t('workflow.advanced'));
-      setAdv(null);
+      setFiche(null);
+      createdRef.current = null;
       void qc.invalidateQueries({ queryKey: ['case', pid] });
+      void qc.invalidateQueries({ queryKey: ['list', 'patients'] });
     },
     onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
   });
+
   if (q.isLoading) return <Card><div className="skeleton h-24" /></Card>;
   const steps = q.data?.steps ?? [];
-  const stepLabel = (s: Step): string => (typeof s.label === 'string' ? s.label : pickAny(s.label as Record<string, string>, lang) || s.key);
+  const caseId = q.data?.case?.id ?? createdRef.current;
   return (
     <Card className="flex flex-col gap-4 overflow-x-auto">
       <div className="flex min-w-max items-center gap-2">
@@ -407,19 +467,20 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
               <div className="flex flex-col items-center gap-1">
                 <motion.button
                   whileTap={{ scale: 0.92 }}
-                  onClick={() => editable && !done && setAdv({ stepKey: s.key, note: '' })}
+                  onClick={() => openStep(s)}
+                  title={done ? undefined : t('workflow.stepFiche')}
                   className={done ? 'text-[rgb(var(--c-primary))]' : cur ? 'text-[rgb(var(--c-amber))]' : ''}
                 >
                   <motion.span
                     animate={cur ? { scale: [1, 1.12, 1] } : {}}
                     transition={{ repeat: Infinity, duration: 2.4 }}
-                    className={`grid h-11 w-11 place-items-center rounded-2xl border-2 font-bold ${done ? 'border-[rgb(var(--c-ok))] bg-[rgb(var(--c-ok-soft))] text-[rgb(var(--c-ok))]' : cur ? 'border-[rgb(var(--c-amber))] bg-[rgb(var(--c-amber-soft))] text-[rgb(var(--c-amber))]' : 'border-[rgb(var(--c-line))] bg-[rgb(var(--c-surface))] text-[rgb(var(--c-muted))]'}`}
+                    className={`grid h-11 w-11 place-items-center rounded-2xl border-2 font-bold ${done ? 'border-[rgb(var(--c-ok))] bg-[rgb(var(--c-ok-soft))] text-[rgb(var(--c-ok))]' : cur ? 'border-[rgb(var(--c-amber))] bg-[rgb(var(--c-amber-soft))] text-[rgb(var(--c-amber))]' : 'border-[rgb(var(--c-line))] bg-[rgb(var(--c-surface))] text-[rgb(var(--c-muted))]'} `}
                   >
                     {done ? '✓' : i + 1}
                   </motion.span>
                 </motion.button>
-                <span className={`max-w-[110px] text-center text-[11.5px] font-semibold ${cur ? 'text-[rgb(var(--c-amber))]' : ''}`}>{stepLabel(s)}</span>
-                {s.done_at ? <span className="font-mono text-[10px] text-[rgb(var(--c-muted))]">{fmtVal(s.done_at).slice(5, 10)}</span> : null}
+                <span className={`max-w-[110px] text-center text-[11.5px] font-semibold ${cur ? 'text-[rgb(var(--c-amber))]' : ''}`}>{stepLabelOf(s)}</span>
+                {s.done_at ? <span dir="ltr" className="tabular-nums text-[10px] text-[rgb(var(--c-muted))]">{fmt(s.done_at, true)}</span> : null}
               </div>
               {i < steps.length - 1 ? <div className={`h-0.5 w-10 rounded ${done ? 'bg-[rgb(var(--c-ok))]' : 'bg-[rgb(var(--c-line))]'}`} /> : null}
             </React.Fragment>
@@ -427,40 +488,72 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
         })}
       </div>
       {q.data?.case ? (
-        <div className="flex items-center gap-2 text-[12.5px] text-[rgb(var(--c-muted))]">
-          <BizCode code={q.data.case.code} copy /> <Badge tone={q.data.case.status === 'closed' ? 'neutral' : 'info'}>{q.data.case.status}</Badge>
+        <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-[rgb(var(--c-muted))]">
+          <BizCode code={q.data.case.code} copy />
+          <Badge tone={q.data.case.status === 'closed' ? 'neutral' : 'info'}>{q.data.case.status === 'closed' ? t('workflow.closed') : t('workflow.open')}</Badge>
+          {q.data.case.status === 'closed' && editable ? (
+            <Button size="sm" variant="ghost" onClick={() => void api.post(`/cases/${q.data.case?.id}/reopen`, {}).then(() => qc.invalidateQueries({ queryKey: ['case', pid] }))}>
+              {t('workflow.reopen')}
+            </Button>
+          ) : null}
         </div>
       ) : (
-        <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('workflow.none')}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('workflow.none')}</p>
+          {editable ? <Button size="sm" variant="primary" onClick={() => void ensureCase(undefined)}>{t('workflow.start')}</Button> : null}
+        </div>
       )}
+      {/* Fiche d'étape — modale large rendue en portail : plus jamais tronquée par la carte. */}
       <Dialog
-        open={Boolean(adv)}
-        onClose={() => setAdv(null)}
-        title={`${t('workflow.markDone')} — ${adv?.stepKey ?? ''}`}
+        wide
+        open={Boolean(fiche)}
+        onClose={() => setFiche(null)}
+        title={`${t('workflow.stepFiche')}${fiche ? ` — ${fiche.label}` : ''}`}
         footer={
           <>
-            <Button onClick={() => setAdv(null)}>{t('cancel')}</Button>
-            <Button variant="primary" loading={advance.isPending} onClick={() => advance.mutate()}>
-              {t('save')}
+            <Button onClick={() => setFiche(null)}>{t('cancel')}</Button>
+            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()} disabled={!caseId}>
+              {t('workflow.saveStep')}
             </Button>
           </>
         }
       >
-        <Field label={tc_note()}>
-          <Textarea rows={3} value={adv?.note ?? ''} onChange={(e) => setAdv((a) => (a ? { ...a, note: e.target.value } : a))} />
-        </Field>
+        <FormProvider {...methods}>
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <Field label={t('workflow.stepStatus')}>
+              <Select {...methods.register('status')} options={[{ value: 'done', label: t('workflow.stDone') }, { value: 'in_progress', label: t('workflow.stProgress') }, { value: 'skipped', label: t('workflow.stSkip') }]} />
+            </Field>
+            <Field label={t('workflow.at')}>
+              <Input type="datetime-local" dir="ltr" {...methods.register('at')} />
+            </Field>
+            <Field label={t('workflow.location')}>
+              <Select {...methods.register('locationId')} options={[{ value: '', label: '—' }, ...(locations.data?.rows ?? []).map((l) => ({ value: String(l.id), label: `${l.code} — ${l.name}` }))]} />
+            </Field>
+            <Field label={t('workflow.practitioners')}>
+              <Multiselect
+                name="practitionerIds"
+                options={(practitioners.data?.rows ?? []).map((p) => ({
+                  value: String(p.id),
+                  label: (p.name as string) || `${String(p.last_name ?? '')} ${String(p.first_name ?? '')}`.trim() || String(p.code ?? p.id),
+                }))}
+              />
+            </Field>
+            <div className="col-span-2">
+              <Field label={t('workflow.stepNote')}>
+                <Textarea rows={3} {...methods.register('note')} />
+              </Field>
+            </div>
+          </div>
+        </FormProvider>
       </Dialog>
     </Card>
   );
 }
-function tc_note(): string {
-  return 'note';
-}
-
 /* ------------------------------------------------ Mouvements */
 function MovementsTab({ pid }: { pid: number }): React.ReactElement {
   const { t } = useT('patient');
   const { t: tc } = useT('common');
+  const fmt = useFmtDate();
   const has = useAuth((s) => s.has);
   const locations = useQuery({ queryKey: ['locations'], queryFn: () => api.get<{ rows: { id: number; code: string; name: string }[] }>('/locations?pageSize=100') });
   const locOptions = useMemo(() => (locations.data?.rows ?? []).map((l) => ({ value: String(l.id), label: `${l.code} — ${l.name}` })), [locations.data]);
@@ -473,7 +566,7 @@ function MovementsTab({ pid }: { pid: number }): React.ReactElement {
       defaultSort={{ id: 'id', desc: true }}
       columns={[
         { key: 'code', label: tc('code'), width: '120px', render: (r) => <BizCode code={r.code as string} /> },
-        { key: 'at', label: tc('date'), width: '150px', render: (r) => <span className="font-mono text-[12px]">{fmtVal(r.at ?? r.created_at).slice(0, 16).replace('T', ' ')}</span> },
+        { key: 'at', label: tc('date'), width: '150px', render: (r) => <span dir="ltr" className="tabular-nums text-[12px]">{fmt(r.at ?? r.created_at)}</span> },
         { key: 'from_location', label: t('mov.from'), render: (r) => fmtVal(r.from_location_name ?? r.from_location ?? '—') },
         { key: 'to_location', label: t('mov.to'), render: (r) => fmtVal(r.to_location_name ?? r.to_location ?? '—') },
         { key: 'status', label: t('mov.status'), width: '110px', render: (r) => <Badge tone={r.status === 'arrived' ? 'ok' : 'warn'}>{fmtVal(r.status)}</Badge> },
@@ -482,17 +575,18 @@ function MovementsTab({ pid }: { pid: number }): React.ReactElement {
       cardTitle={(r) => `${fmtVal(r.from_location_name ?? '—')} → ${fmtVal(r.to_location_name ?? '—')}`}
       extraQuery={{ patientId: pid }}
       canCreate={has('workflow', 'update')}
-      canUpdate={false}
+      canUpdate={has('workflow', 'update')}
       canDelete={false}
       createLabel={t('mov.new')}
       fields={[
-        { key: 'toLocationId', label: t('mov.to'), kind: 'select', options: locOptions, required: true },
-        { key: 'fromLocationId', label: t('mov.from'), kind: 'select', options: [{ value: '', label: '—' }, ...locOptions] },
+        { key: 'toLocationId', label: t('mov.to'), kind: 'autocomplete', options: locOptions, required: true },
+        { key: 'fromLocationId', label: t('mov.from'), kind: 'autocomplete', options: locOptions },
         { key: 'status', label: t('mov.status'), kind: 'select', options: [{ value: 'pending', label: t('mov.pending') }, { value: 'in_transit', label: t('mov.transit') }, { value: 'arrived', label: t('mov.arrived') }] },
         { key: 'reason', label: t('mov.reason') },
         { key: 'at', label: tc('date'), kind: 'datetime' },
       ]}
       transformCreate={(v) => ({ ...v, patientId: pid, toLocationId: Number(v.toLocationId), fromLocationId: v.fromLocationId ? Number(v.fromLocationId) : null })}
+      transformUpdate={(v) => ({ ...v, patientId: pid, toLocationId: Number(v.toLocationId), fromLocationId: v.fromLocationId ? Number(v.fromLocationId) : null })}
     />
   );
 }
@@ -593,6 +687,7 @@ function GedUpload({ pid, onDone }: { pid: number; onDone: () => void }): React.
 /* ------------------------------------------------ Enregistrements (liste toutes catégories) */
 /** Bloc « Fiches » du dossier patient — export NON public : un page.tsx Next ne doit exporter que default + config de page. */
 function PatientRecords({ pid }: { pid: number }): React.ReactElement {
+  const fmt = useFmtDate();
   const { t } = useT('patient');
   const { t: tc } = useT('common');
   const router = useRouter();
@@ -619,7 +714,7 @@ function PatientRecords({ pid }: { pid: number }): React.ReactElement {
         >
           <Badge tone="info">{fmtVal(r.category_prefix)}</Badge>
           <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{fmtVal(r.title ?? r.summary) || tc('untitled')}</span>
-          <span className="font-mono text-[11.5px] text-[rgb(var(--c-muted))]">{fmtVal(r.act_date).slice(0, 10)}</span>
+          <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(r.act_date, true)}</span>
           <BizCode code={r.code as string} />
           <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : 'text-[rgb(var(--c-muted))]'}`}>{fmtVal(r.status)}</span>
         </motion.button>

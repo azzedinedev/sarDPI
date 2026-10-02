@@ -231,5 +231,7 @@
   "settings.sections.medicalRefs": "المراجع الطبية",
   "settings.medicalRefs.blood": "زمر الدم",
   "settings.medicalRefs.funds": "صناديق الضمان الاجتماعي",
-  "settings.medicalRefs.hint": "يُخزَّن الرمز كما هو (مثال A+، CNAS)؛ تُعرض التسميات المترجمة حسب اللغة النشطة. الأسطر المعطّلة تبقى مقروءة في الملفات القديمة."
+  "settings.medicalRefs.hint": "يُخزَّن الرمز كما هو (مثال A+، CNAS)؛ تُعرض التسميات المترجمة حسب اللغة النشطة. الأسطر المعطّلة تبقى مقروءة في الملفات القديمة.",
+  "settings.dateDisplay": "صيغة التاريخ",
+  "settings.timeDisplay": "إظهار الوقت مع التواريخ"
 }

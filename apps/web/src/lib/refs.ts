@@ -18,6 +18,27 @@ interface MedicalRefs {
   ssFunds: RefItemLite[];
 }
 
+/** Wilayas (régions) — pour l'autocomplétion par NOM ; le code numérique reste la valeur stockée. */
+export interface RegionLite { code: string; fr: string; ar: string; parent: number | null }
+export function useWilayas(): { wilayaOptions: { value: string; label: string; sublabel?: string }[]; wilayaLabel: (code: unknown) => string } {
+  const i18n = useI18n();
+  const q = useQuery({
+    queryKey: ['refs', 'regions', 'wilaya'],
+    staleTime: 24 * 3600_000,
+    retry: false,
+    queryFn: () => api.get<{ rows: RegionLite[] }>('/refs/regions?kind=wilaya'),
+  });
+  const wilayas = q.data?.rows ?? [];
+  const ar = i18n.lang === 'ar';
+  const wilayaOptions = wilayas.map((w) => ({ value: String(w.code), label: (ar ? w.ar || w.fr : w.fr) || String(w.code), sublabel: String(w.code) }));
+  const wilayaLabel = (code: unknown): string => {
+    if (code == null || code === '') return '—';
+    const w = wilayas.find((x) => Number(x.code) === Number(code));
+    return w ? (ar ? w.ar || w.fr : w.fr) : String(code);
+  };
+  return { wilayaOptions, wilayaLabel };
+}
+
 export function useMedicalRefs(): {
   bloodGroups: RefItemLite[];
   ssFunds: RefItemLite[];

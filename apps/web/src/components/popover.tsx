@@ -27,6 +27,7 @@ export function PopMenu({
   children,
   className,
   panelClassName,
+  matchWidth,
 }: {
   open: boolean;
   onClose: () => void;
@@ -35,9 +36,11 @@ export function PopMenu({
   /** classe du panneau (largeur, padding…) */
   className?: string;
   panelClassName?: string;
+  /** panneau à la largeur exacte de l'ancre (combobox) */
+  matchWidth?: boolean;
 }): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; w?: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) { setPos(null); return; }
@@ -51,7 +54,7 @@ export function PopMenu({
       if (top + h > window.innerHeight - 8) top = Math.max(8, a.top - h - 6);
       let left = a.right - w; // alignement fin (logique « end »), cohérent RTL car basé sur des coordonnées physiques
       left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
-      setPos({ top, left });
+      setPos({ top, left, w: matchWidth ? a.width : undefined });
     };
     place();
     const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose(); };
@@ -59,13 +62,13 @@ export function PopMenu({
     window.addEventListener('resize', place);
     window.addEventListener('keydown', esc);
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); window.removeEventListener('keydown', esc); };
-  }, [open, onClose, anchor]);
+  }, [open, onClose, anchor, matchWidth]);
 
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
     <>
       <div className="fixed inset-0 z-[190]" onClick={onClose} aria-hidden />
-      <div ref={menuRef} className={cn('glass-card fixed z-[200] p-2 shadow-[var(--shadow-lift)]', className)} style={pos ? { top: pos.top, left: pos.left } : { top: -9999, left: -9999 }} data-open={open}>
+      <div ref={menuRef} className={cn('glass-card fixed z-[200] p-2 shadow-[var(--shadow-lift)]', className)} style={pos ? { top: pos.top, left: pos.left, width: pos.w } : { top: -9999, left: -9999 }} data-open={open}>
         {children}
       </div>
     </>,
