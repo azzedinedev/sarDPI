@@ -29,8 +29,8 @@
   --c-info: 59 130 246;
   --c-info-soft: 224 236 254;
 
-  --r-card: 16px;
-  --r-field: 11px;
+  --r-card: 10px; /* arrondis discrets — le thème abuse moins des coins ronds */
+  --r-field: 7px;
   --shadow-soft: 0 6px 24px -12px rgb(9 40 56 / 0.25);
   --shadow-lift: 0 18px 48px -18px rgb(9 40 56 / 0.35);
   --shadow-glow: 0 0 0 1px rgb(var(--c-primary) / 0.25), 0 8px 32px -12px rgb(var(--c-primary) / 0.45);
@@ -53,8 +53,8 @@ html[lang='ar'] {
 
 /* Densité compacte (Paramètres > Interface) */
 html[data-density='compact'] {
-  --row-h: 34px;
-  font-size: 13.5px;
+  --row-h: 36px;
+  font-size: 14.5px;
 }
 
 * {
@@ -155,7 +155,7 @@ code.inline-code {
   background: rgb(var(--c-surface) / 0.85);
   color: rgb(var(--c-ink));
   padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
   outline: none;
 }
@@ -185,7 +185,7 @@ code.inline-code {
   padding: 0.45rem 0.95rem;
   border-radius: calc(var(--r-field) + 1px);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   border: 1px solid transparent;
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 160ms ease, background 160ms ease, opacity 160ms;
@@ -224,10 +224,10 @@ code.inline-code {
   color: #fff;
 }
 .btn-sm {
-  min-height: 32px;
+  min-height: 33px;
   padding: 0.25rem 0.6rem;
-  font-size: 0.78rem;
-  border-radius: 9px;
+  font-size: 0.85rem;
+  border-radius: 7px;
 }
 .btn-icon {
   min-width: var(--row-h);
@@ -256,7 +256,7 @@ code.inline-code {
   position: relative;
   overflow: hidden;
   background: rgb(var(--c-surface-2) / 0.9);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .motion-on .skeleton::after {
   content: '';
@@ -280,9 +280,9 @@ html.dark .motion-on .skeleton::after {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.14rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  padding: 0.16rem 0.55rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
   font-weight: 600;
   border: 1px solid rgb(var(--c-line) / 0.8);
   background: rgb(var(--c-surface) / 0.8);
@@ -293,7 +293,7 @@ html.dark .motion-on .skeleton::after {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.83rem;
+  font-size: 0.92rem;
 }
 .dt-table thead th {
   position: sticky;
@@ -302,8 +302,8 @@ html.dark .motion-on .skeleton::after {
   background: rgb(var(--c-surface) / 0.92);
   backdrop-filter: blur(8px);
   color: rgb(var(--c-muted));
-  font-weight: 600;
-  font-size: 0.74rem;
+  font-weight: 650;
+  font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.55rem 0.75rem;
@@ -350,6 +350,47 @@ html[data-motion='off'] *::after {
   .bg-blob {
     animation: none !important;
   }
+}
+
+/* Editeur riche (allergies / antécédents / notes) */
+.richtext {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.richtext:empty::before,
+.richtext > br:only-child {
+  display: none;
+}
+.richtext ul {
+  list-style: disc;
+  padding-inline-start: 1.4em;
+  margin: 0.2em 0;
+}
+.richtext ol {
+  list-style: decimal;
+  padding-inline-start: 1.5em;
+  margin: 0.2em 0;
+}
+.richtext p,
+.richtext div {
+  margin: 0.15em 0;
+}
+.richtext b,
+.richtext strong {
+  font-weight: 700;
+}
+/* Contenu riche stocké (allergies, antécédents…) hors éditeur */
+.rich-view ul {
+  list-style: disc;
+  padding-inline-start: 1.3em;
+}
+.rich-view ol {
+  list-style: decimal;
+  padding-inline-start: 1.4em;
+}
+.rich-view p,
+.rich-view div {
+  margin: 0.1em 0;
 }
 
 /* Focus visible AA */

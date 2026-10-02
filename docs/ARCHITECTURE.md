@@ -62,6 +62,39 @@ sarDPI/
 - Un `page.tsx` Next n'exporte QUE `default` + config (`dynamic`, `metadata`…) : les sous-composants d'une
   page vivent en fonctions locales ou dans `components/` (sinon `next build` échoue — validé au build CI-like).
 
+## Référentiels médicaux configurables & champs riches
+
+**Groupes sanguins et caisses de sécurité sociale (SS funds)** ne sont pas codés en dur : ce sont des
+listes administrables sans code via *Réglages › Référentiels médicaux* (section `medicalRefs`), chacune
+composée de `{ code, label: {fr, ar, es, en}, active }`.
+
+- `GET /api/v1/refs/medical` sert les lignes actives ; l'UI (liste patients, filtres, formulaire,
+  dossier) affiche le **libellé traduit selon la langue active** alors que seul le `code` (ex. `A+`,
+  `CNAS`) est stocké — les libellés restent donc modifiables sans migration.
+- La validation serveur (création/édition patient) refuse tout `bloodGroup`/`ssFund` absent de la
+  liste active (422) — un code déjà enregistré reste lisible même si la ligne est désactivée ensuite
+  (immutabilité des données de santé).
+- **Pays du patient** : la liste des pays proposés vient des profils déposés dans
+  `/country-profiles/*.json` (`GET /api/v1/refs/countries`, profils `enabled:false` exclus) —
+  ajouter un pays = déposer un profil, zéro code.
+
+**Allergies, antécédents et notes** sont des champs **texte enrichi (HTML)** : éditeur léger
+(gras/italique/souligné/listes, `RichEditor`) sans dépendance externe, assaini **à la frappe côté
+client ET à l'enregistrement côté serveur** (whitelist de balises `b i u em strong ul ol li br p div
+span`, attributs et `javascript:` retirés — `sanitizeRichHtml()` dans `@sardpi/shared`, même fonction
+à l'affichage : défense en profondeur, aucune donnée médicale ne doit pouvoir porter de HTML hostile).
+Le format ancien (liste de chaînes, `["pénicilline", …]`) reste accepté en lecture/écriture ;
+`allergyTokens()` normalise les deux formats pour le contrôle allergies↔médicaments des ordonnances.
+
+**Formulaire du patient groupé** : les champs sont organisés par association (Identité,
+Localisation, Contact & urgence, Identifiants nationaux, Couverture sociale, Médical, Notes) via la
+clé `group` du `FieldDef` du CrudModule — pures sections visuelles, sans impact API.
+
+**Profondeur des menus** : les menus ancrés (colonnes, filtres avancés, actions ligne) sont rendus
+dans un **portail `fixed`** (`components/popover.tsx`, z-[200]) : ils ne sont plus rognés par
+l'`overflow` des cartes/tableaux ni masqués par les contextes d'empilement créés par le
+`backdrop-filter` des surfaces glass, et basculent au-dessus de l'ancre près du bord de viewport.
+
 ## CrudModule (une implémentation, toutes les entités)
 
 Côté serveur, `registerCrud(cfg)` fournit liste paginée (tri, recherche globale OR, filtres avancés JSON,

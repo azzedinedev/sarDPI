@@ -4,7 +4,7 @@
  * Médicaments : recherche DCI + nom commercial (nomenclature importable, drapeau remboursement).
  */
 import { z } from 'zod';
-import { rxCreateZ, rxTemplateZ } from '@sardpi/shared';
+import { rxCreateZ, rxTemplateZ, allergyTokens } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud } from '../http/crud';
 import { ApiError, notFound } from '../http/errors';
@@ -20,7 +20,7 @@ async function checkRx(patientId: number, lines: { dci?: string | null; tradeNam
   const db = await getDb();
   const patient = await db.findOne<Record<string, unknown>>('patients', { id: patientId });
   const warnings: { kind: 'allergy' | 'interaction'; text: string; refs: string[] }[] = [];
-  const allergies: string[] = Array.isArray(patient?.allergies_json) ? (patient!.allergies_json as string[]) : patient?.allergies_json ? JSON.parse(String(patient.allergies_json)) : [];
+  const allergies: string[] = allergyTokens(patient?.allergies_json);
   const drugIds = lines.map((l) => l.drugId).filter(Boolean) as number[];
   const drugs = drugIds.length ? await db.find<Record<string, unknown>>('drugs', { where: { id: drugIds } }) : [];
   const byId = new Map(drugs.map((d) => [Number(d.id), d]));

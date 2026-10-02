@@ -242,7 +242,7 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
               ))}
             </div>
 
-          <main className="relative mx-auto w-full max-w-[1500px] px-3 py-4 md:px-5 md:py-5">{children}</main>
+          <main className="relative mx-auto w-full max-w-[1840px] px-2 py-3 md:px-3.5 md:py-4">{children}</main>
         </div>
       </div>
 

@@ -4,18 +4,24 @@
  * les champs sensibles (tél, email, NIN, Chifa) sont chiffrés au repos (AES-GCM si ENC_KEYS présent).
  */
 import { z } from 'zod';
-import { patientCreateZ, ageFromBirth, pickLabel } from '@sardpi/shared';
+import { patientCreateZ, ageFromBirth, pickLabel, sanitizeRichHtml, type RefItem } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud, sanitizeRow } from '../http/crud';
 import { allocatePatientCode, peekPatientCode } from '../codes/service';
 import { getDb } from '../data';
-import { notFound } from '../http/errors';
+import { ApiError, notFound } from '../http/errors';
 import { cached } from '../cache';
 import { zonedDate } from '../util';
 import { env } from '../config';
 import { pushHistory } from './history';
 import { barcodeSvg, qrSvg, verifyUrl } from '../qr';
 import { publicToken } from '../util';
+
+/** Chaîne riche (allergies/antécédents/notes) : sanitize ; tableau legacy : conservé tel quel (rétrocompatible). */
+function richField(v: unknown): unknown {
+  if (typeof v === 'string') { const h = sanitizeRichHtml(v); return h || []; }
+  return v ?? [];
+}
 
 export function mapPatientInput(input: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {
@@ -41,12 +47,13 @@ export function mapPatientInput(input: Record<string, unknown>): Record<string, 
     emergency_phone: input.emergencyPhone ?? null,
     emergency_relation: input.emergencyRelation ?? null,
     blood_group: input.bloodGroup ?? null,
-    allergies_json: input.allergies ?? [],
-    antecedents_json: input.antecedents ?? [],
+    // champs riches « antécédents »/« allergies » : HTML assaini ou liste legacy
+    allergies_json: richField(input.allergies),
+    antecedents_json: richField(input.antecedents),
     attending_practitioner_id: input.attendingPractitionerId ?? null,
     preferred_locale: input.preferredLocale ?? 'fr',
     country: input.country ?? 'DZ',
-    notes: input.notes ?? null,
+    notes: typeof input.notes === 'string' && input.notes.trim() ? sanitizeRichHtml(input.notes) || null : (input.notes ?? null),
     consent_json: input.consent ?? { granted: false, scopes: [] },
   };
   return out;
@@ -91,7 +98,16 @@ export function registerPatients(): void {
     defaultSort: ['updated_at', 'desc'],
     bodyCreate: patientCreateZ,
     bodyUpdate: patientCreateZ.partial(),
-    mapInput: async (input) => mapPatientInput(input),
+    mapInput: async (input) => {
+      const out = mapPatientInput(input);
+      // Groupes sanguins & caisses SS : listes CONFIGURABLES (Réglages › Référentiels médicaux) — valeur hors liste ⇒ 422 (hors rétrocompatibilité des codes déjà stockés).
+      const { getSection } = await import('../settings');
+      const refs = (await getSection('medicalRefs')) as { bloodGroups: RefItem[]; ssFunds: RefItem[] };
+      const known = (items: RefItem[] | undefined, v: unknown): boolean => v == null || v === '' || (items ?? []).some((x) => x.code === v || x.active === false);
+      if (!known(refs.bloodGroups, out.blood_group)) throw new ApiError(422, 'errors.validation', 'blood_group', { bloodGroup: `inconnu: ${String(out.blood_group)}` });
+      if (!known(refs.ssFunds, out.ss_fund)) throw new ApiError(422, 'errors.validation', 'ss_fund', { ssFund: `inconnu: ${String(out.ss_fund)}` });
+      return out;
+    },
     allocateCode: async (tx) => (await allocatePatientCode(tx)).code,
     decorate: async (rows) => decoratePatients(rows as Record<string, unknown>[]) as never,
     bump: ['refs'],

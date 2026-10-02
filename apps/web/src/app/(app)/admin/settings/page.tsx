@@ -7,13 +7,13 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Save } from 'lucide-react';
+import { Eye, Plus, Save, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Card, Field, Input, Select, Switch, Tabs, Textarea } from '@/components/ui';
 import { useToast } from '@/components/toast';
 
-const SECTIONS = ['general', 'ui', 'codification', 'gedTypes', 'practitionerTypes', 'languages', 'workflowSteps', 'smtp', 'captcha', 'security', 'backups', 'license', 'vaccination'] as const;
+const SECTIONS = ['general', 'ui', 'codification', 'medicalRefs', 'gedTypes', 'practitionerTypes', 'languages', 'workflowSteps', 'smtp', 'captcha', 'security', 'backups', 'license', 'vaccination'] as const;
 type Section = (typeof SECTIONS)[number];
 
 export default function SettingsPage(): React.ReactElement {
@@ -240,14 +240,60 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
           <SaveBar onSave={onSave} saving={saving} />
         </div>
       );
+    case 'medicalRefs': {
+      const rows = (k: string): { code: string; label: Record<string, string>; active?: boolean }[] =>
+        Array.isArray(data[k]) ? (data[k] as { code: string; label: Record<string, string>; active?: boolean }[]) : [];
+      return (
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] text-[rgb(var(--c-muted))]">{t('settings.medicalRefs.hint')}</p>
+          <RefListEditor title={t('settings.medicalRefs.blood')} items={rows('bloodGroups')} onChange={(v) => set('bloodGroups', v)} />
+          <RefListEditor title={t('settings.medicalRefs.funds')} items={rows('ssFunds')} onChange={(v) => set('ssFunds', v)} />
+          <SaveBar onSave={onSave} saving={saving} />
+        </div>
+      );
+    }
     default:
       return (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('settings.useJson')}</p>
+          <p className="text-[13.5px] text-[rgb(var(--c-muted))]">{t('settings.useJson')}</p>
           <SaveBar onSave={onSave} saving={saving} />
         </div>
       );
   }
+}
+
+/** Éditeur de liste de référence : code + libellés FR/AR/ES/EN + activation. */
+function RefListEditor({ title, items, onChange }: { title: string; items: { code: string; label: Record<string, string>; active?: boolean }[]; onChange: (v: { code: string; label: Record<string, string>; active?: boolean }[]) => void }): React.ReactElement {
+  const { t: tc } = useT('common');
+  const upd = (i: number, patch: Partial<{ code: string; label: Record<string, string>; active?: boolean }>): void =>
+    onChange(items.map((x, j) => (j === i ? { ...x, ...patch, label: patch.label ? { ...x.label, ...patch.label } : x.label } : x)));
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <h3 className="text-[14px] font-bold">{title}</h3>
+        <Button size="sm" variant="ghost" onClick={() => onChange([...items, { code: '', label: { fr: '', ar: '', es: '', en: '' }, active: true }])}>
+          <Plus size={13} /> {tc('new')}
+        </Button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((x, i) => (
+          <div key={i} className="grid grid-cols-[110px_repeat(4,minmax(0,1fr))_90px_34px] items-center gap-1.5 rounded-[8px] border border-[rgb(var(--c-line)/0.7)] p-1.5">
+            <Input value={x.code} onChange={(e) => upd(i, { code: e.target.value.toUpperCase() })} placeholder="A+" className="!min-h-8 !text-[13px] font-mono" />
+            {(['fr', 'ar', 'es', 'en'] as const).map((lg) => (
+              <Input key={lg} value={x.label?.[lg] ?? ''} onChange={(e) => upd(i, { label: { [lg]: e.target.value } })} placeholder={lg.toUpperCase()} dir={lg === 'ar' ? 'rtl' : undefined} className="!min-h-8 !text-[13px]" />
+            ))}
+            <label className="flex items-center justify-center gap-1.5 text-[12px] text-[rgb(var(--c-muted))]">
+              <Switch checked={x.active !== false} onChange={(on) => upd(i, { active: on })} />
+            </label>
+            <Button size="sm" variant="ghost" className="btn-icon !min-h-8 !min-w-8" title={tc('delete')} onClick={() => onChange(items.filter((_, j) => j !== i))}>
+              <X size={14} />
+            </Button>
+          </div>
+        ))}
+        {!items.length ? <p className="text-[13px] text-[rgb(var(--c-muted))]">—</p> : null}
+      </div>
+    </div>
+  );
 }
 
 function Row({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }): React.ReactElement {

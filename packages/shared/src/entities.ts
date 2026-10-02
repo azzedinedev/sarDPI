@@ -55,7 +55,7 @@ export const patientBaseZ = z.object({
   email: z.string().email().max(120).optional().or(z.literal('')).nullable(),
   // Identifiants ALGÉRIENS — tous optionnels, validés par le profil pays côté serveur
   nin: z.string().regex(/^[0-9]{18}$/, 'NIN : 18 chiffres').optional().nullable(),
-  ssFund: z.enum(['CNAS', 'CASNOS', 'CNMA']).optional().nullable(),
+  ssFund: z.preprocess((v) => (v === '' ? null : v), z.string().max(14).optional().nullable()),
   ssNumber: z.string().max(24).optional().nullable(),
   chifaNumber: z.string().max(24).optional().nullable(),
   havingRight: z.coerce.boolean().optional().nullable(),
@@ -63,13 +63,13 @@ export const patientBaseZ = z.object({
   emergencyName: z.string().max(120).optional().nullable(),
   emergencyPhone: z.string().max(24).optional().nullable(),
   emergencyRelation: z.string().max(40).optional().nullable(),
-  bloodGroup: z.enum(bloodGroups).optional().nullable(),
-  allergies: z.array(z.string().max(60)).max(30).default([]),
-  antecedents: z.array(z.string().max(120)).max(30).default([]),
+  bloodGroup: z.preprocess((v) => (v === '' ? null : v), z.enum(bloodGroups).or(z.string().max(12)).optional().nullable()),
+  allergies: z.union([z.string().max(40000), z.array(z.string().max(120)).max(50)]).optional().nullable(),
+  antecedents: z.union([z.string().max(40000), z.array(z.string().max(120)).max(50)]).optional().nullable(),
   attendingPractitionerId: z.coerce.number().int().positive().optional().nullable(),
   preferredLocale: z.enum(['ar', 'fr', 'es', 'en']).default('fr'),
   country: z.string().length(2).default('DZ'),
-  notes: z.string().max(2000).optional().nullable(),
+  notes: z.string().max(40000).optional().nullable(),
   consent: z
     .object({
       granted: z.boolean(),

@@ -38,7 +38,7 @@ export function Spinner({ className }: { className?: string }): React.ReactEleme
   );
 }
 
-export function Badge({ tone, children, className }: { tone?: 'ok' | 'warn' | 'danger' | 'info' | 'neutral'; children: React.ReactNode; className?: string }): React.ReactElement {
+export function Badge({ tone, children, className, title }: { tone?: 'ok' | 'warn' | 'danger' | 'info' | 'neutral'; children: React.ReactNode; className?: string; title?: string }): React.ReactElement {
   const tones: Record<string, string> = {
     ok: 'bg-[rgb(var(--c-ok-soft))] text-[rgb(var(--c-ok))] border-[rgb(var(--c-ok)/0.35)]',
     warn: 'bg-[rgb(var(--c-amber-soft))] text-[rgb(var(--c-amber))] border-[rgb(var(--c-amber)/0.35)]',
@@ -46,7 +46,7 @@ export function Badge({ tone, children, className }: { tone?: 'ok' | 'warn' | 'd
     info: 'bg-[rgb(var(--c-info-soft))] text-[rgb(var(--c-info))] border-[rgb(var(--c-info)/0.35)]',
     neutral: 'bg-[rgb(var(--c-surface-2))] text-[rgb(var(--c-muted))]',
   };
-  return <span className={cn('badge', tones[tone ?? 'neutral'], className)}>{children}</span>;
+  return <span className={cn('badge', tones[tone ?? 'neutral'], className)} title={title}>{children}</span>;
 }
 
 export function Field({

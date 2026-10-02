@@ -154,6 +154,48 @@ export function registerCatalog(): void {
     },
   });
 
+  /** Référentiels médicaux configurables : groupes sanguins + caisses SS (Réglages › medicalRefs). */
+  route({
+    method: 'GET',
+    path: '/refs/medical',
+    auth: true,
+    licenseFree: true,
+    async handler() {
+      const { getSection } = await import('../settings');
+      const cfg = (await getSection('medicalRefs')) as { bloodGroups: { code: string; label: Record<string, string>; active?: boolean }[]; ssFunds: { code: string; label: Record<string, string>; active?: boolean }[] };
+      const on = <T extends { active?: boolean }>(xs: T[]): T[] => xs.filter((x) => x.active !== false);
+      return { bloodGroups: on(cfg.bloodGroups ?? []), ssFunds: on(cfg.ssFunds ?? []) };
+    },
+  });
+
+  /** Pays disponibles = profils déposés dans /country-profiles (aucune donnée personnelle). */
+  route({
+    method: 'GET',
+    path: '/refs/countries',
+    auth: false,
+    licenseFree: true,
+    cacheable: true,
+    async handler() {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const { paths } = await import('../config');
+      const dir = paths.countryProfiles;
+      const out: { code: string; name: Record<string, string> }[] = [];
+      try {
+        for (const f of fs.readdirSync(dir)) {
+          if (!f.endsWith('.json') || f.startsWith('_')) continue;
+          try {
+            const j = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as { code?: string; enabled?: boolean; name?: Record<string, string> };
+            if (j.enabled === false || !j.code) continue;
+            out.push({ code: String(j.code).toUpperCase(), name: j.name ?? { fr: j.code.toUpperCase() } });
+          } catch { /* profil invalide → ignoré (sans impact) */ }
+        }
+      } catch { /* pas de dossier profils → liste vide */ }
+      out.sort((a, b) => a.code.localeCompare(b.code));
+      return { countries: out };
+    },
+  });
+
   /** Wilayas / régions (référentiel importable — cache + ETag). */
   route({
     method: 'GET',

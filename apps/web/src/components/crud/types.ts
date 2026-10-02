@@ -13,6 +13,8 @@ export interface FieldDef {
   required?: boolean;
   options?: { value: string | number; label: string }[];
   colSpan?: 1 | 2; // grille 2 colonnes
+  /** regroupement visuel du formulaire (fieldset) — libellé de section ; consécutifs = même section */
+  group?: React.ReactNode;
   hint?: string;
   min?: number;
   max?: number;

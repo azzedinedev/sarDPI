@@ -227,5 +227,9 @@
   "settings.backup.retention": "Retention (days)",
   "settings.licence.key": "License key",
   "settings.licence.activate": "Activate",
-  "settings.saved": "Settings saved"
+  "settings.saved": "Settings saved",
+  "settings.sections.medicalRefs": "Medical reference lists",
+  "settings.medicalRefs.blood": "Blood groups",
+  "settings.medicalRefs.funds": "Social security funds",
+  "settings.medicalRefs.hint": "The code (e.g. A+, CNAS) is stored verbatim; translated labels render per active language. Disabled rows remain readable in historical records."
 }

@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { env, paths } from '../config';
 import { getDb } from '../data';
-import { DEFAULT_GED_TYPES, DEFAULT_PRACTITIONER_TYPES, smtpSettingsZ, securitySettingsZ, type CodificationConfig } from '@sardpi/shared';
+import { DEFAULT_GED_TYPES, DEFAULT_PRACTITIONER_TYPES, DEFAULT_BLOOD_GROUPS, DEFAULT_SS_FUNDS, medicalRefsZ, smtpSettingsZ, securitySettingsZ, type CodificationConfig } from '@sardpi/shared';
 import { cacheGet, cacheSet, bumpTag } from '../cache';
 
 /* --------------------------------------------------------------- définitions */
@@ -88,6 +88,7 @@ const SECTIONS = {
   ui: { zod: uiZ },
   codification: { zod: codificationZ },
   gedTypes: { zod: gedTypesZ, factory: () => ({ types: DEFAULT_GED_TYPES.map((t) => ({ ...t })) }) },
+  medicalRefs: { zod: medicalRefsZ, factory: () => ({ bloodGroups: DEFAULT_BLOOD_GROUPS.map((t) => ({ ...t })), ssFunds: DEFAULT_SS_FUNDS.map((t) => ({ ...t })) }) },
   practitionerTypes: { zod: practitionerTypesZ, factory: () => ({ types: DEFAULT_PRACTITIONER_TYPES.map((t) => ({ ...t })) }) },
   languages: { zod: languagesSectionZ },
   workflowSteps: {

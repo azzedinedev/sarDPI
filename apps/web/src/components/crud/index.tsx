@@ -27,6 +27,7 @@ import { Dialog } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { BizCode } from '@/components/biz-code';
+import { PopMenu, usePop } from '@/components/popover';
 import { CrudForm } from './form';
 import { FilterBuilder } from './filters';
 import type { CrudProps, RowData } from './types';
@@ -51,10 +52,12 @@ export function CrudModule(props: CrudProps): React.ReactElement {
   const [scope, setScope] = useState<'active' | 'archived' | 'all'>('active');
   const [sort, setSort] = useState<SortingState>(props.defaultSort ? [props.defaultSort] : []);
   const [filters, setFilters] = useState<FilterGroup>(EMPTY_GROUP);
-  const [showFilters, setShowFilters] = useState(false);
+  const filterPop = usePop();
+  const filterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'table' | 'rows' | 'cards'>(() => (localStorage.getItem(`sardpi:view:${resource}`) as 'table' | 'rows' | 'cards') || 'table');
   const [vis, setVis] = useState<VisibilityState>(() => Object.fromEntries(columns.filter((c) => c.hideByDefault).map((c) => [c.key, false])));
-  const [showVis, setShowVis] = useState(false);
+  const visPop = usePop();
+  const visRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [drawer, setDrawer] = useState<{ mode: 'create' | 'edit' | 'view'; row?: RowData } | null>(null);
   const [confirm, setConfirm] = useState<{ action: () => Promise<void>; label: string; danger?: boolean } | null>(null);
@@ -255,8 +258,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
       {/* En-tête */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-[20px] font-bold leading-tight">{props.title}</h1>
-          {props.subtitle ? <p className="mt-0.5 text-[12.5px] text-[rgb(var(--c-muted))]">{props.subtitle}</p> : null}
+          <h1 className="truncate text-[22px] font-bold leading-tight">{props.title}</h1>
+          {props.subtitle ? <p className="mt-0.5 text-[13.5px] text-[rgb(var(--c-muted))]">{props.subtitle}</p> : null}
         </div>
         <div className="ms-auto flex flex-wrap items-center gap-2">
           {props.toolbarExtra}
@@ -272,8 +275,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
       <div className="glass-card flex flex-wrap items-center gap-2 !p-2">
         {props.search !== false ? (
           <div className="relative min-w-[160px] max-w-[320px] flex-1">
-            <Search size={14} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] ltr:left-2.5 rtl:right-2.5" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={props.searchPlaceholder ?? t('search')} className="!min-h-9 !py-1 ps-8" />
+            <Search size={16} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] ltr:left-2.5 rtl:right-2.5" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={props.searchPlaceholder ?? t('search')} className="!min-h-10 !py-1 !text-[14px] ps-9" />
             {q ? (
               <button className="absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] ltr:right-2 rtl:left-2" onClick={() => setQ('')} aria-label={t('clear')}>
                 <X size={13} />
@@ -283,9 +286,9 @@ export function CrudModule(props: CrudProps): React.ReactElement {
         ) : null}
 
         {props.scopeSelect ? (
-          <div className="flex overflow-hidden rounded-[10px] border border-[rgb(var(--c-line))] text-[12px] font-semibold">
+          <div className="flex overflow-hidden rounded-[8px] border border-[rgb(var(--c-line))] text-[13px] font-semibold">
             {(['active', 'archived', 'all'] as const).map((sc) => (
-              <button key={sc} onClick={() => { setScope(sc); setPage(1); }} className={cn('min-h-9 px-2.5', scope === sc ? 'bg-[rgb(var(--c-primary))] text-white' : 'text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface-2))]')}>
+              <button key={sc} onClick={() => { setScope(sc); setPage(1); }} className={cn('min-h-10 px-3', scope === sc ? 'bg-[rgb(var(--c-primary))] text-white' : 'text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface-2))]')}>
                 {t(`scope.${sc}`)}
               </button>
             ))}
@@ -293,51 +296,45 @@ export function CrudModule(props: CrudProps): React.ReactElement {
         ) : null}
 
         {props.filterFields?.length ? (
-          <div className="relative">
-            <Button size="sm" variant={filters.items.length ? 'primary' : 'ghost'} onClick={() => setShowFilters((v) => !v)}>
-              <SlidersHorizontal size={14} /> {filters.items.length ? `${filters.items.length}` : t('filters.title')}
+          <div className="relative" ref={filterRef}>
+            <Button size="sm" variant={filters.items.length ? 'primary' : 'ghost'} onClick={filterPop.toggle}>
+              <SlidersHorizontal size={15} /> {filters.items.length ? `${filters.items.length}` : t('filters.title')}
             </Button>
-            <AnimatePresence>
-              {showFilters ? (
-                <motion.div initial={{ opacity: 0, y: reduce ? 0 : -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="glass-card absolute end-0 top-[42px] z-40 w-[520px] max-w-[92vw] p-3 shadow-[var(--shadow-lift)]">
-                  <FilterBuilder resource={resource} fields={props.filterFields} value={filters} onChange={(g) => { setFilters(g); setPage(1); }} />
-                  <div className="mt-2 flex justify-end">
-                    <Button size="sm" variant="primary" onClick={() => setShowFilters(false)}>{t('apply')}</Button>
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+            <PopMenu open={filterPop.open} onClose={filterPop.close} anchor={filterRef} className="w-[560px] max-w-[92vw] !p-3">
+              <FilterBuilder resource={resource} fields={props.filterFields} value={filters} onChange={(g) => { setFilters(g); setPage(1); }} />
+              <div className="mt-2 flex justify-end">
+                <Button size="sm" variant="primary" onClick={filterPop.close}>{t('apply')}</Button>
+              </div>
+            </PopMenu>
           </div>
         ) : null}
 
-        <div className="relative">
-          <Button size="sm" variant="ghost" onClick={() => setShowVis((v) => !v)}>
-            <Columns3 size={14} /> <span className="max-md:hidden">{t('columns')}</span>
+        <div className="relative" ref={visRef}>
+          <Button size="sm" variant="ghost" onClick={visPop.toggle}>
+            <Columns3 size={15} /> <span className="max-md:hidden">{t('columns')}</span>
           </Button>
-          {showVis ? (
-            <div className="glass-card absolute end-0 top-[42px] z-40 max-h-80 w-60 overflow-y-auto p-2 shadow-[var(--shadow-lift)]" onMouseLeave={() => setShowVis(false)}>
-              {columns.map((c) => (
-                <div key={c.key} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[rgb(var(--c-surface-2))]">
-                  <span className="text-[12.5px] font-medium">{typeof c.label === 'string' ? c.label : c.key}</span>
-                  <Switch checked={vis[c.key] !== false} onChange={(on) => setVis((v) => ({ ...v, [c.key]: on }))} />
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <PopMenu open={visPop.open} onClose={visPop.close} anchor={visRef} className="max-h-[min(26rem,70vh)] w-64 overflow-y-auto !p-1.5">
+            {columns.map((c) => (
+              <div key={c.key} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[rgb(var(--c-surface-2))]">
+                <span className="text-[13.5px] font-medium">{typeof c.label === 'string' ? c.label : c.key}</span>
+                <Switch checked={vis[c.key] !== false} onChange={(on) => setVis((v) => ({ ...v, [c.key]: on }))} />
+              </div>
+            ))}
+          </PopMenu>
         </div>
 
         {props.canExport !== false ? (
-          <div className="flex overflow-hidden rounded-[10px] border border-[rgb(var(--c-line))]">
+          <div className="flex overflow-hidden rounded-[8px] border border-[rgb(var(--c-line))]">
             {(['csv', 'xls', 'pdf'] as const).map((f) => (
-              <button key={f} onClick={() => void exportRows(f)} className="min-h-9 px-2 text-[11.5px] font-bold uppercase text-[rgb(var(--c-muted))] transition-colors hover:bg-[rgb(var(--c-surface-2))]" title={`${t('export.to')} ${f}`}>
-                <Download size={12} className="me-0.5 inline ltr:mr-1 rtl:ml-1" />
+              <button key={f} onClick={() => void exportRows(f)} className="min-h-10 px-2.5 text-[12.5px] font-bold uppercase text-[rgb(var(--c-muted))] transition-colors hover:bg-[rgb(var(--c-surface-2))]" title={`${t('export.to')} ${f}`}>
+                <Download size={14} className="me-0.5 inline ltr:mr-1 rtl:ml-1" />
                 {f}
               </button>
             ))}
           </div>
         ) : null}
 
-        <div className="ms-auto flex overflow-hidden rounded-[10px] border border-[rgb(var(--c-line))]">
+        <div className="ms-auto flex overflow-hidden rounded-[8px] border border-[rgb(var(--c-line))]">
           {(
             [
               ['table', Table2],
@@ -345,8 +342,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
               ['cards', LayoutGrid],
             ] as const
           ).map(([v, Ic]) => (
-            <button key={v} onClick={() => setView(v)} className={cn('min-h-9 px-2.5 transition-colors', view === v ? 'bg-[rgb(var(--c-primary)/0.14)] text-[rgb(var(--c-primary))]' : 'text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface-2))]')} title={t(`view.${v}`)}>
-              <Ic size={15} />
+            <button key={v} onClick={() => setView(v)} className={cn('min-h-10 px-3 transition-colors', view === v ? 'bg-[rgb(var(--c-primary)/0.14)] text-[rgb(var(--c-primary))]' : 'text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface-2))]')} title={t(`view.${v}`)}>
+              <Ic size={16} />
             </button>
           ))}
         </div>
@@ -436,7 +433,7 @@ export function CrudModule(props: CrudProps): React.ReactElement {
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5">
           {rows.map((r, i) => (
             <motion.div key={r.id} initial={{ opacity: reduce ? 1 : 0, y: reduce ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduce ? 0 : Math.min(i, 14) * 0.03, ease: [0.22, 1, 0.36, 1] }}>
               <Card className="list-card group relative flex h-full min-h-[128px] cursor-pointer flex-col gap-1.5" onClick={() => (rowHref ? router.push(rowHref(r)) : setDrawer({ mode: detail ? 'view' : 'edit', row: r }))}>
@@ -449,8 +446,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
                   onChange={() => setSelected((s) => (s.includes(r.id) ? s.filter((x) => x !== r.id) : [...s, r.id]))}
                 />
                 <div className="min-w-0 pe-6 ps-6">
-                  <div className="truncate text-[14px] font-bold">{props.cardTitle ? props.cardTitle(r) : (r.name as string) ?? (r.fullName as string) ?? (r.code as string)}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] text-[rgb(var(--c-muted))]">
+                  <div className="truncate text-[15.5px] font-bold">{props.cardTitle ? props.cardTitle(r) : (r.name as string) ?? (r.fullName as string) ?? (r.code as string)}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px] text-[rgb(var(--c-muted))]">
                     {props.cardSubtitle ? props.cardSubtitle(r) : r.code ? <BizCode code={r.code as string} /> : null}
                   </div>
                 </div>
@@ -466,12 +463,12 @@ export function CrudModule(props: CrudProps): React.ReactElement {
       )}
 
       {/* Pagination serveur */}
-      <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+      <div className="flex flex-wrap items-center gap-2 text-[13.5px]">
         <span className="text-[rgb(var(--c-muted))]">
           {t('list.count')} : <b className="font-mono">{total}</b>
         </span>
         <div className="ms-auto flex items-center gap-1.5">
-          <select className="field !min-h-8 w-auto !py-0.5 text-[12px]" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
+          <select className="field !min-h-9 w-auto !py-0.5 !text-[13px]" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
             {[10, 20, 50, 100].map((n) => (
               <option key={n} value={n}>{n}/p.</option>
             ))}
@@ -541,8 +538,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
           </>
         }
       >
-        <p className="text-[13.5px]">{confirm?.label}</p>
-        <p className="mt-2 text-[12.5px] text-[rgb(var(--c-muted))]">{t('confirm.hint')}</p>
+        <p className="text-[14.5px]">{confirm?.label}</p>
+        <p className="mt-2 text-[13.5px] text-[rgb(var(--c-muted))]">{t('confirm.hint')}</p>
       </Dialog>
     </section>
   );
@@ -550,42 +547,39 @@ export function CrudModule(props: CrudProps): React.ReactElement {
 
 /* ------------------------------------------------------------------ actions ligne */
 function RowActions({ row, props, setDrawer, setConfirm, t, softDelete, detail, router, act }: { row: RowData; props: CrudProps; setDrawer: (d: { mode: 'create' | 'edit' | 'view'; row?: RowData } | null) => void; setConfirm: (c: { action: () => Promise<void>; label: string } | null) => void; t: (k: string) => string; softDelete: boolean; detail?: (r: RowData) => React.ReactNode; router: ReturnType<typeof useRouter>; act: { mutate: (v: { row: RowData; action: 'archive' | 'restore' | 'toggle-active' }) => void } }): React.ReactElement {
-  const [open, setOpen] = useState(false);
+  const pop = usePop();
+  const ref = useRef<HTMLDivElement>(null);
   return (
-    <div className="relative flex justify-end">
+    <div className="relative flex justify-end" ref={ref}>
       <div className="flex gap-0.5">
         {(props.canUpdate !== false || detail) && (props.canUpdate !== false || Boolean(detail)) ? (
           <Button
             size="sm"
             variant="ghost"
-            className="btn-icon !min-h-7 !min-w-7 hover:opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100"
+            className="btn-icon !min-h-8 !min-w-8 hover:opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100"
             onClick={() => setDrawer({ mode: detail ? 'view' : 'edit', row })}
             title={detail ? t('view') : t('edit')}
           >
-            {detail ? <Eye size={13} /> : <Pencil size={13} />}
+            {detail ? <Eye size={15} /> : <Pencil size={15} />}
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" className={cn('btn-icon !min-h-7 !min-w-7', (props.rowMenu || props.canDelete !== false || props.canArchive !== false) && 'opacity-60')} onClick={() => setOpen((o) => !o)} title="…">
-          <MoreVertical size={14} />
+        <Button size="sm" variant="ghost" className={cn('btn-icon !min-h-8 !min-w-8', (props.rowMenu || props.canDelete !== false || props.canArchive !== false) && 'opacity-70')} onClick={() => pop.toggle()} title="…">
+          <MoreVertical size={16} />
         </Button>
       </div>
-      <AnimatePresence>
-        {open ? (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-            <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} className="glass-card absolute end-0 top-8 z-40 w-52 p-1.5 shadow-[var(--shadow-lift)]">
+      <PopMenu open={pop.open} onClose={pop.close} anchor={ref} className="w-52 !p-1.5">
               {props.canUpdate !== false && props.fields?.length ? (
-                <MenuItem icon={Pencil} label={t('edit')} onClick={() => { setOpen(false); setDrawer({ mode: 'edit', row }); }} />
+                <MenuItem icon={Pencil} label={t('edit')} onClick={() => { pop.close(); setDrawer({ mode: 'edit', row }); }} />
               ) : null}
               {rowHrefGuard(props, row) ? (
-                <MenuItem icon={ArrowLeft} label={t('open')} onClick={() => { setOpen(false); router.push(rowHrefGuard(props, row) as string); }} />
+                <MenuItem icon={ArrowLeft} label={t('open')} onClick={() => { pop.close(); router.push(rowHrefGuard(props, row) as string); }} />
               ) : null}
               {props.canArchive !== false && softDelete ? (
                 <MenuItem
                   icon={row.archived_at ? RotateCcw : Archive}
                   label={row.archived_at ? t('restore') : t('archive')}
                   onClick={() => {
-                    setOpen(false);
+                    pop.close();
                     act.mutate({ row, action: row.archived_at ? 'restore' : 'archive' });
                   }}
                 />
@@ -596,16 +590,13 @@ function RowActions({ row, props, setDrawer, setConfirm, t, softDelete, detail, 
                   icon={Trash2}
                   label={t('delete')}
                   onClick={() => {
-                    setOpen(false);
+                    pop.close();
                     setConfirm({ label: `${t('delete')} — ${(row.code as string) ?? row.id}`, action: async () => { await api.del(`/${props.resource}/${row.id}`); setDrawer(null); } });
                   }}
                 />
               ) : null}
-              {props.rowMenu?.(row, () => setOpen(false))}
-            </motion.div>
-          </>
-        ) : null}
-      </AnimatePresence>
+              {props.rowMenu?.(row, () => pop.close())}
+      </PopMenu>
     </div>
   );
 }
@@ -620,8 +611,8 @@ function rowHrefGuard(props: CrudProps, row: RowData): string | undefined {
 
 function MenuItem({ icon: Icon, label, onClick, danger }: { icon: React.ComponentType<{ size?: number }>; label: string; onClick: () => void; danger?: boolean }): React.ReactElement {
   return (
-    <button className={cn('flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-[13px] font-medium hover:bg-[rgb(var(--c-surface-2))]', danger && 'text-[rgb(var(--c-coral))]')} onClick={onClick}>
-      <Icon size={14} /> {label}
+    <button className={cn('flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-[14px] font-medium hover:bg-[rgb(var(--c-surface-2))]', danger && 'text-[rgb(var(--c-coral))]')} onClick={onClick}>
+      <Icon size={15} /> {label}
     </button>
   );
 }
@@ -643,11 +634,11 @@ export function fmtVal(v: unknown): string {
 }
 function formatCell(v: unknown): React.ReactNode {
   if (v === null || v === undefined || v === '') return <span className="text-[rgb(var(--c-muted)/0.5)]">—</span>;
-  if (typeof v === 'object') return <span className="font-mono text-[11.5px]">{JSON.stringify(v)}</span>;
+  if (typeof v === 'object') return <span className="font-mono text-[12.5px]">{JSON.stringify(v)}</span>;
   if (typeof v === 'boolean') return v ? <Badge tone="ok">✓</Badge> : <Badge>—</Badge>;
   const s = String(v);
   if (/^(PAT|MED|DEN|PHR|INF|TLB|RDG|RDL|SEC|ADM|INT|LOC|RDV|MOV|MSG|DRG|CAS|LAB|PHA|DIA|CAR|RAD|CON|SPE|GYP|CHI|SOI|ANA|REE|CER|ORD|ANL|IMG|DOC|RPV|ADM|FIC)-[A-Z0-9-]+$/.test(s)) return <BizCode code={s} />;
-  return <span title={s.length > 60 ? s : undefined} className="block max-w-[420px] truncate align-middle">{s}</span>;
+  return <span title={s.length > 60 ? s : undefined} className="block max-w-[560px] truncate align-middle">{s}</span>;
 }
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);

@@ -11,6 +11,8 @@ import { motion } from 'framer-motion';
 import { Activity, AlertTriangle, BadgeCheck, CalendarPlus, Download, HeartPulse, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Upload, Workflow as WorkflowIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
+import { useMedicalRefs, useCountries } from '@/lib/refs';
+import { sanitizeRichHtml, htmlToPlain } from '@sardpi/shared';
 import { Badge, Button, EmptyState, Field, Input, Select, Tabs, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { BizCode } from '@/components/biz-code';
@@ -25,6 +27,8 @@ export default function PatientPage(): React.ReactElement {
   const router = useRouter();
   const { t } = useT('patient');
   const { t: tc } = useT('common');
+  const refs = useMedicalRefs();
+  const countries = useCountries();
   const [tab, setTab] = useState('history');
   const [qrOpen, setQrOpen] = useState(false);
   const has = useAuth((s) => s.has);
@@ -77,28 +81,21 @@ export default function PatientPage(): React.ReactElement {
               {Number(p.gender ?? p.sex) === 2 || p.sex === 'F' ? <Badge tone="info">{t('sex.f')}</Badge> : <Badge>{t('sex.m')}</Badge>}
             </div>
             {p.full_name_ar ? <div dir="rtl" className="mt-0.5 text-[13px] font-semibold text-[rgb(var(--c-muted))]">{fmtVal(p.full_name_ar)}</div> : null}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[rgb(var(--c-muted))]">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13.5px] text-[rgb(var(--c-muted))]">
               <span>🎂 {fmtVal(p.birth_date).slice(0, 10)}{age(p.birth_date as string) !== null ? ` (${age(p.birth_date as string)} ${t('unit.years')})` : ''}</span>
+              <span>🌍 {countries.countryLabel(p.country)}</span>
               <span>📍 {fmtVal(p.wilaya_label)} {p.commune ? `· ${fmtVal(p.commune)}` : ''}</span>
-              {p.blood_group ? <Badge tone="warn"><DropIcon /> {fmtVal(p.blood_group)}</Badge> : null}
-              {p.ss_fund ? <Badge tone="info">{fmtVal(p.ss_fund)} · <span dir="ltr" className="font-mono">{fmtVal(p.ss_number)}</span></Badge> : null}
-              {p.attending_name ? <span className="inline-flex items-center gap-1"><HeartPulse size={13} className="text-[rgb(var(--c-coral))]" /> {fmtVal(p.attending_name)}</span> : null}
+              {p.blood_group ? <Badge tone="warn" title={refs.bloodLabel(p.blood_group)}><DropIcon /> {fmtVal(p.blood_group)}</Badge> : null}
+              {p.ss_fund ? <Badge tone="info" title={refs.fundLabel(p.ss_fund)}>{fmtVal(p.ss_fund)} · <span dir="ltr" className="font-mono">{fmtVal(p.ss_number)}</span></Badge> : null}
+              {p.attending_name ? <span className="inline-flex items-center gap-1"><HeartPulse size={14} className="text-[rgb(var(--c-coral))]" /> {fmtVal(p.attending_name)}</span> : null}
             </div>
-            {Array.isArray(p.allergies_json) && (p.allergies_json as string[]).length ? (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-[rgb(var(--c-coral-soft))] px-2.5 py-1.5">
-                <AlertTriangle size={14} className="text-[rgb(var(--c-coral))]" />
-                <span className="text-[12px] font-bold text-[rgb(var(--c-coral))]">{t('field.allergies')} :</span>
-                {(p.allergies_json as string[]).map((a) => (
-                  <Badge key={a} tone="danger">{a}</Badge>
-                ))}
-              </div>
-            ) : null}
+            <AllergyAlert value={p.allergies_json} label={t('field.allergies')} />
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <Button size="sm" variant="ghost" title={t('actions.badge')} onClick={() => setQrOpen(true)}>
               <QrCode size={15} />
             </Button>
-            <Button size="sm" variant="ghost" title={tc('print')} onClick={() => printHistory(p, fullName)}>
+            <Button size="sm" variant="ghost" title={tc('print')} onClick={() => printHistory(p, fullName, { title: t('print.title'), code: tc('code'), birth: t('field.birthDate'), blood: t('field.bloodGroup'), wilaya: t('field.wilaya'), fund: t('field.ssFund'), ss: t('field.ssNumber'), country: t('field.country') }, refs.bloodLabel(p.blood_group), refs.fundLabel(p.ss_fund), countries.countryLabel(p.country))}>
               <Printer size={15} />
             </Button>
             <Button size="sm" variant="ghost" title={t('actions.export')} onClick={() => void api.download(`/patients/${pid}/export`, `dossier-${p.code as string}.json`).catch(() => undefined)}>
@@ -258,23 +255,45 @@ export default function PatientPage(): React.ReactElement {
 }
 
 function DropIcon(): React.ReactElement {
-  return <Syringe size={11} />;
+  return <Syringe size={12} />;
+}
+
+/** Bandeau allergies : liste legacy (pastilles) ou HTML riche (éditeur) — ré-assaini à l'affichage. */
+function AllergyAlert({ value, label }: { value: unknown; label: string }): React.ReactElement | null {
+  const arr = Array.isArray(value) ? (value as unknown[]).map((v) => String(v)).filter(Boolean) : null;
+  const html = typeof value === 'string' && value.trim() ? sanitizeRichHtml(value) : null;
+  if (arr && !arr.length) return null;
+  if (!arr && !html) return null;
+  if (!arr && html && !htmlToPlain(html)) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-[8px] bg-[rgb(var(--c-coral-soft))] px-2.5 py-1.5">
+      <AlertTriangle size={15} className="text-[rgb(var(--c-coral))]" />
+      <span className="text-[13px] font-bold text-[rgb(var(--c-coral))]">{label} :</span>
+      {arr ? (
+        arr.map((a) => <Badge key={a} tone="danger">{a}</Badge>)
+      ) : (
+        <span className="rich-view min-w-0 flex-1 text-[13px] font-semibold text-[rgb(var(--c-coral))]" dangerouslySetInnerHTML={{ __html: html ?? '' }} />
+      )}
+    </div>
+  );
 }
 
 /** Impression de la fiche réduite (liste — pas de portail, fenêtre dédiée, LTR codes isolés). */
-function printHistory(p: Record<string, unknown>, name: string): void {
+function printHistory(p: Record<string, unknown>, name: string, L: Record<string, string>, blood: string, fund: string, country: string): void {
+  const esc = (x: string): string => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
   const rows: [string, string][] = [
-    [String(p.code ?? ''), 'code'],
-    [String(p.birth_date ?? ''), 'naissance'],
-    [String(p.blood_group ?? ''), 'groupe'],
-    [String(p.wilaya_label ?? ''), 'wilaya'],
-    [String(p.ss_fund ?? ''), 'organisme'],
-    [String(p.ss_number ?? ''), 'n° sécu'],
+    [String(p.code ?? ''), L.code ?? 'code'],
+    [String(p.birth_date ?? '').slice(0, 10), L.birth ?? ''],
+    [blood, L.blood ?? ''],
+    [country, L.country ?? ''],
+    [String(p.wilaya_label ?? ''), L.wilaya ?? ''],
+    [fund, L.fund ?? ''],
+    [String(p.ss_number ?? ''), L.ss ?? ''],
   ];
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${name}</title><style>
-  body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}table{border-collapse:collapse}td,th{border:1px solid #999;padding:4px 8px;font-size:12px}.code{font-family:monospace;direction:ltr}
-  </style></head><body><h2>Fiche patient — ${name}</h2><table><tbody>${rows
-    .map((r) => `<tr><th>${r[1]}</th><td class="${r[1] === 'code' ? 'code' : ''}">${r[0] || '—'}</td></tr>`)
+  const html = `<!doctype html><html dir="${document.documentElement.dir}"><head><meta charset="utf-8"><title>${esc(name)}</title><style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}table{border-collapse:collapse}td,th{border:1px solid #999;padding:5px 9px;font-size:12.5px;text-align:start}.code{font-family:monospace;direction:ltr}
+  </style></head><body><h2>${esc(L.title ?? 'Fiche')} — ${esc(name)}</h2><table><tbody>${rows
+    .map((r) => `<tr><th>${esc(r[1])}</th><td class="${r[1] === (L.code ?? 'code') ? 'code' : ''}">${esc(r[0]) || '—'}</td></tr>`)
     .join('')}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`;
   const w = window.open('', '_blank', 'width=720,height=640');
   if (w) {

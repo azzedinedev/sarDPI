@@ -4,6 +4,7 @@
  */
 export * from './labels';
 export * from './codes';
+export * from './medicalRefs';
 export * from './permissions';
 export * from './entities';
 export * from './manifest';
