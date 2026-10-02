@@ -309,5 +309,7 @@
   "dash.newPatient": "مريض جديد",
   "dash.newConsult": "استشارة جديدة",
   "dash.newLab": "تحليل",
-  "dash.newRx": "وصفة طبية"
+  "dash.newRx": "وصفة طبية",
+  "ui.back": "رجوع",
+  "ui.backHome": "العودة إلى لوحة القيادة"
 }

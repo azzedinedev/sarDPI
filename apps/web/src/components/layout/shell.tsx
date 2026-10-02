@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
+  ArrowLeft,
   CalendarRange,
   ChevronFirst,
   FlaskConical,
@@ -171,6 +172,19 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
             <button className="btn btn-ghost btn-sm btn-icon lg:hidden" onClick={() => setMobileOpen(true)} aria-label={t('nav.openMenu')}>
               <Menu size={18} />
             </button>
+            {pathname && pathname !== '/dashboard' ? (
+              <button
+                className="btn btn-ghost btn-sm btn-icon shrink-0"
+                title={t('ui.back')}
+                aria-label={t('ui.back')}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+                  else router.push('/dashboard');
+                }}
+              >
+                <ArrowLeft size={18} className="rtl:rotate-180" />
+              </button>
+            ) : null}
             <form
               className="relative min-w-0 flex-1 max-w-md"
               onSubmit={(e) => {

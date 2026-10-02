@@ -309,5 +309,7 @@
   "dash.newPatient": "Nouveau patient",
   "dash.newConsult": "Nouvelle consultation",
   "dash.newLab": "Analyse",
-  "dash.newRx": "Ordonnance"
+  "dash.newRx": "Ordonnance",
+  "ui.back": "Retour",
+  "ui.backHome": "Retour au tableau de bord"
 }

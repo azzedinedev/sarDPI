@@ -309,5 +309,7 @@
   "dash.newPatient": "New patient",
   "dash.newConsult": "New consultation",
   "dash.newLab": "Lab test",
-  "dash.newRx": "Prescription"
+  "dash.newRx": "Prescription",
+  "ui.back": "Back",
+  "ui.backHome": "Back to dashboard"
 }

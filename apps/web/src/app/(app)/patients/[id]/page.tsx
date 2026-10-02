@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Activity, AlertTriangle, BadgeCheck, CalendarPlus, Download, HeartPulse, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Upload, Workflow as WorkflowIcon } from 'lucide-react';
+import { Activity, AlertCircle, AlertTriangle, BadgeCheck, CalendarPlus, CheckCircle2, Download, HeartPulse, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Undo2, Upload, Workflow as WorkflowIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { useMedicalRefs, useCountries } from '@/lib/refs';
@@ -41,7 +41,7 @@ export default function PatientPage(): React.ReactElement {
   const patient = useQuery({ queryKey: ['patient', pid], queryFn: () => api.get<Record<string, unknown>>(`/patients/${pid}`) });
   const consent = (patient.data?.consent_json as { granted?: boolean; scopes?: string[] } | undefined) ?? undefined;
 
-  const history = useQuery({ queryKey: ['history', pid], queryFn: () => api.get<{ rows: { id: number; kind: string; at: string; ref_code: string | null; summary: Record<string, string> | null }[] }>(`/patients/${pid}/history?mode=${tab === 'history' ? 'reduced' : 'reduced'}`), enabled: tab === 'history' });
+  const history = useQuery({ queryKey: ['history', pid], queryFn: () => api.get<{ rows: { id: number; kind: string; at: string; ref_code: string | null; tone?: string | null; summary: Record<string, string> | null }[] }>(`/patients/${pid}/history?mode=${tab === 'history' ? 'reduced' : 'reduced'}`), enabled: tab === 'history' });
 
   const badge = useQuery({ queryKey: ['badge', pid], queryFn: () => api.get<{ qr: string; barcode: string; url: string; code: string; name: string }>(`/patients/${pid}/badge-assets`), enabled: qrOpen, staleTime: 300_000 });
 
@@ -312,7 +312,7 @@ function printHistory(p: Record<string, unknown>, name: string, L: Record<string
 }
 
 /* ------------------------------------------------ Antécédents */
-function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; kind: string; at: string; ref_code: string | null; summary: Record<string, string> | null }[]; loading: boolean }): React.ReactElement {
+function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; kind: string; at: string; ref_code: string | null; tone?: string | null; summary: Record<string, string> | null }[]; loading: boolean }): React.ReactElement {
   const fmt = useFmtDate();
   const { t } = useT('patient');
   const { lang } = useT('common');
@@ -346,14 +346,17 @@ function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; k
     movement: <WorkflowIcon size={13} />,
     case: <WorkflowIcon size={13} />,
   };
+  // tonalité → icône + couleur : annulation (coral + Undo2), succès (ok + check), en cours (ambre)
+  const toneIcon = (tone?: string | null): React.ReactNode | null =>
+    tone === 'cancel' ? <Undo2 size={13} /> : tone === 'ok' ? <CheckCircle2 size={13} /> : tone === 'warn' ? <AlertCircle size={13} /> : null;
   return (
     <Card className="flex flex-col gap-3">
       {loading ? <div className="skeleton h-40" /> : !data.length ? <EmptyState icon={Activity} title={t('history.empty')} /> : null}
       <ul className="relative flex flex-col gap-0">
         {data.map((ev, i) => (
           <motion.li key={ev.id} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i, 15) * 0.02 }} className="relative flex items-start gap-3 border-s-2 border-[rgb(var(--c-line))] py-2 ltr:ps-4 rtl:pe-4 rtl:border-s-0 rtl:border-e-2">
-            <span className="absolute top-3 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full border border-[rgb(var(--c-line))] bg-[rgb(var(--c-surface))] text-[rgb(var(--c-primary))] ltr:left-0 rtl:left-auto rtl:-translate-x-[-50%] rtl:translate-x-1/2 rtl:right-0 rtl:border-e-0">
-              {KIND_ICON[ev.kind] ?? <BadgeCheck size={12} />}
+            <span className={`absolute top-3 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full border bg-[rgb(var(--c-surface))] ltr:left-0 rtl:left-auto rtl:-translate-x-[-50%] rtl:translate-x-1/2 rtl:right-0 rtl:border-e-0 ${ev.tone === 'cancel' ? 'border-[rgb(var(--c-coral)/0.5)] text-[rgb(var(--c-coral))]' : ev.tone === 'ok' ? 'border-[rgb(var(--c-line))] text-[rgb(var(--c-ok))]' : ev.tone === 'warn' ? 'border-[rgb(var(--c-line))] text-[rgb(var(--c-amber))]' : 'border-[rgb(var(--c-line))] text-[rgb(var(--c-primary))]'}`}>
+              {toneIcon(ev.tone) ?? KIND_ICON[ev.kind] ?? <BadgeCheck size={12} />}
             </span>
             <span dir="ltr" className="mt-0.5 shrink-0 tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(ev.at, true)}</span>
             <span className="min-w-0 flex-1 text-[13px]">{pickAny(ev.summary, lang)}</span>

@@ -23,6 +23,16 @@ function richField(v: unknown): unknown {
   return v ?? [];
 }
 
+/** JSON.parse tolérant (les colonnes *_json peuvent arriver en texte selon l'adaptateur). */
+function safeParse(raw: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function mapPatientInput(input: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {
     first_name: input.firstName,
@@ -206,13 +216,20 @@ export function registerPatients(): void {
       if (mode === 'reduced') {
         return {
           mode,
-          rows: rows.map((r) => ({
-            id: Number(r.id),
-            kind: r.kind,
-            at: r.occurred_at,
-            ref_code: r.ref_code,
-            summary: typeof r.summary_json === 'string' ? JSON.parse(String(r.summary_json)) : r.summary_json,
-          })),
+          rows: rows.map((r) => {
+            const detail = typeof r.detail_json === 'string' ? safeParse(String(r.detail_json)) : (r.detail_json as Record<string, unknown> | null);
+            // tonalité d'affichage : une étape annulée (stepStatus 'todo') ressort en « cancel » (icône/couleur dédiées)
+            const stepStatus = detail && typeof detail === 'object' ? String((detail as Record<string, unknown>).stepStatus ?? '') : '';
+            const tone = stepStatus === 'todo' ? 'cancel' : stepStatus === 'done' ? 'ok' : stepStatus ? 'warn' : null;
+            return {
+              id: Number(r.id),
+              kind: r.kind,
+              at: r.occurred_at,
+              ref_code: r.ref_code,
+              tone,
+              summary: typeof r.summary_json === 'string' ? JSON.parse(String(r.summary_json)) : r.summary_json,
+            };
+          }),
         };
       }
       return { mode, rows: rows.map((r) => sanitizeRow(r)) };

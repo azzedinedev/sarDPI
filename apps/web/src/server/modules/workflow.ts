@@ -99,13 +99,25 @@ export function registerWorkflow(): void {
         await db.update('patient_cases', input.caseId, { status: 'closed', closed_at: new Date().toISOString(), current_step: input.stepKey });
       }
       ctx.resultId = input.caseId;
+      // libellé d'historique localisé : « annulée » (et non « todo ») quand on annule une étape
+      const stepName = (lg: string): string => {
+        const lbl = defs[idx]!.label as Record<string, string> | string | undefined;
+        return typeof lbl === 'string' && lbl ? lbl : (lbl as Record<string, string>)?.[lg] ?? (lbl as Record<string, string>)?.fr ?? defs[idx]!.key;
+      };
+      const WORD: Record<string, { fr: string; ar: string; es: string; en: string }> = {
+        done: { fr: 'terminée', ar: 'منجزة', es: 'completada', en: 'completed' },
+        in_progress: { fr: 'en cours', ar: 'قيد التنفيذ', es: 'en curso', en: 'in progress' },
+        skipped: { fr: 'passée sans suite', ar: 'متخطّاة', es: 'omitida', en: 'skipped' },
+        todo: { fr: 'annulée', ar: 'ملغاة', es: 'cancelada', en: 'cancelled' },
+      };
+      const w = WORD[input.status] ?? WORD.done!;
       await pushHistory(ctx.user!.uid, {
         patientId: Number(kase.patient_id),
         kind: 'case',
         refId: input.caseId,
         refCode: String(kase.code),
-        summary: { fr: `Étape « ${defs[idx]!.key} » ${input.status}`, ar: `خطوة ${defs[idx]!.key} : ${input.status}`, en: `Step “${defs[idx]!.key}” ${input.status}` },
-        detail: { locationId: input.locationId, practitioners: input.practitionerIds },
+        summary: { fr: `Étape « ${stepName('fr')} » ${w.fr}`, ar: `خطوة « ${stepName('ar')} » : ${w.ar}`, es: `Paso « ${stepName('es')} » ${w.es}`, en: `Step “${stepName('en')}” ${w.en}` },
+        detail: { locationId: input.locationId, practitioners: input.practitionerIds, stepStatus: input.status },
       });
       return { ok: true, current_step: nextStep };
     },

@@ -196,7 +196,11 @@ function renderInput(f: FieldDef, register: ReturnType<typeof useForm>['register
       return <StringList name={f.key} disabled={f.disabled} placeholder={f.placeholder} />;
     case 'code':
       return <Input readOnly disabled {...register(f.key)} className="font-mono" />;
-    default:
-      return <Input type={f.kind === 'number' ? 'number' : f.kind === 'date' || f.kind === 'datetime' || f.kind === 'time' ? f.kind : f.kind === 'tel' ? 'tel' : f.kind === 'email' ? 'email' : f.kind === 'password' ? 'password' : 'text'} step={f.step ?? (f.kind === 'number' ? 'any' : undefined)} min={f.min} max={f.max} placeholder={f.placeholder} disabled={f.disabled} {...register(f.key)} />;
+    default: {
+      // date / datetime / time → sélecteurs natifs au format standard (« datetime » HTML n'existe pas → datetime-local)
+      const isTemporal = f.kind === 'date' || f.kind === 'datetime' || f.kind === 'time';
+      const inputType = f.kind === 'number' ? 'number' : f.kind === 'datetime' ? 'datetime-local' : isTemporal ? f.kind : f.kind === 'tel' ? 'tel' : f.kind === 'email' ? 'email' : f.kind === 'password' ? 'password' : 'text';
+      return <Input dir={isTemporal ? 'ltr' : undefined} className={isTemporal ? 'tabular-nums' : undefined} type={inputType} step={f.step ?? (f.kind === 'number' ? 'any' : undefined)} min={f.min} max={f.max} placeholder={f.placeholder} disabled={f.disabled} {...register(f.key)} />;
+    }
   }
 }
