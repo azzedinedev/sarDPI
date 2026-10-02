@@ -85,6 +85,11 @@ export function registerWorkflow(): void {
       // le courant = dernière étape commencée
       const nextStep = input.status === 'done' ? (defs[idx + 1]?.key ?? input.stepKey) : input.stepKey;
       await db.update('patient_cases', input.caseId, { current_step: nextStep });
+      // annulation d'une étape (todo/in_progress) sur un dossier clôturé → on le réouvre
+      if (input.status !== 'done') {
+        const kase2 = await db.findOne<Record<string, unknown>>('patient_cases', { id: input.caseId });
+        if (kase2 && kase2.status === 'closed') await db.update('patient_cases', input.caseId, { status: 'open', closed_at: null });
+      }
       if (input.status === 'done' && defs[idx + 1]) {
         const nx = await db.findOne<Record<string, unknown>>('case_steps', { case_id: input.caseId, step_key: defs[idx + 1]!.key });
         if (nx) await db.update('case_steps', Number(nx.id), { status: 'in_progress', updated_at: new Date().toISOString() });

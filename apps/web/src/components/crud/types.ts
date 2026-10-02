@@ -65,6 +65,12 @@ export interface CrudProps {
   scopeSelect?: boolean; // actif / archivés / tous
   extraQuery?: Record<string, string | number | undefined>; // scope patient, catégorie…
   initialQ?: string; // recherche préremplie (querystring global)
+  /** deep-link : nom du paramètre querystring portant l'id à ouvrir dans le tiroir détail (défaut « open ») */
+  openParam?: string;
+  /** valeurs préremplies du formulaire de création (deep-link agenda/dossier) */
+  createDefaults?: Record<string, unknown> | null;
+  /** ouvrir directement le tiroir de création au montage (deep-link « ?new=1 ») */
+  autoCreate?: boolean;
   transformCreate?: (values: Record<string, unknown>) => Record<string, unknown>;
   transformUpdate?: (values: Record<string, unknown>, row: RowData) => Record<string, unknown>;
   rowHref?: (row: RowData) => string;

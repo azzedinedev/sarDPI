@@ -6,13 +6,14 @@
  */
 import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Field, Input, Select, Spinner, Textarea } from '@/components/ui';
 import { useToast } from '@/components/toast';
+import { useAuth } from '@/stores/auth';
 
 interface DrugHit {
   id: number;
@@ -44,6 +45,10 @@ export default function RxNewPage(): React.ReactElement {
   const { t } = useT('patient');
   const { t: tc } = useT('common');
   const toast = useToast();
+  const qc = useQueryClient();
+  const has = useAuth((s) => s.has);
+  const editId = sp.get('id') ? Number(sp.get('id')) : null; // mode édition d'une ordonnance existante
+  const isAdmin = has('prescriptions', 'validate');
 
   const [patientQuery, setPatientQuery] = useState('');
   const [patient, setPatient] = useState<{ id: number; code: string; full_name: string } | null>(null);
@@ -60,6 +65,34 @@ export default function RxNewPage(): React.ReactElement {
   const templates = useQuery({ queryKey: ['rx-templates'], queryFn: () => api.get<{ rows: { id: number; name: string; practitioner_id: number | null }[] }>('/rx-templates?pageSize=50') });
   const drugs = useQuery({ queryKey: ['drug-search', drugSearch], queryFn: () => api.get<{ rows: DrugHit[] }>(`/drugs/search?q=${encodeURIComponent(drugSearch)}`), enabled: drugSearch.length >= 2 });
 
+  // ordonnance chargée en édition (statut/verrou + lignes)
+  const loaded = useQuery({
+    queryKey: ['rx', editId],
+    enabled: Boolean(editId),
+    queryFn: () =>
+      api.get<{
+        id: number; code: string | null; status: string; act_date?: string; notes?: string | null; refills?: number;
+        locked_at?: string | null; practitioner_id?: number; patient_id?: number;
+        patient?: { code: string; last_name: string; first_name: string } | null;
+        lines?: { drug_id?: number | null; dci?: string | null; trade_name: string; form?: string | null; dosage?: string | null; quantity: number; posology: string; duration_days: number; instructions?: string | null }[];
+      }>(`/prescriptions/${editId}`),
+  });
+  const locked = Boolean(loaded.data?.locked_at) || loaded.data?.status === 'validated';
+  const readOnly = Boolean(editId) && locked && !isAdmin;
+  const [hydrated, setHydrated] = useState(false);
+  React.useEffect(() => {
+    if (!editId || !loaded.data || hydrated) return;
+    const rx = loaded.data;
+    if (rx.patient) setPatient({ id: Number(rx.patient_id), code: rx.patient.code, full_name: `${rx.patient.first_name ?? ''} ${rx.patient.last_name ?? ''}`.trim() });
+    if (rx.practitioner_id) setPractitionerId(Number(rx.practitioner_id));
+    if (rx.act_date) setDate(String(rx.act_date).slice(0, 10));
+    setRefills(Number(rx.refills ?? 0));
+    setNotes(rx.notes ?? '');
+    if (rx.lines?.length) setLines(rx.lines.map((l) => ({ key: lineSeq++, drugId: l.drug_id ?? null, dci: l.dci ?? '', tradeName: l.trade_name, form: l.form ?? '', dosage: l.dosage ?? '', quantity: Number(l.quantity ?? 1), posology: l.posology ?? '', durationDays: Number(l.duration_days ?? 7), instructions: l.instructions ?? '' })));
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, loaded.data, hydrated]);
+
   const check = useMutation({
     mutationFn: () => api.post<{ warnings: { kind: 'allergy' | 'interaction'; text: string }[] }>('/prescriptions/check', { patientId: patient?.id, lines: lines.map((l) => ({ dci: l.dci, tradeName: l.tradeName })) }),
   });
@@ -69,22 +102,31 @@ export default function RxNewPage(): React.ReactElement {
 
   const save = useMutation({
     mutationFn: async () => {
-      const r = await api.post<{ id: number }>('/prescriptions', {
+      const payloadLines = lines.map((l) => ({ drugId: l.drugId, dci: l.dci || null, tradeName: l.tradeName, form: l.form || null, dosage: l.dosage || null, quantity: l.quantity, posology: l.posology, durationDays: l.durationDays, instructions: l.instructions || null }));
+      if (editId) {
+        await api.put(`/prescriptions/${editId}`, { practitionerId: Number(practitionerId), actDate: date, refills, notes: notes || null, lines: payloadLines });
+        return { id: editId };
+      }
+      return await api.post<{ id: number }>('/prescriptions', {
         patientId: patient?.id,
         practitionerId: Number(practitionerId),
         templateId: templateId ? Number(templateId) : null,
         actDate: date,
         refills,
         notes: notes || null,
-        lines: lines.map((l) => ({ drugId: l.drugId, dci: l.dci || null, tradeName: l.tradeName, form: l.form || null, dosage: l.dosage || null, quantity: l.quantity, posology: l.posology, durationDays: l.durationDays, instructions: l.instructions || null })),
+        lines: payloadLines,
       });
-      return r;
     },
     onSuccess: (r) => {
       toast.success(tc('saved'));
+      void qc.invalidateQueries({ queryKey: ['rx', r.id] });
+      void qc.invalidateQueries({ queryKey: ['list', 'prescriptions'] });
       router.push(`/prescriptions/${r.id}`);
     },
-    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
+    onError: (e: unknown) => {
+      const code = (e as { code?: string }).code ?? 'network';
+      toast.error(code === 'errors.locked' ? t('errors.locked') : t(`errors.${code}`));
+    },
   });
 
   const preselect = sp.get('patient');
@@ -99,19 +141,24 @@ export default function RxNewPage(): React.ReactElement {
   }, [preselect]);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="glass-card flex flex-wrap items-center gap-3 p-4">
-          <h1 className="text-[19px] font-bold">{t('rx.new')}</h1>
+          <h1 className="text-[19px] font-bold">{editId ? t('rx.edit') : t('rx.new')}</h1>
+          {editId && loaded.data?.code ? <Badge tone="info">{loaded.data.code}</Badge> : null}
+          {locked ? <Badge tone={isAdmin ? 'warn' : 'danger'}>{t('rx.lockedBadge')}</Badge> : null}
           <div className="ms-auto flex gap-2">
             <Button variant="ghost" onClick={() => check.mutate()} disabled={!patient || !lines.length}>
               <AlertTriangle size={14} /> {t('rx.check')}
             </Button>
-            <Button variant="primary" loading={save.isPending} disabled={!valid} onClick={() => save.mutate()}>
+            <Button variant="primary" loading={save.isPending} disabled={!valid || readOnly} onClick={() => save.mutate()}>
               <Save size={15} /> {tc('save')}
             </Button>
           </div>
         </div>
+        {readOnly ? (
+          <p className="mt-2 rounded-xl bg-[rgb(var(--c-coral-soft))] px-3 py-2 text-[12.5px] font-bold text-[rgb(var(--c-coral))]">{t('rx.lockedHint')}</p>
+        ) : null}
       </motion.div>
 
       <div className="grid gap-3 md:grid-cols-2">

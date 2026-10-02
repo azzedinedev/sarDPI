@@ -66,6 +66,7 @@ export function CrudForm({
   title,
   fields,
   row,
+  defaults,
   schema,
   onSubmit,
   busy,
@@ -76,22 +77,26 @@ export function CrudForm({
   title: React.ReactNode;
   fields: FieldDef[];
   row: RowData | null;
+  /** valeurs de création préremplies (deep-link) — ignorées en édition */
+  defaults?: Record<string, unknown> | null;
   schema?: import('zod').ZodTypeAny;
   onSubmit: (values: Record<string, unknown>) => void;
   busy?: boolean;
   footerExtra?: React.ReactNode;
 }): React.ReactElement {
   const { t } = useT('common');
+  // en création (row=null), les « defaults » servent de graine au formulaire
+  const seed = (row ?? defaults ?? null) as RowData | null;
   const methods = useForm<Record<string, unknown>>({
     resolver: schema ? (zodResolver(schema as never) as never) : undefined,
-    defaultValues: initValue(fields, row),
+    defaultValues: initValue(fields, seed),
   });
   const { register, handleSubmit, formState } = methods;
 
   useEffect(() => {
-    if (open) methods.reset(initValue(fields, row));
+    if (open) methods.reset(initValue(fields, seed));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, row]);
+  }, [open, row, defaults]);
 
   const submit: SubmitHandler<Record<string, unknown>> = (values) => {
     const clean: Record<string, unknown> = {};

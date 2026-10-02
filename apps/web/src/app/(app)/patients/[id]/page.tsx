@@ -159,7 +159,12 @@ export default function PatientPage(): React.ReactElement {
           rowMenu={(r) => (
             <button
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-[13px] font-medium hover:bg-[rgb(var(--c-surface-2))]"
-              onClick={() => void api.download(`/ged/${r.id}/url`, 'doc').catch(() => undefined)}
+              onClick={() =>
+                void api
+                  .get<{ url: string }>(`/ged/${r.id}/url`, { download: '1' })
+                  .then((x) => window.open(x.url, '_blank', 'noopener'))
+                  .catch(() => undefined)
+              }
             >
               <Download size={14} /> {t('ged.download')}
             </button>
@@ -381,6 +386,8 @@ interface Step {
   status: 'todo' | 'in_progress' | 'done' | 'skipped';
   done_at: string | null;
   note: string | null;
+  location_id?: number | null;
+  practitioners?: unknown[];
 }
 function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): React.ReactElement {
   const { t } = useT('patient');
@@ -418,17 +425,33 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
   };
 
   const openStep = (s: Step): void => {
-    if (!editable || s.status === 'done') return;
+    if (!editable) return;
     void (async () => {
       try {
         await ensureCase(s.key);
-        methods.reset({ status: 'done', at: nowLocal(), locationId: '', practitionerIds: [], note: s.note ?? '' });
+        const st = ['done', 'in_progress', 'skipped', 'todo'].includes(String(s.status)) ? String(s.status) : 'done';
+        methods.reset({ status: st, at: s.done_at ? String(s.done_at).slice(0, 16) : nowLocal(), locationId: s.location_id ? String(s.location_id) : '', practitionerIds: Array.isArray(s.practitioners) ? (s.practitioners as unknown[]).map(String) : [], note: s.note ?? '' });
         setFiche({ stepKey: s.key, label: stepLabelOf(s) });
       } catch {
         /* toast déjà émis par ensureCase */
       }
     })();
   };
+
+  // annulation d'une étape : statut « todo », le current_step revient dessus (côté serveur) + historique
+  const cancelStep = useMutation({
+    mutationFn: async (s: Step) => {
+      await ensureCase(s.key);
+      return api.post('/cases/advance', { caseId: q.data?.case?.id ?? createdRef.current, stepKey: s.key, status: 'todo', note: null, at: null });
+    },
+    onSuccess: () => {
+      toast.success(t('workflow.stepCancelled'));
+      createdRef.current = null;
+      void qc.invalidateQueries({ queryKey: ['case', pid] });
+      void qc.invalidateQueries({ queryKey: ['list', 'patients'] });
+    },
+    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
+  });
 
   const save = useMutation({
     mutationFn: () => {
@@ -481,6 +504,19 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
                 </motion.button>
                 <span className={`max-w-[110px] text-center text-[11.5px] font-semibold ${cur ? 'text-[rgb(var(--c-amber))]' : ''}`}>{stepLabelOf(s)}</span>
                 {s.done_at ? <span dir="ltr" className="tabular-nums text-[10px] text-[rgb(var(--c-muted))]">{fmt(s.done_at, true)}</span> : null}
+                {editable && caseId && s.status !== 'todo' ? (
+                  <button
+                    className="text-[10px] font-semibold text-[rgb(var(--c-muted))] underline-offset-2 hover:text-[rgb(var(--c-coral))] hover:underline disabled:opacity-40"
+                    title={t('workflow.cancelStep')}
+                    disabled={cancelStep.isPending}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cancelStep.mutate(s);
+                    }}
+                  >
+                    ↩ {t('workflow.cancelStep')}
+                  </button>
+                ) : null}
               </div>
               {i < steps.length - 1 ? <div className={`h-0.5 w-10 rounded ${done ? 'bg-[rgb(var(--c-ok))]' : 'bg-[rgb(var(--c-line))]'}`} /> : null}
             </React.Fragment>
@@ -505,7 +541,7 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
       )}
       {/* Fiche d'étape — modale large rendue en portail : plus jamais tronquée par la carte. */}
       <Dialog
-        wide
+        xwide
         open={Boolean(fiche)}
         onClose={() => setFiche(null)}
         title={`${t('workflow.stepFiche')}${fiche ? ` — ${fiche.label}` : ''}`}
@@ -521,7 +557,7 @@ function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): Rea
         <FormProvider {...methods}>
           <div className="grid grid-cols-2 gap-3 py-1">
             <Field label={t('workflow.stepStatus')}>
-              <Select {...methods.register('status')} options={[{ value: 'done', label: t('workflow.stDone') }, { value: 'in_progress', label: t('workflow.stProgress') }, { value: 'skipped', label: t('workflow.stSkip') }]} />
+              <Select {...methods.register('status')} options={[{ value: 'done', label: t('workflow.stDone') }, { value: 'in_progress', label: t('workflow.stProgress') }, { value: 'skipped', label: t('workflow.stSkip') }, { value: 'todo', label: t('workflow.stTodo') }]} />
             </Field>
             <Field label={t('workflow.at')}>
               <Input type="datetime-local" dir="ltr" {...methods.register('at')} />
@@ -709,7 +745,7 @@ function PatientRecords({ pid }: { pid: number }): React.ReactElement {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(i, 12) * 0.02 }}
-          onClick={() => router.push(`/records/${fmtVal(r.category_module ?? r.category)}/${r.id}`)}
+          onClick={() => router.push(`/records/${fmtVal(r.category_module ?? r.category_prefix ?? r.category)}?open=${r.id}`)}
           className="flex items-center gap-3 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-2.5 text-start transition-colors hover:bg-[rgb(var(--c-primary-soft)/0.4)]"
         >
           <Badge tone="info">{fmtVal(r.category_prefix)}</Badge>

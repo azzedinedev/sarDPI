@@ -8,7 +8,7 @@
  * archivage/suppression logique avec confirmation, animations Framer Motion (désactivables).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   flexRender,
   getCoreRowModel,
@@ -41,6 +41,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
   const disp = useDisplayCfg();
   const [expId, setExpId] = useState<number | null>(null);
   const router = useRouter();
+  const sp = useSearchParams();
+  const openParam = props.openParam ?? 'open';
   const toast = useToast();
   const { t } = useT('common');
   const { t: te } = useT('errors');
@@ -100,6 +102,45 @@ export function CrudModule(props: CrudProps): React.ReactElement {
 
   const rows = useMemo(() => query.data?.rows ?? [], [query.data]);
   const total = query.data?.total ?? 0;
+
+  // Deep-link : « ?open=<id> » ouvre le tiroir détail/édition ; « ?new=1 » ouvre la création.
+  // Robuste à la pagination : si la ligne n'est pas dans la page courante, on la recharge à l'unité.
+  const deepLinkDone = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sp) return;
+    const strip = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(openParam);
+      url.searchParams.delete('new');
+      router.replace(`${url.pathname}${url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''}`, { scroll: false });
+    };
+    if (sp.get('new') === '1' && props.autoCreate !== false && props.canCreate !== false && fields.length && deepLinkDone.current !== 'new') {
+      deepLinkDone.current = 'new';
+      setDrawer({ mode: 'create' });
+      strip();
+      return;
+    }
+    const openId = sp.get(openParam);
+    if (!openId || deepLinkDone.current === openId) return;
+    deepLinkDone.current = openId;
+    const idNum = Number(openId);
+    const mode: 'view' | 'edit' = detail ? 'view' : props.canUpdate === false ? 'view' : 'edit';
+    const finish = (row: RowData) => {
+      setDrawer({ mode, row });
+      strip();
+    };
+    const found = rows.find((r) => Number(r.id) === idNum);
+    if (found) {
+      finish(found);
+      return;
+    }
+    void api
+      .get<RowData>(`/${resource}/${idNum}`)
+      .then((r) => (r && typeof r === 'object' ? finish(r) : undefined))
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp, rows, resource, openParam, detail, fields.length]);
+
 
   const refetchAll = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ['list', resource] });
@@ -538,6 +579,7 @@ export function CrudModule(props: CrudProps): React.ReactElement {
           title={drawer?.mode === 'create' ? (props.createLabel ?? t('new')) : t('edit')}
           fields={fields.map((f) => ({ ...f, label: f.label }))}
           row={drawer?.mode === 'edit' ? drawer.row ?? null : null}
+          defaults={drawer?.mode === 'create' ? props.createDefaults ?? null : null}
           schema={schema}
           busy={save.isPending}
           onSubmit={(values) => save.mutate({ mode: drawer?.mode as 'create' | 'edit', values, row: drawer?.row })}

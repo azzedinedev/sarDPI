@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { userCreateZ, userUpdateZ, roleUpdateZ, multiLabelZ, can } from '@sardpi/shared';
+import { userCreateZ, userUpdateZ, roleUpdateZ, multiLabelZ, can, compactDate } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud, sanitizeRow } from '../http/crud';
 import { ApiError, notFound } from '../http/errors';
@@ -179,6 +179,115 @@ export function registerAdmin(): void {
         }
       }
       return { ok: true, applied, skipped };
+    },
+  });
+
+  /**
+   * REFORMATAGE des codes métier legacy — migration ponctuelle des anciennes bases.
+   * Ancien format : {PAT}-{AAAAMMJJ}-{PREFIX}-{SEQ}  (ex. PAT-00001-20260831-ORD-01)
+   * Nouveau format : {PREFIX}-{AAAAMMJJ}-{SEQ}-{PAT}  (ex. ORD-20260831-01-PAT-00001)
+   * Transformation déterministe (réordonnancement des segments) ; les codes déjà conformes
+   * sont ignorés ; les collisions sont signalées et sautées (jamais de réutilisation forcée).
+   * dryRun=1 → aperçu du plan sans écriture. Réservé à l'admin (setting.update), audité.
+   */
+  route({
+    method: 'POST',
+    path: '/admin/codes/reformat',
+    perm: ['setting', 'update'],
+    audit: { action: 'codes.reformat', entity: 'settings' },
+    async handler(ctx: Ctx) {
+      const db = await getDb();
+      const body = (await ctx.req.json().catch(() => ({}))) as { dryRun?: string | boolean };
+      const dryRun = String(body?.dryRun ?? '0') === '1' || body?.dryRun === true;
+      const LEGACY = /^([A-Z]{2,6}-\d{4,8})-(\d{6,8})-([A-Z]{2,5})-(\d{2,3})$/;
+      const NEW_RE = /^[A-Z]{2,5}-\d{6,8}-\d{2,3}-[A-Z]{1,6}-\d{4,8}$/;
+      const tables = ['medical_records', 'prescriptions'] as const;
+      // tous les codes existants (pour détecter les collisions avec une cible déjà prise)
+      const used = new Set<string>();
+      const allRows: { table: string; id: number; code: string }[] = [];
+      for (const table of tables) {
+        const rows = await db.find<Record<string, unknown>>(table, { limit: 200000 });
+        for (const r of rows) {
+          const code = String(r.code ?? '');
+          if (code) used.add(code);
+          allRows.push({ table, id: Number(r.id), code });
+        }
+      }
+      const plan: { table: string; id: number; from: string; to: string }[] = [];
+      const conflicts: { table: string; id: number; from: string; to: string }[] = [];
+      const reserved = new Set<string>();
+      for (const row of allRows) {
+        if (!row.code || NEW_RE.test(row.code)) continue; // déjà conforme
+        const m = LEGACY.exec(row.code);
+        if (!m) continue; // format inconnu → laissé tel quel
+        const to = `${m[3]}-${m[2]}-${m[4]}-${m[1]}`;
+        // collision si la cible est un code existant (autre ligne) ou déjà réservée par le plan
+        if ((used.has(to) && !allRows.some((x) => x.code === to && x.id === row.id && x.table === row.table)) || reserved.has(to)) {
+          conflicts.push({ table: row.table, id: row.id, from: row.code, to });
+          continue;
+        }
+        reserved.add(to);
+        plan.push({ table: row.table, id: row.id, from: row.code, to });
+      }
+      if (dryRun) return { ok: true, dryRun: true, count: plan.length, conflicts: conflicts.length, plan: plan.slice(0, 300), conflictList: conflicts.slice(0, 100) };
+      let done = 0;
+      for (const p of plan) {
+        await db.update(p.table, p.id, { code: p.to });
+        done++;
+      }
+      await bumpTag('records');
+      await bumpTag('rx');
+      return { ok: true, count: done, conflicts: conflicts.length, plan: plan.slice(0, 300), conflictList: conflicts.slice(0, 100) };
+    },
+  });
+
+  /**
+   * CODIFICATION en CRUD — une ligne par type de code : préfixe, padding, séparateur,
+   * aperçu du PROCHAIN code (seq courant + 1) et compteur actuel (code_sequences, jamais caché).
+   * Lecture seule pour les compteurs ; l'édition passe par PUT /admin/settings/codification.
+   */
+  route({
+    method: 'GET',
+    path: '/admin/codification/rows',
+    perm: ['setting', 'view'],
+    async handler() {
+      const db = await getDb();
+      const cod = (await getSection('codification')) as Record<string, unknown>;
+      const sep = String(cod.separator ?? '-');
+      const datePattern = String(cod.datePattern ?? 'YYYYMMDD');
+      const patientPrefix = String(cod.patientPrefix ?? 'PAT');
+      const num = (k: string, d: number): number => (typeof cod[k] === 'number' ? (cod[k] as number) : d);
+      const pad = (x: number, p: number): string => String(x).padStart(p, '0');
+      const seqs = await db.find<Record<string, unknown>>('code_sequences', { limit: 200000 });
+      const maxSeq = (scopePrefix: string): number => {
+        let m = 0;
+        for (const r of seqs) if (String(r.scope ?? '').startsWith(scopePrefix)) m = Math.max(m, Number(r.last_value ?? 0));
+        return m;
+      };
+      const sampleDate = compactDate(new Date(), env.timezone, datePattern as 'YYYYMMDD' | 'YYMMDD' | 'DDMMYYYY');
+      interface Kind { kind: string; scopePrefix: string; paddingField: string; padding: number; prefixField?: string; prefix: string; dateInCode?: boolean }
+      const kinds: Kind[] = [
+        { kind: 'patient', scopePrefix: 'patient:', paddingField: 'patientPadding', padding: num('patientPadding', 5), prefixField: 'patientPrefix', prefix: patientPrefix },
+        { kind: 'record', scopePrefix: 'record:', paddingField: 'recordSeqPadding', padding: num('recordSeqPadding', 2), prefix: 'LAB', dateInCode: true },
+        { kind: 'ged', scopePrefix: 'ged:', paddingField: 'gedPadding', padding: num('gedPadding', 6), prefix: 'ANL' },
+        { kind: 'practitioner', scopePrefix: 'practitioner:', paddingField: 'practitionerPadding', padding: num('practitionerPadding', 5), prefix: 'MED' },
+        { kind: 'location', scopePrefix: 'location:', paddingField: 'locationPadding', padding: num('locationPadding', 3), prefix: 'LOC' },
+        { kind: 'drug', scopePrefix: 'drug:', paddingField: 'patientPadding', padding: num('patientPadding', 5), prefix: 'DRG' },
+        { kind: 'appointment', scopePrefix: 'appointment:', paddingField: 'genericPadding', padding: num('genericPadding', 5), prefix: 'RDV' },
+        { kind: 'movement', scopePrefix: 'movement:', paddingField: 'genericPadding', padding: num('genericPadding', 5), prefix: 'MOV' },
+        { kind: 'message', scopePrefix: 'message:', paddingField: 'genericPadding', padding: num('genericPadding', 5), prefix: 'MSG' },
+        { kind: 'case', scopePrefix: 'case:', paddingField: 'genericPadding', padding: num('genericPadding', 5), prefix: 'CAS' },
+        { kind: 'template', scopePrefix: 'template:', paddingField: 'genericPadding', padding: num('genericPadding', 5), prefix: 'TPL' },
+      ];
+      const rows = kinds.map((k) => {
+        const cur = maxSeq(k.scopePrefix);
+        const next = cur + 1;
+        const nextPreview = k.dateInCode
+          ? `${k.prefix}${sep}${sampleDate}${sep}${pad(next, k.padding)}${sep}${patientPrefix}${sep}${pad(1, num('patientPadding', 5))}`
+          : `${k.prefix}${sep}${pad(next, k.padding)}`;
+        return { kind: k.kind, prefix: k.prefix, prefixField: k.prefixField ?? null, padding: k.padding, paddingField: k.paddingField, separator: sep, datePattern: k.dateInCode ? datePattern : null, currentSeq: cur, nextPreview };
+      });
+      return { rows, separator: sep, datePattern, patientPrefix };
     },
   });
 

@@ -21,7 +21,7 @@ export function useEscOpen(onClose: () => void, open: boolean): void {
   }, [open, onClose]);
 }
 
-export function Dialog({ open, onClose, title, children, wide, footer }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; wide?: boolean; footer?: React.ReactNode }): React.ReactElement | null {
+export function Dialog({ open, onClose, title, children, wide, xwide, footer }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; wide?: boolean; xwide?: boolean; footer?: React.ReactNode }): React.ReactElement | null {
   useEscOpen(onClose, open);
   const reduce = useReducedMotion();
   // portail sur <body> : un parent avec transform (framer-motion) ou overflow (carte de liste)
@@ -35,7 +35,7 @@ export function Dialog({ open, onClose, title, children, wide, footer }: { open:
           <motion.div
             role="dialog"
             aria-modal="true"
-            className={cn('glass-card relative z-10 max-h-[min(88vh,900px)] w-full overflow-y-auto p-5 shadow-[var(--shadow-lift)]', wide ? 'max-w-4xl' : 'max-w-lg')}
+            className={cn('glass-card relative z-10 max-h-[min(88vh,900px)] w-full overflow-y-auto p-5 shadow-[var(--shadow-lift)]', xwide ? 'max-w-6xl' : wide ? 'max-w-4xl' : 'max-w-lg')}
             initial={{ opacity: 0, scale: 0.96, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}

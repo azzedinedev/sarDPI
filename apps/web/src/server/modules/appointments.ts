@@ -95,12 +95,14 @@ export function registerAppointments(): void {
       const to = String(ctx.query.get('to') ?? new Date(Date.now() + 30 * 86_400_000).toISOString());
       const practitionerId = ctx.query.get('practitionerId');
       const locationId = ctx.query.get('locationId');
+      const patientId = ctx.query.get('patientId');
       const where: { field: string; op: 'gte' | 'lte' | 'eq'; value: unknown }[] = [
         { field: 'start_at', op: 'gte', value: from },
         { field: 'start_at', op: 'lte', value: to },
       ];
       if (practitionerId) where.push({ field: 'practitioner_id', op: 'eq', value: Number(practitionerId) });
       if (locationId) where.push({ field: 'location_id', op: 'eq', value: Number(locationId) });
+      if (patientId) where.push({ field: 'patient_id', op: 'eq', value: Number(patientId) });
       const rows = await ctx.db.find<Record<string, unknown>>('appointments', { where: where as never, orderBy: [['start_at', 'asc']], limit: 800 });
       return { rows };
     },

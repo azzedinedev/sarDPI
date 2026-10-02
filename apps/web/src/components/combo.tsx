@@ -6,7 +6,7 @@
  * - StringList   : ajouts successifs de textes (« + ») — allergènes, antécédents… ; valeur = tableau.
  * Les trois s'appuient sur le PopMenu (portail <body>) pour que la liste flotte au-dessus de tout.
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { X, Plus } from 'lucide-react';
 import { PopMenu } from '@/components/popover';
@@ -157,6 +157,124 @@ export function Autocomplete({
       )}
       <PopMenu open={st.open} onClose={() => st.setOpen(false)} anchor={st.anchorRef} matchWidth className="p-1">
         <OptionList items={st.filtered} active={st.active} multiple={false} selected={(o) => o.value === value} onPick={pick} emptyLabel={emptyLabel} />
+      </PopMenu>
+    </div>
+  );
+}
+
+/* ------------------------------------------- AsyncAutocomplete (contrôlé, hors formulaire) */
+/**
+ * Autocomplete contrôlé pour les dialogs (agenda, création rapide) : recherche LOCALE (options)
+ * ou DISTANTE (fetchOptions, anti-rebond). Rends la liste dans un portail (jamais rognée).
+ */
+export function AsyncAutocomplete({
+  value,
+  options,
+  fetchOptions,
+  onChange,
+  placeholder,
+  disabled,
+  emptyLabel = 'Aucune correspondance',
+  minChars = 0,
+}: {
+  value: ComboOption | null;
+  options?: ComboOption[];
+  fetchOptions?: (q: string) => Promise<ComboOption[]>;
+  onChange: (o: ComboOption | null) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  emptyLabel?: string;
+  minChars?: number;
+}): React.ReactElement {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const [remote, setRemote] = useState<ComboOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const items = useMemo(() => normalize(fetchOptions ? remote : options), [fetchOptions, remote, options]);
+
+  useEffect(() => {
+    if (!fetchOptions || !open) return;
+    const term = q.trim();
+    if (term.length < minChars) {
+      setRemote([]);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      setLoading(true);
+      void fetchOptions(term)
+        .then((r) => {
+          if (!cancelled) setRemote(r ?? []);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [q, open, fetchOptions, minChars]);
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return items.slice(0, 60);
+    return items.filter((o) => o.label.toLowerCase().includes(t) || o.value.toLowerCase().includes(t) || (o.sublabel ?? '').toLowerCase().includes(t)).slice(0, 60);
+  }, [items, q]);
+
+  const shown = open ? q : value?.label ?? '';
+  const pick = (o: ComboOption): void => {
+    onChange(o);
+    setOpen(false);
+    setQ('');
+  };
+  const key = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setOpen(true);
+      setActive((a) => (filtered.length ? (a + (e.key === 'ArrowDown' ? 1 : -1) + filtered.length) % filtered.length : 0));
+    } else if (e.key === 'Enter' && open && filtered[active]) {
+      e.preventDefault();
+      pick(filtered[active]!);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={anchorRef} className="relative">
+      <input
+        dir="auto"
+        disabled={disabled}
+        role="combobox"
+        aria-expanded={open}
+        className="field !pe-8"
+        placeholder={placeholder}
+        value={shown}
+        onFocus={() => {
+          setQ('');
+          setActive(0);
+          setOpen(true);
+        }}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setActive(0);
+          setOpen(true);
+          if (!e.target.value && value) onChange(null);
+        }}
+        onKeyDown={key}
+      />
+      {value ? (
+        <button type="button" className="absolute inset-y-0 end-1 my-auto grid h-6 w-6 place-items-center rounded-md text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface))]" onClick={() => { onChange(null); setQ(''); }} aria-label="effacer">
+          <X size={13} />
+        </button>
+      ) : null}
+      <PopMenu open={open} onClose={() => setOpen(false)} anchor={anchorRef} matchWidth className="p-1">
+        {loading ? <p className="px-2 py-1.5 text-[12px] text-[rgb(var(--c-muted))]">…</p> : null}
+        <OptionList items={filtered} active={active} multiple={false} selected={(o) => o.value === value?.value} onPick={pick} emptyLabel={emptyLabel} />
       </PopMenu>
     </div>
   );

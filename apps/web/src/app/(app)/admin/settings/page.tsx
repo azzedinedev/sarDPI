@@ -7,10 +7,11 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Plus, Save, X } from 'lucide-react';
+import { Eye, Hash, Pencil, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Card, Field, Input, Select, Switch, Tabs, Textarea } from '@/components/ui';
+import { Drawer } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 
 const SECTIONS = ['general', 'ui', 'codification', 'medicalRefs', 'gedTypes', 'practitionerTypes', 'languages', 'workflowSteps', 'smtp', 'captcha', 'security', 'backups', 'license', 'vaccination'] as const;
@@ -182,21 +183,19 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
       );
     case 'codification':
       return (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t('settings.patientPrefix')}><Input value={s('patientPrefix')} onChange={(e) => set('patientPrefix', e.target.value.toUpperCase())} /></Field>
-          <Field label={t('settings.patientPadding')}><Input type="number" min={3} max={8} value={n('patientPadding', 5)} onChange={(e) => set('patientPadding', Number(e.target.value))} /></Field>
-          <Field label={t('settings.separator')}>
-            <Select value={s('separator') || '-'} onChange={(e) => set('separator', e.target.value)} options={[{ value: '-', label: '-' }, { value: '.', label: '.' }, { value: '_', label: '_' }]} />
-          </Field>
-          <Field label={t('settings.datePattern')}>
-            <Select value={s('datePattern') || 'YYYYMMDD'} onChange={(e) => set('datePattern', e.target.value)} options={['YYYYMMDD', 'YYMMDD', 'DDMMYYYY'].map((x) => ({ value: x, label: x }))} />
-          </Field>
-          <Field label={t('settings.practitionerPadding')}><Input type="number" min={3} max={8} value={n('practitionerPadding', 5)} onChange={(e) => set('practitionerPadding', Number(e.target.value))} /></Field>
-          <Field label={t('settings.gedPadding')}><Input type="number" min={4} max={8} value={n('gedPadding', 6)} onChange={(e) => set('gedPadding', Number(e.target.value))} /></Field>
-          <Field label={t('settings.locationPadding')}><Input type="number" min={2} max={6} value={n('locationPadding', 3)} onChange={(e) => set('locationPadding', Number(e.target.value))} /></Field>
-          <Field label={t('settings.recordSeqPadding')}><Input type="number" min={2} max={3} value={n('recordSeqPadding', 2)} onChange={(e) => set('recordSeqPadding', Number(e.target.value))} /></Field>
-          <Field label={t('settings.genericPadding')}><Input type="number" min={3} max={8} value={n('genericPadding', 5)} onChange={(e) => set('genericPadding', Number(e.target.value))} /></Field>
-          <div className="col-span-2">
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-3">
+            <Field label={t('settings.patientPrefix')}><Input value={s('patientPrefix')} onChange={(e) => set('patientPrefix', e.target.value.toUpperCase())} className="font-mono" /></Field>
+            <Field label={t('settings.separator')}>
+              <Select value={s('separator') || '-'} onChange={(e) => set('separator', e.target.value)} options={[{ value: '-', label: '-' }, { value: '.', label: '.' }, { value: '_', label: '_' }]} />
+            </Field>
+            <Field label={t('settings.datePattern')}>
+              <Select value={s('datePattern') || 'YYYYMMDD'} onChange={(e) => set('datePattern', e.target.value)} options={['YYYYMMDD', 'YYMMDD', 'DDMMYYYY'].map((x) => ({ value: x, label: x }))} />
+            </Field>
+          </div>
+          {/* CRUD des types de code : préfixe / padding / séparateur / prochain code / compteur — éditable, sans suppression */}
+          <CodificationCrud data={data} set={set} />
+          <div>
             <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase text-[rgb(var(--c-muted))]">
               <Eye size={12} /> {t('settings.preview')}
             </div>
@@ -253,8 +252,8 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
       return (
         <div className="flex flex-col gap-4">
           <p className="text-[13px] text-[rgb(var(--c-muted))]">{t('settings.medicalRefs.hint')}</p>
-          <RefListEditor title={t('settings.medicalRefs.blood')} items={rows('bloodGroups')} onChange={(v) => set('bloodGroups', v)} />
-          <RefListEditor title={t('settings.medicalRefs.funds')} items={rows('ssFunds')} onChange={(v) => set('ssFunds', v)} />
+          <RefCrudTable title={t('settings.medicalRefs.blood')} items={rows('bloodGroups')} onChange={(v) => set('bloodGroups', v)} />
+          <RefCrudTable title={t('settings.medicalRefs.funds')} items={rows('ssFunds')} onChange={(v) => set('ssFunds', v)} />
           <SaveBar onSave={onSave} saving={saving} />
         </div>
       );
@@ -269,36 +268,129 @@ function FormEditor({ section, data, onChange, onSave, saving }: { section: Sect
   }
 }
 
-/** Éditeur de liste de référence : code + libellés FR/AR/ES/EN + activation. */
-function RefListEditor({ title, items, onChange }: { title: string; items: { code: string; label: Record<string, string>; active?: boolean }[]; onChange: (v: { code: string; label: Record<string, string>; active?: boolean }[]) => void }): React.ReactElement {
+/** Liste CRUD de référence (groupes sanguins, caisses SS) : table + tiroir créer/éditer, activation, suppression. */
+interface RefItem { code: string; label: Record<string, string>; active?: boolean }
+function RefCrudTable({ title, items, onChange }: { title: string; items: RefItem[]; onChange: (v: RefItem[]) => void }): React.ReactElement {
   const { t: tc } = useT('common');
-  const upd = (i: number, patch: Partial<{ code: string; label: Record<string, string>; active?: boolean }>): void =>
-    onChange(items.map((x, j) => (j === i ? { ...x, ...patch, label: patch.label ? { ...x.label, ...patch.label } : x.label } : x)));
+  const { t } = useT('settings');
+  const [drawer, setDrawer] = useState<{ mode: 'new' | 'edit'; index?: number } | null>(null);
+  const [form, setForm] = useState<RefItem>({ code: '', label: { fr: '', ar: '', es: '', en: '' }, active: true });
+  const openNew = (): void => {
+    setForm({ code: '', label: { fr: '', ar: '', es: '', en: '' }, active: true });
+    setDrawer({ mode: 'new' });
+  };
+  const openEdit = (i: number): void => {
+    const it = items[i]!;
+    setForm({ code: it.code, label: { fr: '', ar: '', es: '', en: '', ...(it.label ?? {}) }, active: it.active !== false });
+    setDrawer({ mode: 'edit', index: i });
+  };
+  const commit = (): void => {
+    const code = form.code.trim().toUpperCase();
+    if (!code) return;
+    const entry: RefItem = { code, label: form.label ?? {}, active: form.active !== false };
+    if (drawer?.mode === 'new') onChange([...items, entry]);
+    else if (drawer?.mode === 'edit' && drawer.index != null) onChange(items.map((x, j) => (j === drawer.index ? entry : x)));
+    setDrawer(null);
+  };
+  const toggle = (i: number): void => onChange(items.map((x, j) => (j === i ? { ...x, active: x.active === false } : x)));
+  const remove = (i: number): void => onChange(items.filter((_, j) => j !== i));
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
+    <Card className="flex flex-col gap-2 !p-3">
+      <div className="flex items-center justify-between">
         <h3 className="text-[14px] font-bold">{title}</h3>
-        <Button size="sm" variant="ghost" onClick={() => onChange([...items, { code: '', label: { fr: '', ar: '', es: '', en: '' }, active: true }])}>
-          <Plus size={13} /> {tc('new')}
-        </Button>
+        <Button size="sm" variant="primary" onClick={openNew}><Plus size={13} /> {tc('new')}</Button>
       </div>
-      <div className="flex flex-col gap-1.5">
-        {items.map((x, i) => (
-          <div key={i} className="grid grid-cols-[110px_repeat(4,minmax(0,1fr))_90px_34px] items-center gap-1.5 rounded-[8px] border border-[rgb(var(--c-line)/0.7)] p-1.5">
-            <Input value={x.code} onChange={(e) => upd(i, { code: e.target.value.toUpperCase() })} placeholder="A+" className="!min-h-8 !text-[13px] font-mono" />
-            {(['fr', 'ar', 'es', 'en'] as const).map((lg) => (
-              <Input key={lg} value={x.label?.[lg] ?? ''} onChange={(e) => upd(i, { label: { [lg]: e.target.value } })} placeholder={lg.toUpperCase()} dir={lg === 'ar' ? 'rtl' : undefined} className="!min-h-8 !text-[13px]" />
+      <div className="overflow-x-auto rounded-xl border border-[rgb(var(--c-line))]">
+        <table className="dt-table">
+          <thead>
+            <tr><th>{tc('code')}</th><th>FR</th><th>ع</th><th>ES</th><th>EN</th><th>{tc('active')}</th><th /></tr>
+          </thead>
+          <tbody>
+            {items.map((x, i) => (
+              <tr key={`${x.code}-${i}`}>
+                <td dir="ltr" className="font-mono text-[12.5px] font-bold">{x.code}</td>
+                <td className="text-[12.5px]">{x.label?.fr}</td>
+                <td dir="rtl" className="text-[12.5px]">{x.label?.ar}</td>
+                <td className="text-[12.5px]">{x.label?.es}</td>
+                <td className="text-[12.5px]">{x.label?.en}</td>
+                <td>{x.active === false ? <Badge>—</Badge> : <Badge tone="ok">✓</Badge>}</td>
+                <td>
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" variant="ghost" className="btn-icon !min-h-7 !min-w-7" title={tc('edit')} onClick={() => openEdit(i)}><Pencil size={13} /></Button>
+                    <Button size="sm" variant="ghost" className="btn-icon !min-h-7 !min-w-7" title={x.active === false ? t('settings.ref.enable') : t('settings.ref.disable')} onClick={() => toggle(i)}>{x.active === false ? '↺' : '⏻'}</Button>
+                    <Button size="sm" variant="ghost" className="btn-icon !min-h-7 !min-w-7" title={tc('delete')} onClick={() => remove(i)}><Trash2 size={13} /></Button>
+                  </div>
+                </td>
+              </tr>
             ))}
-            <label className="flex items-center justify-center gap-1.5 text-[12px] text-[rgb(var(--c-muted))]">
-              <Switch checked={x.active !== false} onChange={(on) => upd(i, { active: on })} />
-            </label>
-            <Button size="sm" variant="ghost" className="btn-icon !min-h-8 !min-w-8" title={tc('delete')} onClick={() => onChange(items.filter((_, j) => j !== i))}>
-              <X size={14} />
-            </Button>
-          </div>
-        ))}
-        {!items.length ? <p className="text-[13px] text-[rgb(var(--c-muted))]">—</p> : null}
+            {!items.length ? <tr><td colSpan={7} className="py-3 text-center text-[13px] text-[rgb(var(--c-muted))]">—</td></tr> : null}
+          </tbody>
+        </table>
       </div>
+      <Drawer
+        open={Boolean(drawer)}
+        onClose={() => setDrawer(null)}
+        title={drawer?.mode === 'edit' ? `${tc('edit')} — ${title}` : `${tc('new')} — ${title}`}
+        footer={<><Button onClick={() => setDrawer(null)}>{tc('cancel')}</Button><Button variant="primary" disabled={!form.code.trim()} onClick={commit}>{tc('save')}</Button></>}
+      >
+        <div className="flex flex-col gap-3">
+          <Field label={tc('code')} required><Input className="font-mono" value={form.code} placeholder="A+ / CNAS" onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></Field>
+          {(['fr', 'ar', 'es', 'en'] as const).map((lg) => (
+            <Field key={lg} label={lg.toUpperCase()}><Input dir={lg === 'ar' ? 'rtl' : undefined} value={form.label?.[lg] ?? ''} onChange={(e) => setForm({ ...form, label: { ...form.label, [lg]: e.target.value } })} /></Field>
+          ))}
+          <Row label={tc('active')} on={form.active !== false} onChange={(v) => setForm({ ...form, active: v })} />
+        </div>
+      </Drawer>
+    </Card>
+  );
+}
+
+/** CRUD codification — une ligne par type de code (préfixe, padding, séparateur, prochain code, compteur). */
+interface CodRow { kind: string; prefix: string; prefixField: string | null; padding: number; paddingField: string; separator: string; datePattern: string | null; currentSeq: number; nextPreview: string }
+function CodificationCrud({ data, set }: { data: Record<string, unknown>; set: (k: string, v: unknown) => void }): React.ReactElement {
+  const { t } = useT('settings');
+  const q = useQuery({ queryKey: ['codification-rows'], queryFn: () => api.get<{ rows: CodRow[] }>('/admin/codification/rows') });
+  const rows = q.data?.rows ?? [];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase text-[rgb(var(--c-muted))]"><Hash size={13} /> {t('settings.codification.table')}</h3>
+        <Button size="sm" variant="ghost" onClick={() => void q.refetch()}><RefreshCw size={13} /> {t('settings.codification.refresh')}</Button>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-[rgb(var(--c-line))]">
+        <table className="dt-table">
+          <thead>
+            <tr>
+              <th>{t('settings.codification.kind')}</th>
+              <th>{t('settings.codification.prefix')}</th>
+              <th>{t('settings.codification.padding')}</th>
+              <th>{t('settings.codification.separator')}</th>
+              <th className="text-center">{t('settings.codification.currentSeq')}</th>
+              <th>{t('settings.codification.nextPreview')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.kind}>
+                <td className="text-[12.5px] font-semibold">{t(`settings.codKind.${r.kind}`)}</td>
+                <td>
+                  {r.prefixField ? (
+                    <Input className="!min-h-8 w-24 !text-[13px] font-mono" value={String(data[r.prefixField] ?? r.prefix)} onChange={(e) => set(r.prefixField as string, e.target.value.toUpperCase())} />
+                  ) : (
+                    <span dir="ltr" className="font-mono text-[12px] text-[rgb(var(--c-muted))]">{r.prefix}</span>
+                  )}
+                </td>
+                <td><Input type="number" min={2} max={8} className="!min-h-8 w-20 !text-[13px]" value={Number(data[r.paddingField] ?? r.padding)} onChange={(e) => set(r.paddingField, Number(e.target.value))} /></td>
+                <td className="text-center font-mono text-[13px]">{r.separator}</td>
+                <td className="text-center font-mono text-[13px] tabular-nums">{r.currentSeq}</td>
+                <td><span dir="ltr" className="rounded-lg border border-[rgb(var(--c-primary)/0.4)] bg-[rgb(var(--c-primary-soft))] px-2 py-0.5 font-mono text-[12px] font-bold">{r.nextPreview}</span></td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td colSpan={6} className="py-3 text-center text-[13px] text-[rgb(var(--c-muted))]">…</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11.5px] text-[rgb(var(--c-muted))]">{t('settings.codification.hint')}</p>
     </div>
   );
 }

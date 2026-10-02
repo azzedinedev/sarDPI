@@ -4,6 +4,7 @@
   "errors.forbidden": "Acción no permitida para su rol.",
   "errors.notFound": "Recurso no encontrado.",
   "errors.conflict": "Conflicto de datos.",
+  "errors.locked": "Elemento bloqueado o validado: modificación rechazada.",
   "errors.validation": "Datos no válidos.",
   "errors.server": "Error del servidor: {id}",
   "errors.rateLimited": "Demasiadas peticiones, espere {seconds} s.",

@@ -4,6 +4,7 @@
   "errors.forbidden": "Action non autorisée pour votre rôle.",
   "errors.notFound": "Ressource introuvable.",
   "errors.conflict": "Conflit de données (élément modifié simultanément).",
+  "errors.locked": "Élément verrouillé ou validé — modification refusée.",
   "errors.validation": "Données invalides.",
   "errors.server": "Erreur serveur. Identifiant : {id}",
   "errors.rateLimited": "Trop de requêtes, attendez {seconds} s.",

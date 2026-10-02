@@ -18,12 +18,24 @@ import { pushHistory } from './history';
 import { sanitizeRow } from '../http/crud';
 import { audit } from '../audit';
 
-export async function categoryByModule(): Promise<Map<string, { prefix: string; module: string; label: unknown; color: string; icon: string }>> {
+export interface CatLite { id: number; code: string; prefix: string; module: string; label: unknown; color: string; icon: string }
+
+/** TOUTES les catégories actives (liste) — plusieurs catégories peuvent partager un même module
+ * applicatif (ex. « record.consultation » pour CON et ORD) : une Map indexée par module les
+ * écraserait, d'où cette liste complète pour la résolution par code/préfixe/module. */
+export async function categoryList(): Promise<CatLite[]> {
   return cached('refs', 'categories', 300_000, async () => {
     const db = await getDb();
     const rows = await db.find<Record<string, unknown>>('intervention_categories', { where: { active: 1 } });
-    return new Map(rows.map((r) => [String(r.module), { prefix: String(r.prefix), module: String(r.module), label: (r.label_json ?? {}) as never, color: String(r.color), icon: String(r.icon) }]));
+    return rows.map((r) => ({ id: Number(r.id), code: String(r.code ?? ''), prefix: String(r.prefix), module: String(r.module), label: (r.label_json ?? {}) as never, color: String(r.color ?? ''), icon: String(r.icon ?? '') }));
   });
+}
+
+export async function categoryByModule(): Promise<Map<string, CatLite>> {
+  const list = await categoryList();
+  const m = new Map<string, CatLite>();
+  for (const c of list) if (!m.has(c.module)) m.set(c.module, c);
+  return m;
 }
 
 async function typesMap(): Promise<Map<number, Record<string, unknown>>> {
@@ -34,9 +46,26 @@ async function typesMap(): Promise<Map<number, Record<string, unknown>>> {
   });
 }
 
+/** Résout une catégorie d'intervention par n'importe quelle forme : module complet
+ * (« record.lab »), forme courte (« lab ») ou préfixe (« LAB ») — le menu et les liens
+ * historiques utilisent le préfixe ; l'API accepte les trois. */
+export async function resolveCategory(raw: string): Promise<CatLite | null> {
+  const list = await categoryList();
+  const key = String(raw ?? '').trim();
+  if (!key) return null;
+  const lower = key.toLowerCase();
+  // 1) module complet exact (« record.lab ») — 2) préfixe (« LAB ») — 3) code (« CONSULT ») — 4) forme courte (« lab »)
+  return (
+    list.find((c) => c.module === key) ??
+    list.find((c) => c.prefix.toLowerCase() === lower) ??
+    list.find((c) => c.code.toLowerCase() === lower) ??
+    list.find((c) => c.module.toLowerCase() === `record.${lower}` || c.module.toLowerCase() === lower) ??
+    null
+  );
+}
+
 async function guard(ctx: Ctx, categoryModule: string, action: 'view' | 'create' | 'update' | 'delete' | 'validate' | 'archive' | 'export' | 'print' | 'pdf' | 'email'): Promise<void> {
-  const cats = await categoryByModule();
-  const cat = cats.get(categoryModule);
+  const cat = await resolveCategory(categoryModule);
   if (!cat) throw notFound();
   // cat.module contient DÉJÀ la clé complète du module de permission (ex. « record.lab ») — telle que
   // déclarée dans le profil de catégorie admin (alignée sur MODULES partagé front/back).
@@ -77,6 +106,9 @@ async function decorateRecords(rows: Record<string, unknown>[], ctx: Ctx): Promi
   const prIds = [...new Set([...teamByRec.values()].flat())];
   const practs = prIds.length ? await db.find<Record<string, unknown>>('practitioners', { where: { id: prIds } }) : [];
   const practById = new Map(practs.map((p) => [Number(p.id), `${p.last_name} ${p.first_name}` as unknown]));
+  const apptIds = [...new Set(rows.map((r) => Number(r.appointment_id)).filter((n) => Number.isFinite(n) && n > 0))];
+  const appts = apptIds.length ? await db.find<Record<string, unknown>>('appointments', { where: { id: apptIds } }) : [];
+  const apptById = new Map(appts.map((a) => [Number(a.id), a]));
   const lang = ctx.user?.locale ?? 'fr';
   return rows.map((r) => {
     const t = types.get(Number(r.type_id));
@@ -91,12 +123,17 @@ async function decorateRecords(rows: Record<string, unknown>[], ctx: Ctx): Promi
     return {
       ...r,
       type_name: t ? pickLabel((t.name_json ?? {}) as never, lang) : r.category_prefix,
+      type_label: t ? pickLabel((t.name_json ?? {}) as never, lang) : r.category_prefix,
       type_code: t?.type_code ?? null,
       patient_code: p?.code ?? null,
       patient_name: p ? `${String(p.last_name ?? '').toUpperCase()} ${p.first_name ?? ''}` : null,
       summary: r.summary_json ? pickLabel(r.summary_json as never, lang) : null,
       team: (teamByRec.get(Number(r.id)) ?? []).map((id) => practById.get(id)).filter(Boolean),
       results,
+      appt: (() => {
+        const a = apptById.get(Number(r.appointment_id));
+        return a ? { id: Number(a.id), code: a.code ?? null, start_at: a.start_at ?? null, end_at: a.end_at ?? null, kind: a.kind ?? null } : null;
+      })(),
     };
   });
 }
@@ -118,8 +155,7 @@ export function registerRecords(): void {
           scope: z.enum(['active', 'archived', 'all']).default('active'),
         })
         .parse(Object.fromEntries(ctx.query.entries()));
-      const cats = await categoryByModule();
-      const cat = cats.get(category);
+      const cat = await resolveCategory(category);
       if (!cat) throw notFound();
       await guard(ctx, String(cat.module), 'view'); // même clé de permission que la création (record.<module>)
       const cats2 = await db.find<Record<string, unknown>>('intervention_categories');
@@ -209,6 +245,7 @@ export function registerRecords(): void {
           patient_id: input.patientId,
           type_id: input.typeId,
           category_prefix: catPrefix,
+          appointment_id: input.apptId ?? null,
           act_date: new Date(input.actDate.length <= 10 ? `${input.actDate}T12:00:00` : input.actDate).toISOString(),
           status: input.status,
           summary_json: input.summary ?? null,
@@ -305,6 +342,7 @@ export function registerRecords(): void {
         fields_json: input.fields ?? before.fields_json,
         icd10_json: input.icd10 ?? before.icd10_json,
         location_id: input.locationId ?? null,
+        appointment_id: input.apptId ?? before.appointment_id ?? null,
       });
       await db.removeWhere('record_practitioners', { record_id: id });
       for (const pid of input.practitionerIds ?? []) await db.insert('record_practitioners', { record_id: id, practitioner_id: pid });
@@ -367,7 +405,7 @@ export function registerRecords(): void {
 }
 
 async function moduleOfCategoryPrefix(prefix: string): Promise<string> {
-  const cats = await categoryByModule();
-  const found = [...cats.values()].find((c) => c.prefix === prefix);
-  return found?.module ?? 'lab';
+  const list = await categoryList();
+  const found = list.find((c) => c.prefix === prefix);
+  return found?.module ?? 'record.lab';
 }

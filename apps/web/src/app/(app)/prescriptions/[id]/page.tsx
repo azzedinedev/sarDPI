@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Printer, QrCode, Trash2 } from 'lucide-react';
+import { CheckCircle2, Lock, Pencil, Printer, QrCode, Trash2, Unlock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button } from '@/components/ui';
@@ -34,26 +34,45 @@ export default function RxDetailPage(): React.ReactElement {
       void qc.invalidateQueries({ queryKey: ['rx', rid] });
     },
   });
+  const toggleLock = useMutation({
+    mutationFn: (lock: boolean) => api.post(`/prescriptions/${rid}/lock`, { lock: lock ? '1' : '0' }),
+    onSuccess: () => {
+      toast.success(tc('saved'));
+      void qc.invalidateQueries({ queryKey: ['rx', rid] });
+    },
+  });
 
   if (q.isLoading) return <Card><div className="skeleton h-40" /></Card>;
   if (q.isError) return <Card><p className="text-sm">{tc('notFound')}</p></Card>;
   const rx = q.data!;
+  const isLocked = Boolean(rx.locked_at) || rx.status === 'validated';
   const qrUrl = rx.verify_token ? `${window.location.origin}/verify/${rx.verify_token}` : null;
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
       <Card className="flex flex-wrap items-center gap-3 p-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[18px] font-bold">{t('rx.rx')}</h1>
             <BizCode code={rx.code} />
             <Badge tone={rx.status === 'validated' ? 'ok' : rx.status === 'cancelled' ? 'danger' : 'warn'}>{fmtVal(rx.status)}</Badge>
+            {isLocked ? <Badge tone="warn"><Lock size={11} /> {t('rx.lockedBadge')}</Badge> : null}
           </div>
           <p className="mt-1 text-[12.5px] text-[rgb(var(--c-muted))]">
             {rx.patient?.last_name} {rx.patient?.first_name} · <span dir="ltr" className="font-mono">{fmtVal(rx.patient?.code)}</span> · {fmtVal(rx.act_date ?? rx.created_at).slice(0, 10)} — {rx.practitioner?.name}
           </p>
         </div>
         <div className="ms-auto flex flex-wrap gap-1.5">
+          {has('prescriptions', 'update') && !isLocked ? (
+            <Button size="sm" variant="ghost" onClick={() => router.push(`/prescriptions/new?id=${rid}`)}>
+              <Pencil size={14} /> {tc('edit')}
+            </Button>
+          ) : null}
+          {has('prescriptions', 'validate') ? (
+            <Button size="sm" variant="ghost" loading={toggleLock.isPending} onClick={() => toggleLock.mutate(!isLocked)} title={isLocked ? t('rx.unlock') : t('rx.lock')}>
+              {isLocked ? <Unlock size={14} /> : <Lock size={14} />} {isLocked ? t('rx.unlock') : t('rx.lock')}
+            </Button>
+          ) : null}
           {has('prescriptions', 'validate') && rx.status !== 'validated' ? (
             <Button size="sm" variant="ok" loading={validate.isPending} onClick={() => validate.mutate()}>
               <CheckCircle2 size={14} /> {t('rx.validate')}
@@ -165,6 +184,7 @@ interface Rx {
   created_at?: string;
   notes?: string | null;
   refills?: number;
+  locked_at?: string | null;
   lines?: { trade_name: string; dci: string | null; form: string | null; dosage: string | null; quantity: number; posology: string; duration_days: number }[];
   patient?: { code: string; last_name: string; first_name: string } | null;
   practitioner?: { name: string; code: string } | null;

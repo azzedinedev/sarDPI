@@ -4,6 +4,7 @@
   "errors.forbidden": "Action not allowed for your role.",
   "errors.notFound": "Resource not found.",
   "errors.conflict": "Data conflict (concurrent modification).",
+  "errors.locked": "Locked or validated item — edit refused.",
   "errors.validation": "Invalid data.",
   "errors.server": "Server error: {id}",
   "errors.rateLimited": "Too many requests, wait {seconds}s.",

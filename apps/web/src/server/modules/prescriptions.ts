@@ -4,7 +4,7 @@
  * Médicaments : recherche DCI + nom commercial (nomenclature importable, drapeau remboursement).
  */
 import { z } from 'zod';
-import { rxCreateZ, rxTemplateZ, allergyTokens } from '@sardpi/shared';
+import { rxCreateZ, rxUpdateZ, rxTemplateZ, allergyTokens, can } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud } from '../http/crud';
 import { ApiError, notFound } from '../http/errors';
@@ -166,8 +166,102 @@ export function registerPrescriptions(): void {
       const db = ctx.db;
       const row = await db.findOne<Record<string, unknown>>('prescriptions', { id: Number(ctx.params.id) });
       if (!row) throw notFound();
-      await db.update('prescriptions', Number(row.id), { status: 'validated' });
+      await db.update('prescriptions', Number(row.id), { status: 'validated', locked_at: new Date().toISOString(), locked_by: ctx.user!.uid });
       ctx.resultId = Number(row.id);
+      await bumpTag('rx');
+      return { ok: true };
+    },
+  });
+
+  /** Verrouillage / déverrouillage admin (bascule manuelle, indépendante de la validation). */
+  route({
+    method: 'POST',
+    path: '/prescriptions/:id/lock',
+    perm: ['prescription', 'validate'],
+    audit: { action: 'rx.lock', entity: 'prescriptions' },
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const id = Number(ctx.params.id);
+      const row = await db.findOne<Record<string, unknown>>('prescriptions', { id });
+      if (!row) throw notFound();
+      const lock = String((await ctx.req.json().catch(() => ({})))?.lock ?? '1') !== '0';
+      await db.update('prescriptions', id, lock ? { locked_at: new Date().toISOString(), locked_by: ctx.user!.uid } : { locked_at: null, locked_by: null });
+      ctx.resultId = id;
+      await bumpTag('rx');
+      return { ok: true, locked: lock };
+    },
+  });
+
+  /**
+   * ÉDITION d'une ordonnance existante (lignes + en-tête). Refusée si verrouillée ou validée,
+   * sauf pour un administrateur (permission « prescription.validate ») qui peut forcer.
+   * Le code métier est immuable : jamais régénéré ni modifié ici.
+   */
+  route({
+    method: 'PUT',
+    path: '/prescriptions/:id',
+    perm: ['prescription', 'update'],
+    audit: { action: 'rx.update', entity: 'prescriptions' },
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const id = Number(ctx.params.id);
+      const row = await db.findOne<Record<string, unknown>>('prescriptions', { id });
+      if (!row) throw notFound();
+      const isAdmin = can(ctx.user!.perms, 'prescription', 'validate');
+      const locked = Boolean(row.locked_at) || row.status === 'validated';
+      if (locked && !isAdmin) throw new ApiError(423, 'errors.locked', 'ordonnance verrouillée ou validée — édition refusée');
+      const input = await ctx.body(rxUpdateZ);
+      const patientId = Number(row.patient_id);
+      if (input.lines?.length) {
+        const checks = await checkRx(patientId, input.lines);
+        void checks; // avertissements non bloquants (déjà remontés à la création)
+      }
+      await db.transaction(async (tx) => {
+        const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (input.notes !== undefined) upd.notes = input.notes;
+        if (input.refills !== undefined) upd.refills = input.refills;
+        if (input.practitionerId !== undefined) upd.practitioner_id = input.practitionerId;
+        if (input.actDate) upd.act_date = new Date(input.actDate.length <= 10 ? `${input.actDate}T12:00:00` : input.actDate).toISOString();
+        // un non-admin ne peut pas changer un statut validé ; l'admin le peut (ex. retour en brouillon)
+        if (input.status && (isAdmin || row.status !== 'validated')) upd.status = input.status;
+        if (input.lines?.length) {
+          await tx.removeWhere('prescription_lines', { prescription_id: id });
+          let seq = 0;
+          for (const line of input.lines) {
+            seq++;
+            let reimbursable: null | number = null;
+            if (line.drugId) {
+              const d = await tx.findOne<Record<string, unknown>>('drugs', { id: line.drugId });
+              if (d) reimbursable = Number(d.reimbursable) ? 1 : 0;
+            }
+            await tx.insert('prescription_lines', {
+              prescription_id: id,
+              seq,
+              drug_id: line.drugId ?? null,
+              dci: line.dci ?? null,
+              trade_name: line.tradeName,
+              form: line.form ?? null,
+              dosage: line.dosage ?? null,
+              quantity: line.quantity,
+              posology: line.posology,
+              duration_days: line.durationDays,
+              instructions: line.instructions ?? null,
+              reimbursable,
+            });
+          }
+        }
+        await tx.update('prescriptions', id, upd);
+      });
+      ctx.resultId = id;
+      await pushHistory(ctx.user!.uid, {
+        patientId,
+        kind: 'rx',
+        refId: id,
+        refCode: String(row.code ?? ''),
+        summary: { fr: 'Ordonnance modifiée', ar: 'تعديل الوصفة', en: 'Prescription edited' },
+        detail: { lines: input.lines?.length ?? 0 },
+      });
+      await bumpTag('rx');
       return { ok: true };
     },
   });

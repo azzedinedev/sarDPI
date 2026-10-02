@@ -6,7 +6,7 @@
  */
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Database, Download, PlugZap, Rocket, Upload } from 'lucide-react';
+import { Database, Download, PlugZap, RefreshCw, Rocket, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Card, Field, Input, Select } from '@/components/ui';
@@ -19,6 +19,26 @@ export default function DatabaseAdminPage(): React.ReactElement {
   const q = useQuery({ queryKey: ['admin-db'], queryFn: () => api.get<DbInfo>('/admin/db') });
   const [form, setForm] = useState<Partial<FormState>>({});
   const [importJson, setImportJson] = useState('');
+  const [reformat, setReformat] = useState<{ count: number; conflicts: number; plan: { table: string; from: string; to: string }[] } | null>(null);
+
+  // reformatage des codes legacy {PAT}-{date}-{PFX}-{seq} → {PFX}-{date}-{seq}-{PAT}
+  const reformatDry = useMutation({
+    mutationFn: () => api.post<{ count: number; conflicts: number; plan: { table: string; from: string; to: string }[] }>('/admin/codes/reformat', { dryRun: '1' }),
+    onSuccess: (r) => {
+      setReformat({ count: r.count, conflicts: r.conflicts, plan: r.plan ?? [] });
+      toast.success(`${t('db.reformatPreview')} : ${r.count}`);
+    },
+    onError: () => toast.error(t('db.reformatFailed')),
+  });
+  const reformatApply = useMutation({
+    mutationFn: () => api.post<{ count: number; conflicts: number }>('/admin/codes/reformat', {}),
+    onSuccess: (r) => {
+      toast.success(`${t('db.reformatDone')} : ${r.count}`);
+      setReformat(null);
+      void q.refetch();
+    },
+    onError: () => toast.error(t('db.reformatFailed')),
+  });
 
   const test = useMutation({
     mutationFn: () => api.post<{ ok: boolean; error?: string | null; ms?: number; adapter?: string }>('/admin/db/test', form),
@@ -113,6 +133,44 @@ export default function DatabaseAdminPage(): React.ReactElement {
           </Button>
           <p className="text-[11.5px] text-[rgb(var(--c-muted))]">{t('db.importWarn')} — {tc('print')}: {info?.config.adapter}</p>
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-[14px] font-bold"><RefreshCw size={15} /> {t('db.reformat')}</h2>
+        <p className="text-[12px] text-[rgb(var(--c-muted))]">{t('db.reformatHint')}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" loading={reformatDry.isPending} onClick={() => reformatDry.mutate()}>
+            {t('db.reformatPreview')}
+          </Button>
+          <Button variant="primary" disabled={!reformat || reformat.count === 0} loading={reformatApply.isPending} onClick={() => reformatApply.mutate()}>
+            {t('db.reformatApply')} {reformat ? `(${reformat.count})` : ''}
+          </Button>
+        </div>
+        {reformat ? (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[12px]">
+              <Badge tone={reformat.count ? 'info' : 'neutral'}>{reformat.count}</Badge> {t('db.reformatToChange')}
+              {reformat.conflicts ? <> · <Badge tone="warn">{reformat.conflicts}</Badge> {t('db.reformatConflicts')}</> : null}
+            </p>
+            {reformat.plan.length ? (
+              <div className="max-h-52 overflow-y-auto rounded-xl border border-[rgb(var(--c-line))]">
+                <table className="dt-table">
+                  <thead><tr><th>{t('db.reformatTable')}</th><th>Legacy</th><th>→</th><th>{t('db.reformatNew')}</th></tr></thead>
+                  <tbody>
+                    {reformat.plan.slice(0, 100).map((p, i) => (
+                      <tr key={i}>
+                        <td className="text-[11px] text-[rgb(var(--c-muted))]">{p.table}</td>
+                        <td dir="ltr" className="font-mono text-[11px] text-[rgb(var(--c-coral))]">{p.from}</td>
+                        <td className="text-center">→</td>
+                        <td dir="ltr" className="font-mono text-[11px] text-[rgb(var(--c-ok))]">{p.to}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Card>
     </div>
   );

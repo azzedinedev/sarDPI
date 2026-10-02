@@ -161,6 +161,8 @@ export type InterventionTypeInput = z.infer<typeof interventionTypeBaseZ>;
 export const medicalRecordCreateZ = z.object({
   patientId: idZ,
   typeId: idZ,
+  /** rendez-vous associé (agenda → action dans le dossier) — facultatif */
+  apptId: idZ.optional().nullable(),
   actDate: z.string().min(8).max(32), // date locale ISO (date ou datetime)
   status: recordStatusZ.default('draft'),
   summary: multiLabelZ.partial().optional(),
@@ -210,6 +212,17 @@ export const rxCreateZ = z.object({
   refills: z.coerce.number().int().min(0).max(12).default(0),
 });
 export type RxInput = z.infer<typeof rxCreateZ>;
+
+/** Édition d'une ordonnance existante — refusée serveur si verrouillée/validée (sauf admin). */
+export const rxUpdateZ = z.object({
+  practitionerId: idZ.optional().nullable(),
+  actDate: z.string().min(8).max(32).optional(),
+  status: z.enum(['draft', 'validated', 'cancelled']).optional(),
+  lines: z.array(rxLineZ).min(1).max(30).optional(),
+  notes: z.string().max(1000).optional().nullable(),
+  refills: z.coerce.number().int().min(0).max(12).optional(),
+});
+export type RxUpdateInput = z.infer<typeof rxUpdateZ>;
 
 export const rxTemplateZ = z.object({
   name: z.string().min(1).max(80),

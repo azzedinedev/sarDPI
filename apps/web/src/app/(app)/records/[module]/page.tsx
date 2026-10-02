@@ -6,7 +6,7 @@
  * et rendus proprement en lecture.
  */
 import React, { useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui';
 import { BizCode } from '@/components/biz-code';
@@ -20,13 +20,29 @@ import { pickLabel } from '@sardpi/shared';
 export default function RecordsModulePage(): React.ReactElement {
   const params = useParams<{ module: string }>();
   const category = params.module;
+  const sp = useSearchParams();
+  // deep-link agenda/dossier : ?new=1&patient=<id>&appt=<id> → création pré-remplie
+  const autoCreate = sp?.get('new') === '1';
+  const prePatient = sp?.get('patient');
+  const preAppt = sp?.get('appt');
+  const createDefaults = useMemo(() => {
+    const d: Record<string, unknown> = { actDate: new Date().toISOString().slice(0, 10) };
+    if (prePatient) d.patientId = String(prePatient);
+    if (preAppt) d.apptId = String(preAppt);
+    return d;
+  }, [prePatient, preAppt]);
   const { t } = useT('patient');
   const { t: tc } = useT('common');
   const { lang } = useT('common');
   const has = useAuth((s) => s.has);
-  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.get<{ categories: { id: number; module: string; prefix: string; label_json: Record<string, string> }[]; types: { id: number; category_id: number; code: string; label_json: Record<string, string>; active: number }[] }>('/refs/catalog') });
-  const cat = useMemo(() => catalog.data?.categories.find((c) => c.module === category), [catalog.data, category]);
-  const types = useMemo(() => (catalog.data?.types ?? []).filter((x) => x.category_id === cat?.id && Boolean(Number(x.active))), [catalog.data, cat]);
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.get<{ categories: { id: number; module: string; prefix: string; code: string; label_json: Record<string, string> }[]; types: { id: number; category_prefix: string; code: string; name_json: Record<string, string>; active: number }[] }>('/refs/catalog') });
+  // l'URL peut porter le module complet (« record.lab »), sa forme courte (« lab ») ou le préfixe (« LAB »)
+  const cat = useMemo(() => {
+    const key = String(category ?? '').trim();
+    const lower = key.toLowerCase();
+    return (catalog.data?.categories ?? []).find((c) => c.module === key || c.module.toLowerCase() === lower || c.prefix === key || c.prefix.toLowerCase() === lower || c.code === key || c.code.toLowerCase() === lower) ?? null;
+  }, [catalog.data, category]);
+  const types = useMemo(() => (catalog.data?.types ?? []).filter((x) => cat != null && x.category_prefix === cat.prefix && Boolean(Number(x.active))), [catalog.data, cat]);
   const can = has(category, 'create') || has('records', 'create');
   const patientsLite = useQuery({ queryKey: ['pat-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; full_name: string }[] }>('/patients?pageSize=100') });
 
@@ -82,18 +98,21 @@ export default function RecordsModulePage(): React.ReactElement {
       ]}
       fields={[
         { key: 'patientId', label: t('field.patient'), kind: 'select', required: true, options: (patientsLite.data?.rows ?? []).map((p) => ({ value: String(p.id), label: `${p.full_name} — ${p.code}` })) },
-        { key: 'typeId', label: t('records.type'), kind: 'select', required: true, options: types.map((x) => ({ value: String(x.id), label: `${x.code} — ${pickLabel(x.label_json, lang)}` })) },
+        { key: 'typeId', label: t('records.type'), kind: 'select', required: true, options: types.map((x) => ({ value: String(x.id), label: `${x.code} — ${pickLabel(x.name_json, lang)}` })) },
         { key: 'actDate', label: tc('date'), kind: 'date', required: true },
         { key: 'status', label: t('records.status'), kind: 'select', options: [{ value: 'draft', label: t('records.st.draft') }, { value: 'validated', label: t('records.st.validated') }, { value: 'awaiting_results', label: t('records.st.awaiting') }, { value: 'cancelled', label: t('records.st.cancelled') }] },
         { key: 'summaryFr', label: `${tc('title')} (FR)` },
         { key: 'summaryAr', label: `${tc('title')} (ع)` },
         { key: 'practitionerIdsCsv', label: t('records.team'), hint: t('field.csvIdsHint'), colSpan: 2 },
         { key: 'locationId', label: t('records.location'), kind: 'number' },
+        { key: 'apptId', label: t('records.appt'), kind: 'number', hint: t('records.apptHint') },
         { key: 'icd10Csv', label: 'ICD-10', hint: 'S06.0, J18.9' },
         { key: 'fieldsJson', label: t('records.fields'), kind: 'json', hint: t('records.fieldsHint'), colSpan: 2 },
         { key: 'valuesJson', label: t('records.values'), kind: 'json', hint: t('records.valuesHint'), colSpan: 2 },
         { key: 'attachmentsCsv', label: t('records.attachments'), hint: t('records.attachmentsHint'), colSpan: 2 },
       ]}
+      autoCreate={autoCreate}
+      createDefaults={createDefaults}
       transformCreate={(v) => parseRecord(v)}
       transformUpdate={(v) => parseRecord(v)}
       detail={(r) => (
@@ -167,6 +186,7 @@ function parseRecord(v: Record<string, unknown>): Record<string, unknown> {
     actDate: v.actDate,
     status: v.status,
     locationId: v.locationId ? Number(v.locationId) : null,
+    apptId: v.apptId ? Number(v.apptId) : null,
   };
   if (v.summaryFr || v.summaryAr) out.summary = { fr: v.summaryFr as string, ar: v.summaryAr as string };
   const ids = csv(v.practitionerIdsCsv);

@@ -4,6 +4,7 @@
   "errors.forbidden": "الإجراء غير مسموح لدورك.",
   "errors.notFound": "المورد غير موجود.",
   "errors.conflict": "تعارض في البيانات.",
+  "errors.locked": "عنصر مقفل أو معتمد — رُفض التعديل.",
   "errors.validation": "بيانات غير صالحة.",
   "errors.server": "خطأ في الخادم: {id}",
   "errors.rateLimited": "طلبات كثيرة، انتظر {seconds} ث.",
