@@ -86,13 +86,32 @@ export function Textarea({ className, rows = 4, ...rest }: React.TextareaHTMLAtt
   return <textarea rows={rows} className={cn('field min-h-[90px]', className)} {...rest} />;
 }
 
+/**
+ * Garde-fou de rendu pour un libellé d'option.
+ * Les options proviennent souvent de configurations saisies en base (JSONB non typé) : un libellé
+ * peut y être un objet multilingue {fr,ar,es,en}. Passé tel quel comme enfant React, il lève
+ * « Objects are not valid as a React child » et fait tomber toute la page — pas seulement la
+ * liste déroulante. Les appelants résolvent la langue active en amont (voir normOptions dans
+ * record-fields) ; ici on garantit qu'aucun cas ne peut planter, en retombant sur la première
+ * langue renseignée.
+ */
+export function optionLabel(label: unknown): string {
+  if (label == null) return '';
+  if (typeof label === 'string') return label;
+  if (typeof label === 'object') {
+    const first = Object.values(label as Record<string, unknown>).find((v) => typeof v === 'string' && v.trim());
+    return typeof first === 'string' ? first : '';
+  }
+  return String(label);
+}
+
 export function Select({ className, options, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement> & { options: { value: string; label: string }[] }): React.ReactElement {
   return (
     <span className="relative block">
       <select className={cn('field appearance-none pe-8 bg-[length:0]', className)} {...rest}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label}
+            {optionLabel(o.label)}
           </option>
         ))}
       </select>

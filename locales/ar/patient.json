@@ -360,5 +360,8 @@
   "appt.labelLang.fr": "التسمية (بالفرنسية)",
   "appt.labelLang.ar": "التسمية (بالعربية)",
   "appt.labelLang.es": "التسمية (بالإسبانية)",
-  "appt.labelLang.en": "التسمية (بالإنجليزية)"
+  "appt.labelLang.en": "التسمية (بالإنجليزية)",
+  "errors.locked": "عنصر مقفل أو معتمد — رُفض التعديل.",
+  "workflow.title": "المتابعة",
+  "loc.k.service": "مصلحة استشفائية"
 }

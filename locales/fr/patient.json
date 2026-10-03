@@ -360,5 +360,8 @@
   "appt.labelLang.fr": "Libellé (français)",
   "appt.labelLang.ar": "Libellé (arabe)",
   "appt.labelLang.es": "Libellé (espagnol)",
-  "appt.labelLang.en": "Libellé (anglais)"
+  "appt.labelLang.en": "Libellé (anglais)",
+  "errors.locked": "Élément verrouillé ou validé — modification refusée.",
+  "workflow.title": "Suivi",
+  "loc.k.service": "Service hospitalier"
 }

@@ -342,5 +342,21 @@
   "nav.sources": "مصادر البيانات",
   "nav.system": "النظام",
   "nav.themes": "السمات المرئية",
-  "nav.translations": "الترجمات"
+  "nav.translations": "الترجمات",
+  "all": "الكل",
+  "view.table": "جدول",
+  "records.perms.lab": "المخبر",
+  "records.perms.pharmacy": "الصيدلية",
+  "records.perms.diagnosis": "التشخيص",
+  "records.perms.cardio": "أمراض القلب",
+  "records.perms.radio": "الأشعة",
+  "records.perms.consultation": "العيادة",
+  "records.perms.specialties": "الاختصاصات",
+  "records.perms.gynped": "النساء وطب الأطفال",
+  "records.perms.surgery": "الجراحة",
+  "records.perms.care": "العلاج",
+  "records.perms.anatpath": "التشريح المرضي",
+  "records.perms.reeducation": "إعادة التأهيل",
+  "records.perms.certificates": "الشهادات الطبية",
+  "records.perms.prescription": "الوصفات"
 }

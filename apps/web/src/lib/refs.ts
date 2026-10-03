@@ -94,3 +94,38 @@ export function useCountries(): { countries: CountryLite[]; countryOptions: { va
     },
   };
 }
+
+/** Type de document GED — la configuration vit dans les réglages « gedTypes ». */
+export interface GedTypeLite { prefix: string; path?: string; label: Record<string, string> | string; count?: number }
+
+/**
+ * Types de document GED, libellés traduits dans la langue active (le PRÉFIXE reste la valeur
+ * stockée en base).
+ * ------------------------------------------------------------------
+ * La route /ged/meta/types renvoie { types: [...] } et des libellés multilingues. Les deux
+ * appelants historiques lisaient « rows » et traitaient le libellé comme une chaîne : la liste
+ * déroulante des types de document était donc TOUJOURS VIDE — sans aucune erreur, il n'y avait
+ * simplement rien à choisir au moment de téléverser un document. Centralisé ici pour que la forme
+ * de la réponse ne soit plus recopiée (et donc plus jamais divergente) côté client.
+ * @param enabled passer `false` pour ne charger qu'à l'ouverture d'une modale.
+ */
+export function useGedTypes(enabled = true): { gedTypes: GedTypeLite[]; gedTypeOptions: { value: string; label: string }[]; gedTypeLabel: (prefix: unknown) => string } {
+  const { lang } = useI18n();
+  const q = useQuery({
+    queryKey: ['refs', 'ged-types'],
+    queryFn: () => api.get<{ types: GedTypeLite[] }>('/ged/meta/types'),
+    staleTime: 600_000,
+    enabled,
+  });
+  const gedTypes = q.data?.types ?? [];
+  const labelOf = (t: GedTypeLite): string => (typeof t.label === 'string' ? t.label : pickLabel(t.label as never, lang as never)) || t.prefix;
+  return {
+    gedTypes,
+    gedTypeOptions: gedTypes.map((t) => ({ value: t.prefix, label: `${t.prefix} — ${labelOf(t)}` })),
+    gedTypeLabel: (prefix: unknown): string => {
+      const p = String(prefix ?? '');
+      const found = gedTypes.find((t) => t.prefix === p);
+      return found ? labelOf(found) : p;
+    },
+  };
+}

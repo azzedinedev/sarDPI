@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import { Activity, AlertCircle, AlertTriangle, BadgeCheck, CalendarPlus, CheckCircle2, Download, FolderOpen, HeartPulse, Plus, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Undo2, Upload, Workflow as WorkflowIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
-import { useMedicalRefs, useCountries } from '@/lib/refs';
+import { useMedicalRefs, useCountries, useGedTypes } from '@/lib/refs';
 import { sanitizeRichHtml, htmlToPlain } from '@sardpi/shared';
 import { Badge, Button, EmptyState, Field, Input, Select, Tabs, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
@@ -459,7 +459,7 @@ function GedUpload({ pid, onDone }: { pid: number; onDone: () => void }): React.
   const [title, setTitle] = useState('');
   const [type, setType] = useState('DOC');
   const [file, setFile] = useState<File | null>(null);
-  const types = useQuery({ queryKey: ['ged-types'], queryFn: () => api.get<{ rows: { prefix: string; label: string }[] }>('/ged/meta/types') });
+  const { gedTypeOptions } = useGedTypes();
   const up = useMutation({
     mutationFn: async () => {
       const fd = new FormData();
@@ -498,7 +498,7 @@ function GedUpload({ pid, onDone }: { pid: number; onDone: () => void }): React.
       >
         <div className="flex flex-col gap-3">
           <Field label={t('ged.type')}>
-            <Select value={type} onChange={(e) => setType(e.target.value)} options={(types.data?.rows ?? []).map((x) => ({ value: x.prefix, label: `${x.prefix} — ${x.label}` }))} />
+            <Select value={type} onChange={(e) => setType(e.target.value)} options={gedTypeOptions} />
           </Field>
           <Field label={tc('title')}>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={file?.name} />

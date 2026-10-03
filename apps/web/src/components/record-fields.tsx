@@ -20,7 +20,12 @@ export interface FieldConfig {
   label?: Record<string, string> | string;
   unit?: string;
   required?: boolean;
-  options?: string[] | { value: string; label: string }[];
+  /**
+   * Options d'une liste déroulante. La configuration des types d'intervention est saisie en base
+   * (JSONB non typé) : un libellé peut donc être un objet multilingue {fr,ar,es,en} et pas
+   * seulement une chaîne — le type doit le dire, sinon le rendu plante (voir normOptions).
+   */
+  options?: string[] | { value: string; label?: string | Record<string, string> }[];
 }
 
 /**
@@ -36,9 +41,33 @@ function labelOf(c: { key: string; label?: Record<string, string> | string }, la
   return c.key;
 }
 
-function normOptions(o: FieldConfig['options']): { value: string; label: string }[] {
+/**
+ * Normalise les options d'une liste déroulante en {value, label} toujours CHAÎNES.
+ * Un libellé multilingue {fr,ar,es,en} est résolu dans la langue active via pickLabel — comme
+ * labelOf() le fait déjà pour l'intitulé du champ. Sans cette résolution, l'objet était transmis
+ * tel quel à <Select> qui le rendait comme enfant React : erreur « Objects are not valid as a
+ * React child » et fiche de consultation entière inutilisable.
+ */
+export /** Première valeur réellement renseignée d'un libellé multilingue (la langue active peut y être vide). */
+function firstLabelValue(o: Record<string, string>): string {
+  for (const v of Object.values(o)) if (typeof v === 'string' && v.trim()) return v;
+  return '';
+}
+
+export function normOptions(o: FieldConfig['options'], lang: string): { value: string; label: string }[] {
   if (!Array.isArray(o)) return [];
-  return o.map((x) => (typeof x === 'string' ? { value: x, label: x } : { value: String(x.value), label: x.label ?? String(x.value) }));
+  return o.map((x) => {
+    if (typeof x === 'string') return { value: x, label: x };
+    const value = String(x.value ?? '');
+    let label = typeof x.label === 'string' ? x.label : '';
+    if (!label && x.label && typeof x.label === 'object') {
+      // pickLabel renvoie la valeur de la langue active, même vide : une option sans libellé
+      // afficherait une ligne blanche dans la liste déroulante. On retombe sur la première
+      // langue renseignée, puis sur la valeur elle-même.
+      label = pickLabel(x.label as never, lang as never) || firstLabelValue(x.label);
+    }
+    return { value, label: String(label ?? '').trim() || value };
+  });
 }
 
 /**
@@ -185,7 +214,7 @@ export function RecordFields({
     const v = vals[c.key];
     if (kind === 'textarea') return <Textarea rows={2} value={displayValue(v)} onChange={(e) => setField(c.key, e.target.value)} />;
     if (kind === 'number') return <Input type="number" dir="ltr" value={v == null ? '' : String(v)} onChange={(e) => setField(c.key, e.target.value === '' ? null : Number(e.target.value))} />;
-    if (kind === 'select') return <Select value={displayValue(v)} onChange={(e) => setField(c.key, e.target.value)} options={[{ value: '', label: '—' }, ...normOptions(c.options)]} />;
+    if (kind === 'select') return <Select value={displayValue(v)} onChange={(e) => setField(c.key, e.target.value)} options={[{ value: '', label: '—' }, ...normOptions(c.options, lang)]} />;
     if (kind === 'date') return <Input type="date" dir="ltr" value={displayValue(v)} onChange={(e) => setField(c.key, e.target.value)} />;
     return <Input type="text" value={displayValue(v)} onChange={(e) => setField(c.key, e.target.value)} />;
   };

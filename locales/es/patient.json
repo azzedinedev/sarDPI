@@ -360,5 +360,8 @@
   "appt.labelLang.fr": "Texto (francés)",
   "appt.labelLang.ar": "Texto (árabe)",
   "appt.labelLang.es": "Texto (español)",
-  "appt.labelLang.en": "Texto (inglés)"
+  "appt.labelLang.en": "Texto (inglés)",
+  "errors.locked": "Elemento bloqueado o validado: modificación rechazada.",
+  "workflow.title": "Seguimiento",
+  "loc.k.service": "Servicio hospitalario"
 }

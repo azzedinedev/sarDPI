@@ -6,13 +6,14 @@
  * optionnellement, caseId (dossier) / recordId (fiche) pour lier le document.
  */
 import React, { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Button, Field, Input, Select } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
+import { useGedTypes } from '@/lib/refs';
 
 export function GedUploadButton({
   pid,
@@ -36,7 +37,7 @@ export function GedUploadButton({
   const [title, setTitle] = useState('');
   const [type, setType] = useState('DOC');
   const [file, setFile] = useState<File | null>(null);
-  const types = useQuery({ queryKey: ['ged-types'], queryFn: () => api.get<{ rows: { prefix: string; label: string }[] }>('/ged/meta/types'), enabled: open });
+  const { gedTypeOptions } = useGedTypes(open);
 
   const up = useMutation({
     mutationFn: async () => {
@@ -77,7 +78,7 @@ export function GedUploadButton({
       >
         <div className="flex flex-col gap-3">
           <Field label={t('ged.type')}>
-            <Select value={type} onChange={(e) => setType(e.target.value)} options={(types.data?.rows ?? []).map((x) => ({ value: x.prefix, label: `${x.prefix} — ${x.label}` }))} />
+            <Select value={type} onChange={(e) => setType(e.target.value)} options={gedTypeOptions} />
           </Field>
           <Field label={tc('title')}>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={file?.name} />

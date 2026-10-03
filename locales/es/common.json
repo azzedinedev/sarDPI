@@ -342,5 +342,21 @@
   "nav.sources": "Fuentes de datos",
   "nav.system": "Sistema",
   "nav.themes": "Temas visuales",
-  "nav.translations": "Traducciones"
+  "nav.translations": "Traducciones",
+  "all": "Todos",
+  "view.table": "Tabla",
+  "records.perms.lab": "Laboratorio",
+  "records.perms.pharmacy": "Farmacia",
+  "records.perms.diagnosis": "Diagnóstico",
+  "records.perms.cardio": "Cardiología",
+  "records.perms.radio": "Radiología",
+  "records.perms.consultation": "Consulta",
+  "records.perms.specialties": "Especialidades",
+  "records.perms.gynped": "Ginecología-pediatría",
+  "records.perms.surgery": "Cirugía",
+  "records.perms.care": "Cuidados",
+  "records.perms.anatpath": "Anatomopatología",
+  "records.perms.reeducation": "Reeducación",
+  "records.perms.certificates": "Certificados",
+  "records.perms.prescription": "Recetas"
 }

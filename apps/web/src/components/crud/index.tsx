@@ -37,6 +37,36 @@ import type { FilterGroup } from '@sardpi/shared';
 
 const EMPTY_GROUP: FilterGroup = { combinator: 'AND', items: [] };
 
+/** Modes d'affichage d'un module CRUD (tableau dense, lignes espacées, cartes). */
+type ViewMode = 'table' | 'rows' | 'cards';
+
+/**
+ * Préférence d'affichage : lecture/écriture SANS effet de bord au rendu.
+ * L'ancienne version lisait localStorage directement dans l'initialiseur de useState :
+ *  - côté serveur, localStorage n'existe pas → ReferenceError dès qu'un module CRUD était
+ *    rendu pendant le SSR ;
+ *  - côté client, la valeur initiale différait du HTML servi → échec d'hydratation.
+ * Le stockage peut aussi être indisponible (navigation privée, quota) : on ne lève jamais.
+ */
+function readViewPref(resource: string): ViewMode | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const v = window.localStorage.getItem(`sardpi:view:${resource}`);
+    return v === 'table' || v === 'rows' || v === 'cards' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeViewPref(resource: string, view: ViewMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(`sardpi:view:${resource}`, view);
+  } catch {
+    /* stockage indisponible : la préférence ne sera simplement pas mémorisée */
+  }
+}
+
 export function CrudModule(props: CrudProps): React.ReactElement {
   const { resource, columns, fields = [], schema, extraQuery, softDelete = true, rowHref, detail, expand } = props;
   const disp = useDisplayCfg();
@@ -60,7 +90,7 @@ export function CrudModule(props: CrudProps): React.ReactElement {
   const [filters, setFilters] = useState<FilterGroup>(EMPTY_GROUP);
   const filterPop = usePop();
   const filterRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<'table' | 'rows' | 'cards'>(() => (localStorage.getItem(`sardpi:view:${resource}`) as 'table' | 'rows' | 'cards') || 'table');
+  const [view, setView] = useState<ViewMode>('table');
   const [vis, setVis] = useState<VisibilityState>(() => Object.fromEntries(columns.filter((c) => c.hideByDefault).map((c) => [c.key, false])));
   const visPop = usePop();
   const visRef = useRef<HTMLDivElement>(null);
@@ -77,8 +107,19 @@ export function CrudModule(props: CrudProps): React.ReactElement {
     }, 260);
   }, [q]);
 
+  // Préférence d'affichage : restaurée après le montage, mémorisée à chaque changement.
+  // Un seul effet pour les deux, afin de ne JAMAIS écrire la valeur par défaut par-dessus la
+  // préférence stockée lors du premier rendu (l'ancien code lisait localStorage dans
+  // l'initialiseur de useState → ReferenceError en SSR et échec d'hydratation côté client).
+  const viewReady = useRef(false);
   useEffect(() => {
-    localStorage.setItem(`sardpi:view:${resource}`, view);
+    if (!viewReady.current) {
+      const saved = readViewPref(resource);
+      if (saved) setView(saved);
+      viewReady.current = true;
+      return;
+    }
+    writeViewPref(resource, view);
   }, [resource, view]);
 
   useEffect(() => setSelected([]), [page, qDeb, scope, filters, JSON.stringify(extraQuery ?? {})]);

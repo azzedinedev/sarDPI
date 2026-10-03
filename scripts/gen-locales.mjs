@@ -1377,6 +1377,48 @@ for (const [ns, keys] of Object.entries(EXTRA2)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA3 — clés utilisées par le code mais absentes des dictionnaires.
+ * Repérées par un balayage systématique (appels t('…') littéraux ET familles dynamiques
+ * t(`view.${v}`), t(`records.perms.${module}`), t(`loc.k.${kind}`)) croisé avec les fichiers
+ * de locales : chaque clé manquante faisait afficher son identifiant brut à l'écran.
+ *   - common/view.table        : le 3e mode d'affichage du CrudModule (le titre du bouton
+ *                                restait « view.table » ; view.list existe mais n'est plus utilisé) ;
+ *   - common/all               : filtres « Tous » de admin/system et messages ;
+ *   - common/records.perms.*   : libellé des 14 catégories d'intervention sur la page fiches ;
+ *   - patient/errors.locked    : refus de modification d'une ordonnance verrouillée/validée ;
+ *   - patient/workflow.title   : en-tête de la section « suivi » de la carte patient ;
+ *   - patient/loc.k.service    : type de lieu « service hospitalier » (les 7 autres existaient).
+ */
+const EXTRA3 = {
+  common: {
+    'all': ['Tous', 'الكل', 'Todos', 'All'],
+    'view.table': ['Tableau', 'جدول', 'Tabla', 'Table'],
+    'records.perms.lab': ['Laboratoire', 'المخبر', 'Laboratorio', 'Laboratory'],
+    'records.perms.pharmacy': ['Pharmacie', 'الصيدلية', 'Farmacia', 'Pharmacy'],
+    'records.perms.diagnosis': ['Diagnostic', 'التشخيص', 'Diagnóstico', 'Diagnostics'],
+    'records.perms.cardio': ['Cardiologie', 'أمراض القلب', 'Cardiología', 'Cardiology'],
+    'records.perms.radio': ['Radiologie', 'الأشعة', 'Radiología', 'Radiology'],
+    'records.perms.consultation': ['Consultation', 'العيادة', 'Consulta', 'Consultation'],
+    'records.perms.specialties': ['Spécialités', 'الاختصاصات', 'Especialidades', 'Specialties'],
+    'records.perms.gynped': ['Gynécologie-pédiatrie', 'النساء وطب الأطفال', 'Ginecología-pediatría', 'Gynaecology-paediatrics'],
+    'records.perms.surgery': ['Chirurgie', 'الجراحة', 'Cirugía', 'Surgery'],
+    'records.perms.care': ['Soins', 'العلاج', 'Cuidados', 'Care'],
+    'records.perms.anatpath': ['Anatomopathologie', 'التشريح المرضي', 'Anatomopatología', 'Histopathology'],
+    'records.perms.reeducation': ['Rééducation', 'إعادة التأهيل', 'Reeducación', 'Rehabilitation'],
+    'records.perms.certificates': ['Certificats', 'الشهادات الطبية', 'Certificados', 'Certificates'],
+    'records.perms.prescription': ['Ordonnances', 'الوصفات', 'Recetas', 'Prescriptions'],
+  },
+  patient: {
+    'errors.locked': ['Élément verrouillé ou validé — modification refusée.', 'عنصر مقفل أو معتمد — رُفض التعديل.', 'Elemento bloqueado o validado: modificación rechazada.', 'Locked or validated item — edit refused.'],
+    'workflow.title': ['Suivi', 'المتابعة', 'Seguimiento', 'Follow-up'],
+    'loc.k.service': ['Service hospitalier', 'مصلحة استشفائية', 'Servicio hospitalario', 'Hospital department'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA3)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

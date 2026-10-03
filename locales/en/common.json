@@ -342,5 +342,21 @@
   "nav.sources": "Data sources",
   "nav.system": "System",
   "nav.themes": "Visual themes",
-  "nav.translations": "Translations"
+  "nav.translations": "Translations",
+  "all": "All",
+  "view.table": "Table",
+  "records.perms.lab": "Laboratory",
+  "records.perms.pharmacy": "Pharmacy",
+  "records.perms.diagnosis": "Diagnostics",
+  "records.perms.cardio": "Cardiology",
+  "records.perms.radio": "Radiology",
+  "records.perms.consultation": "Consultation",
+  "records.perms.specialties": "Specialties",
+  "records.perms.gynped": "Gynaecology-paediatrics",
+  "records.perms.surgery": "Surgery",
+  "records.perms.care": "Care",
+  "records.perms.anatpath": "Histopathology",
+  "records.perms.reeducation": "Rehabilitation",
+  "records.perms.certificates": "Certificates",
+  "records.perms.prescription": "Prescriptions"
 }

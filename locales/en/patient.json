@@ -360,5 +360,8 @@
   "appt.labelLang.fr": "Label (French)",
   "appt.labelLang.ar": "Label (Arabic)",
   "appt.labelLang.es": "Label (Spanish)",
-  "appt.labelLang.en": "Label (English)"
+  "appt.labelLang.en": "Label (English)",
+  "errors.locked": "Locked or validated item — edit refused.",
+  "workflow.title": "Follow-up",
+  "loc.k.service": "Hospital department"
 }

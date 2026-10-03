@@ -187,15 +187,31 @@ export function registerPatients(): void {
     path: '/patients/search',
     perm: ['patient', 'view'],
     async handler(ctx: Ctx) {
-      const q = String(ctx.query.get('code') ?? '').trim().toUpperCase();
-      if (!q) return { rows: [] };
+      // Deux noms de paramètre coexistent dans le client historique : « code » (recherche par
+      // code métier) et « q » (saisie libre depuis l'éditeur d'ordonnance). La route n'acceptait
+      // que « code » : tout appel avec « q » renvoyait une liste VIDE, sans erreur — la recherche
+      // de patient semblait simplement cassée.
+      const raw = String(ctx.query.get('q') ?? ctx.query.get('code') ?? '').trim();
+      if (!raw) return { rows: [] };
       const db = ctx.db;
-      const direct = await db.findOne<Record<string, unknown>>('patients', { code: q });
+      // 1. Code métier exact : cas du bracelet scanné ou du code recopié.
+      const direct = await db.findOne<Record<string, unknown>>('patients', { code: raw.toUpperCase() });
       if (direct) {
         const [d] = await decoratePatients([direct]);
         return { rows: [sanitizeRow(d!)] };
       }
-      const rows = await db.find<Record<string, unknown>>('patients', { where: [{ field: 'code', op: 'contains', value: q }], limit: 20 });
+      // 2. Sinon recherche partielle sur le code ET sur le nom/prénom — l'utilisateur tape le
+      //    plus souvent un nom. (Les champs chiffrés au repos — tél., e-mail, NIN, Chifa — ne
+      //    sont pas interrogeables : c'est voulu, loi 18-07.)
+      const rows = await db.find<Record<string, unknown>>('patients', {
+        where: [
+          { field: 'code', op: 'contains', value: raw.toUpperCase() },
+          { field: 'last_name', op: 'contains', value: raw },
+          { field: 'first_name', op: 'contains', value: raw },
+        ],
+        combinator: 'OR',
+        limit: 20,
+      });
       return { rows: (await decoratePatients(rows)).map(sanitizeRow) };
     },
   });

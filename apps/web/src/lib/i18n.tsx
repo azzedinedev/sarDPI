@@ -127,10 +127,20 @@ export function I18nProvider({
 
   const t = useCallback(
     (ns: string, key: string, vars?: Record<string, string | number>) => {
-      const v = dicts[ns]?.[key];
+      const dict = dicts[ns];
+      if (dict === undefined) {
+        // Espace de noms pas encore chargé (lazy-load à la première utilisation) : ce n'est PAS
+        // une clé manquante. Le signaler noyait la console de dizaines de faux positifs à
+        // l'ouverture d'une page — et masquait les vraies absences dans le rapport d'admin.
+        // On rend la clé brute le temps du chargement, puis le re-render affichera la traduction.
+        void ensure(ns);
+        return key;
+      }
+      const v = dict[key];
       if (v === undefined) {
+        // Cas réel : l'espace de noms est chargé et la clé n'y figure pas.
         missing.add(`${lang}/${ns}/${key}`);
-        void ensure(ns); // tenter un rechargement du namespace (clé ajoutée entre-temps)
+        void ensure(ns); // la clé a pu être ajoutée depuis le chargement (i18n à chaud)
         return key;
       }
       return interpolate(v, vars);
