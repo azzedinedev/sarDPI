@@ -4,7 +4,7 @@
  * Déplacements : transferts entre lieux avec statut/horodatage/responsable (MOV-00001).
  */
 import { z } from 'zod';
-import { movementZ, pickLabel } from '@sardpi/shared';
+import { movementZ, pickLabel, type MultiLabel } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud } from '../http/crud';
 import { notFound, ApiError } from '../http/errors';
@@ -12,12 +12,44 @@ import { getSection } from '../settings';
 import { allocateSuffixed } from '../codes/service';
 import { pushHistory } from './history';
 import { getDb } from '../data';
+import type { DataAdapter } from '../data/types';
 
 type StepDef = { key: string; order: number; color: string; label: Record<string, string> };
 
 async function steps(): Promise<StepDef[]> {
   const wf = (await getSection('workflowSteps')) as { steps: StepDef[] };
   return [...(wf.steps ?? [])].sort((a, b) => a.order - b.order);
+}
+
+/** Étapes (defs) fusionnées avec les case_steps d'un dossier donné. */
+async function stepsForCase(db: DataAdapter, caseId: number, defs: StepDef[]) {
+  const rows = await db.find<Record<string, unknown>>('case_steps', { where: { case_id: caseId }, orderBy: [['seq', 'asc']] });
+  const byKey = new Map(rows.map((r) => [String(r.step_key), r]));
+  return defs.map((d) => {
+    const r = byKey.get(d.key);
+    return { ...d, id: r?.id ?? null, status: (r?.status as string) ?? 'todo', planned_at: r?.planned_at ?? null, done_at: r?.done_at ?? null, location_id: r?.location_id ?? null, practitioners: parseArr(r?.practitioners_json), documents: parseArr(r?.documents_json), note: r?.note ?? null };
+  });
+}
+
+/** Étiquette multilingue sûre depuis une colonne *_json (texte ou objet). */
+function asLabel(v: unknown): MultiLabel {
+  return (jp(v) ?? {}) as unknown as MultiLabel;
+}
+
+/** JSON.parse tolérant → objet | null (les colonnes *_json peuvent arriver en texte selon l'adaptateur). */
+function jp(v: unknown): Record<string, unknown> | null {
+  if (v && typeof v === 'object') return v as Record<string, unknown>;
+  if (typeof v === 'string' && v) {
+    try { const o = JSON.parse(v); return o && typeof o === 'object' ? (o as Record<string, unknown>) : null; } catch { return null; }
+  }
+  return null;
+}
+
+/** Libellé + couleur d'une catégorie (intervention_categories) par préfixe. */
+async function categoryInfo(db: DataAdapter, prefix: string | null, lang: string): Promise<{ label: string; color: string | null; icon: string | null }> {
+  if (!prefix) return { label: lang === 'ar' ? 'ملف المتابعة' : lang === 'es' ? 'Expediente de seguimiento' : lang === 'en' ? 'Care record' : 'Dossier de suivi', color: null, icon: null };
+  const c = await db.findOne<Record<string, unknown>>('intervention_categories', { prefix });
+  return { label: c ? pickLabel(asLabel(c.label_json), lang) || prefix : prefix, color: c ? String(c.color ?? '') || null : null, icon: c ? String(c.icon ?? '') || null : null };
 }
 
 export function registerWorkflow(): void {
@@ -27,21 +59,22 @@ export function registerWorkflow(): void {
     path: '/cases/current',
     perm: ['patient_case', 'view'],
     async handler(ctx: Ctx) {
-      const patientId = Number(ctx.query.get('patientId'));
-      if (!patientId) throw new ApiError(400, 'errors.validation', 'patientId requis');
       const db = ctx.db;
-      const kase = await db.findOne<Record<string, unknown>>('patient_cases', { where: { patient_id: patientId }, orderBy: [['id', 'desc']], limit: 1 });
       const defs = await steps();
+      const caseId = Number(ctx.query.get('caseId') ?? 0);
+      const patientId = Number(ctx.query.get('patientId') ?? 0);
+      let kase: Record<string, unknown> | null = null;
+      if (caseId) {
+        kase = await db.findOne<Record<string, unknown>>('patient_cases', { id: caseId });
+      } else if (patientId) {
+        // dossier de suivi GLOBAL (catégorie null) de préférence ; sinon le plus récent
+        kase = await db.findOne<Record<string, unknown>>('patient_cases', { where: [{ field: 'patient_id', op: 'eq' as const, value: patientId }, { field: 'category_prefix', op: 'isNull' as const }], orderBy: [['id', 'desc']], limit: 1 });
+        if (!kase) kase = await db.findOne<Record<string, unknown>>('patient_cases', { where: { patient_id: patientId }, orderBy: [['id', 'desc']], limit: 1 });
+      } else {
+        throw new ApiError(400, 'errors.validation', 'patientId ou caseId requis');
+      }
       if (!kase) return { case: null, steps: defs.map((d) => ({ ...d, status: 'todo' })) };
-      const rows = await db.find<Record<string, unknown>>('case_steps', { where: { case_id: Number(kase.id) }, orderBy: [['seq', 'asc']] });
-      const byKey = new Map(rows.map((r) => [String(r.step_key), r]));
-      return {
-        case: kase,
-        steps: defs.map((d) => {
-          const r = byKey.get(d.key);
-          return { ...d, id: r?.id ?? null, status: r?.status ?? 'todo', planned_at: r?.planned_at ?? null, done_at: r?.done_at ?? null, location_id: r?.location_id ?? null, practitioners: parseArr(r?.practitioners_json), documents: parseArr(r?.documents_json), note: r?.note ?? null };
-        }),
-      };
+      return { case: kase, steps: await stepsForCase(db, Number(kase.id), defs) };
     },
   });
 
@@ -130,26 +163,35 @@ export function registerWorkflow(): void {
     perm: ['patient_case', 'create'],
     audit: { action: 'case.create', entity: 'patient_cases' },
     async handler(ctx: Ctx) {
-      const input = await ctx.body(z.object({ patientId: z.number().int().positive(), firstStep: z.string().max(30).optional() }));
+      const input = await ctx.body(z.object({ patientId: z.number().int().positive(), firstStep: z.string().max(30).optional(), categoryPrefix: z.string().max(10).nullable().optional() }));
       const db = ctx.db;
       const pat = await db.findOne<Record<string, unknown>>('patients', { id: input.patientId });
       if (!pat) throw notFound();
-      const open = await db.findOne<Record<string, unknown>>('patient_cases', { patient_id: input.patientId, status: 'open' });
+      const cat = (input.categoryPrefix ?? null) as string | null;
+      // un dossier ouvert PAR (patient, catégorie) — catégorie null = dossier de suivi global
+      const openWhere = [
+        { field: 'patient_id', op: 'eq' as const, value: input.patientId },
+        { field: 'status', op: 'eq' as const, value: 'open' },
+        cat ? { field: 'category_prefix', op: 'eq' as const, value: cat } : { field: 'category_prefix', op: 'isNull' as const },
+      ];
+      const open = await db.findOne<Record<string, unknown>>('patient_cases', { where: openWhere, orderBy: [['id', 'desc']], limit: 1 });
       if (open) {
         ctx.resultId = Number(open.id);
-        return { ok: true, id: Number(open.id), code: String(open.code), alreadyOpen: true };
+        return { ok: true, id: Number(open.id), code: String(open.code), alreadyOpen: true, categoryPrefix: cat };
       }
       const defs = await steps();
       const first = defs.find((d) => d.key === input.firstStep)?.key ?? defs[0]?.key;
       if (!first) throw new ApiError(500, 'errors.config', 'Aucune étape configurée (workflowSteps)');
+      const lang = ctx.user?.locale ?? 'fr';
+      const ci = await categoryInfo(db, cat, lang);
       const code = (await allocateSuffixed('case', 'CAS')).code;
       const now = new Date().toISOString();
-      const ins = await db.insert('patient_cases', { code, patient_id: input.patientId, status: 'open', current_step: first, opened_at: now, created_at: now, updated_at: now });
+      const ins = await db.insert('patient_cases', { code, patient_id: input.patientId, category_prefix: cat, title: ci.label, status: 'open', current_step: first, opened_at: now, created_at: now, updated_at: now });
       const id = Number((ins as { id?: number }).id ?? 0);
       await db.insert('case_steps', { case_id: id, step_key: first, seq: defs.findIndex((d) => d.key === first) + 1, status: 'in_progress', started_at: now, created_at: now, updated_at: now });
       ctx.resultId = id;
-      await pushHistory(ctx.user!.uid, { patientId: input.patientId, kind: 'case', refId: id, refCode: code, summary: { fr: 'Dossier de suivi ouvert', ar: 'تم فتح ملف المتابعة', en: 'Care record opened' }, detail: null });
-      return { ok: true, id, code, alreadyOpen: false };
+      await pushHistory(ctx.user!.uid, { patientId: input.patientId, kind: 'case', refId: id, refCode: code, summary: { fr: `Dossier « ${ci.label} » ouvert`, ar: `تم فتح ملف « ${ci.label} »`, en: `Record “${ci.label}” opened` }, detail: { categoryPrefix: cat } });
+      return { ok: true, id, code, alreadyOpen: false, categoryPrefix: cat };
     },
   });
 
@@ -168,6 +210,121 @@ export function registerWorkflow(): void {
       ctx.resultId = id;
       await pushHistory(ctx.user!.uid, { patientId: Number(kase.patient_id), kind: 'case', refId: id, refCode: String(kase.code), summary: { fr: 'Dossier réouvert', ar: 'أُعيد فتح الملف', en: 'Record reopened' }, detail: null });
       return { ok: true };
+    },
+  });
+
+  /** Liste des dossiers d'un patient (un par catégorie + le global) avec compteurs. */
+  route({
+    method: 'GET',
+    path: '/patients/:id/dossiers',
+    perm: ['patient_case', 'view'],
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const pid = Number(ctx.params.id);
+      const lang = ctx.user?.locale ?? 'fr';
+      const cases = await db.find<Record<string, unknown>>('patient_cases', { where: { patient_id: pid }, orderBy: [['id', 'desc']] });
+      if (!cases.length) return { rows: [] };
+      const [records, appts, rxs, docs] = await Promise.all([
+        db.find<Record<string, unknown>>('medical_records', { where: { patient_id: pid } }),
+        db.find<Record<string, unknown>>('appointments', { where: { patient_id: pid } }),
+        db.find<Record<string, unknown>>('prescriptions', { where: { patient_id: pid } }),
+        db.find<Record<string, unknown>>('ged_documents', { where: { patient_id: pid } }),
+      ]);
+      const rows = [];
+      for (const k of cases) {
+        const kid = Number(k.id);
+        const cat = k.category_prefix ? String(k.category_prefix) : null;
+        const ci = await categoryInfo(db, cat, lang);
+        const recIds = new Set(records.filter((r) => Number(r.case_id) === kid || (!r.case_id && cat && String(r.category_prefix) === cat)).map((r) => Number(r.id)));
+        const recApptIds = new Set(records.filter((r) => recIds.has(Number(r.id)) && r.appointment_id).map((r) => Number(r.appointment_id)));
+        rows.push({
+          id: kid,
+          code: String(k.code),
+          title: k.title ?? null,
+          category_prefix: cat,
+          category_label: ci.label,
+          category_color: ci.color,
+          category_icon: ci.icon,
+          status: k.status,
+          current_step: k.current_step ?? null,
+          opened_at: k.opened_at,
+          closed_at: k.closed_at,
+          counts: {
+            records: recIds.size,
+            appointments: appts.filter((a) => Number(a.case_id) === kid || recApptIds.has(Number(a.id))).length,
+            prescriptions: rxs.filter((p) => Number(p.case_id) === kid).length,
+            documents: docs.filter((d) => Number(d.case_id) === kid || (d.record_id && recIds.has(Number(d.record_id)))).length,
+          },
+        });
+      }
+      return { rows };
+    },
+  });
+
+  /** Détail agrégé d'un dossier : étapes + fiches + RDV + ordonnances + documents + historique (liaison hybride). */
+  route({
+    method: 'GET',
+    path: '/dossiers/:id',
+    perm: ['patient_case', 'view'],
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const id = Number(ctx.params.id);
+      const lang = ctx.user?.locale ?? 'fr';
+      const kase = await db.findOne<Record<string, unknown>>('patient_cases', { id });
+      if (!kase) throw notFound();
+      const pid = Number(kase.patient_id);
+      const cat = kase.category_prefix ? String(kase.category_prefix) : null;
+      const ci = await categoryInfo(db, cat, lang);
+      const defs = await steps();
+      const stepsOut = await stepsForCase(db, id, defs);
+
+      const [allRecords, allAppts, allRx, allDocs, allHist, types, pracs, locs] = await Promise.all([
+        db.find<Record<string, unknown>>('medical_records', { where: { patient_id: pid }, orderBy: [['id', 'desc']] }),
+        db.find<Record<string, unknown>>('appointments', { where: { patient_id: pid }, orderBy: [['start_at', 'desc']] }),
+        db.find<Record<string, unknown>>('prescriptions', { where: { patient_id: pid }, orderBy: [['id', 'desc']] }),
+        db.find<Record<string, unknown>>('ged_documents', { where: { patient_id: pid }, orderBy: [['id', 'desc']] }),
+        db.find<Record<string, unknown>>('history_events', { where: { patient_id: pid }, orderBy: [['occurred_at', 'desc']], limit: 300 }),
+        db.find<Record<string, unknown>>('intervention_types', {}),
+        db.find<Record<string, unknown>>('practitioners', {}),
+        db.find<Record<string, unknown>>('locations', {}),
+      ]);
+
+      // liaison hybride : case_id explicite SINON repli catégorie (fiches) / rattachement (RDV via fiche, documents via fiche)
+      const records = allRecords.filter((r) => Number(r.case_id) === id || (!r.case_id && cat && String(r.category_prefix) === cat));
+      const recIds = new Set(records.map((r) => Number(r.id)));
+      const recApptIds = new Set(records.filter((r) => r.appointment_id).map((r) => Number(r.appointment_id)));
+      const appointments = allAppts.filter((a) => Number(a.case_id) === id || recApptIds.has(Number(a.id)));
+      const prescriptions = allRx.filter((p) => Number(p.case_id) === id);
+      const rxIds = new Set(prescriptions.map((p) => Number(p.id)));
+      const documents = allDocs.filter((d) => Number(d.case_id) === id || (d.record_id && recIds.has(Number(d.record_id))));
+      const docIds = new Set(documents.map((d) => Number(d.id)));
+
+      const typeBy = new Map<number, MultiLabel>(types.map((t) => [Number(t.id), asLabel(t.name_json)]));
+      const pracBy = new Map(pracs.map((p) => [Number(p.id), `${p.last_name ?? ''} ${p.first_name ?? ''}`.trim()]));
+      const locBy = new Map<number, MultiLabel>(locs.map((l) => [Number(l.id), asLabel(l.name_json)]));
+
+      const history = allHist
+        .filter((h) => {
+          const kind = String(h.kind);
+          const rid = Number(h.ref_id);
+          return (kind === 'case' && rid === id) || ((kind === 'record' || kind === 'lab') && recIds.has(rid)) || (kind === 'rx' && rxIds.has(rid)) || (kind === 'ged' && docIds.has(rid));
+        })
+        .map((h) => {
+          const detail = jp(h.detail_json);
+          const stepStatus = detail ? String(detail.stepStatus ?? '') : '';
+          const tone = stepStatus === 'todo' ? 'cancel' : stepStatus === 'done' ? 'ok' : stepStatus ? 'warn' : null;
+          return { id: Number(h.id), kind: h.kind, at: h.occurred_at, ref_code: h.ref_code ?? null, tone, summary: jp(h.summary_json) };
+        });
+
+      return {
+        case: { ...kase, category_prefix: cat, category_label: ci.label, category_color: ci.color, category_icon: ci.icon },
+        steps: stepsOut,
+        records: records.map((r) => ({ id: Number(r.id), code: String(r.code), category_prefix: r.category_prefix, type_label: pickLabel(typeBy.get(Number(r.type_id)) ?? ({} as MultiLabel), lang), summary: jp(r.summary_json), act_date: r.act_date, status: r.status, appointment_id: r.appointment_id ?? null })),
+        appointments: appointments.map((a) => ({ id: Number(a.id), code: String(a.code), start_at: a.start_at, end_at: a.end_at, status: a.status, reason: a.reason ?? null, practitioner_name: a.practitioner_id ? pracBy.get(Number(a.practitioner_id)) ?? null : null, location_name: a.location_id ? pickLabel(locBy.get(Number(a.location_id)) ?? ({} as MultiLabel), lang) : null })),
+        prescriptions: prescriptions.map((p) => ({ id: Number(p.id), code: String(p.code), act_date: p.act_date, status: p.status, practitioner_name: p.practitioner_id ? pracBy.get(Number(p.practitioner_id)) ?? null : null })),
+        documents: documents.map((d) => ({ id: Number(d.id), code: String(d.code), title: d.title ?? null, type_prefix: d.type_prefix, current_version: d.current_version ?? 1, record_id: d.record_id ?? null, created_at: d.created_at })),
+        history,
+      };
     },
   });
 

@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Activity, AlertCircle, AlertTriangle, BadgeCheck, CalendarPlus, CheckCircle2, Download, HeartPulse, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Undo2, Upload, Workflow as WorkflowIcon } from 'lucide-react';
+import { Activity, AlertCircle, AlertTriangle, BadgeCheck, CalendarPlus, CheckCircle2, Download, FolderOpen, HeartPulse, Plus, Printer, QrCode, Shield, ShieldCheck, ShieldX, Syringe, Undo2, Upload, Workflow as WorkflowIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { useMedicalRefs, useCountries } from '@/lib/refs';
@@ -20,9 +20,8 @@ import { CrudModule, Card, fmtVal } from '@/components/crud';
 import { useToast } from '@/components/toast';
 import { useAuth } from '@/stores/auth';
 import { age } from '@/lib/format';
-import { FormProvider, useForm } from 'react-hook-form';
 import { useFmtDate } from '@/lib/display';
-import { Multiselect } from '@/components/combo';
+import { CaseStepper } from '@/components/case-stepper';
 
 export default function PatientPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
@@ -124,6 +123,7 @@ export default function PatientPage(): React.ReactElement {
         active={tab}
         onChange={setTab}
         tabs={[
+          { key: 'dossiers', label: t('tabs.dossiers') },
           { key: 'history', label: t('tabs.history') },
           { key: 'records', label: t('tabs.records') },
           { key: 'ged', label: t('tabs.ged') },
@@ -135,6 +135,7 @@ export default function PatientPage(): React.ReactElement {
         ]}
       />
 
+      {tab === 'dossiers' ? <DossiersTab pid={pid} /> : null}
       {tab === 'history' ? <HistoryTab pid={pid} data={history.data?.rows ?? []} loading={history.isLoading} /> : null}
       {tab === 'records' ? <PatientRecords pid={pid} /> : null}
       {tab === 'ged' ? (
@@ -172,7 +173,7 @@ export default function PatientPage(): React.ReactElement {
           toolbarExtra={has('ged', 'create') ? <GedUpload pid={pid} onDone={() => void qc.invalidateQueries({ queryKey: ['list', 'ged'] })} /> : null}
         />
       ) : null}
-      {tab === 'workflow' ? <WorkflowTab pid={pid} editable={has('patient_case', 'update')} /> : null}
+      {tab === 'workflow' ? <CaseStepper pid={pid} editable={has('patient_case', 'update')} /> : null}
       {tab === 'movements' ? <MovementsTab pid={pid} /> : null}
       {tab === 'appts' ? (
         <CrudModule
@@ -381,213 +382,6 @@ function pickAny(s: Record<string, string> | null, lang: string): string {
   return s[lang] ?? s.fr ?? s.en ?? s.ar ?? s.es ?? Object.values(s)[0] ?? '';
 }
 
-/* ------------------------------------------------ Circuit de soins */
-interface Step {
-  key: string;
-  label: Record<string, string> | string;
-  color?: string;
-  status: 'todo' | 'in_progress' | 'done' | 'skipped';
-  done_at: string | null;
-  note: string | null;
-  location_id?: number | null;
-  practitioners?: unknown[];
-}
-function WorkflowTab({ pid, editable }: { pid: number; editable: boolean }): React.ReactElement {
-  const { t } = useT('patient');
-  const { lang } = useT('common');
-  const toast = useToast();
-  const qc = useQueryClient();
-  const fmt = useFmtDate();
-  const methods = useForm<Record<string, unknown>>({ defaultValues: { status: 'done', at: '', locationId: '', practitionerIds: [], note: '' } });
-  const q = useQuery({ queryKey: ['case', pid], queryFn: () => api.get<{ case: { id: number; code: string; status: string; current_step?: string } | null; steps: Step[] }>(`/cases/current?patientId=${pid}`) });
-  const locations = useQuery({ queryKey: ['locations'], queryFn: () => api.get<{ rows: { id: number; code: string; name: string }[] }>('/locations?pageSize=100') });
-  const practitioners = useQuery({ queryKey: ['practitioners', 'opts'], queryFn: () => api.get<{ rows: Record<string, unknown>[] }>('/practitioners?pageSize=100') });
-  const [fiche, setFiche] = useState<{ stepKey: string; label: string } | null>(null);
-  const createdRef = React.useRef<number | null>(null);
-  const stepLabelOf = (s: Step): string => (typeof s.label === 'string' ? s.label : pickAny(s.label as Record<string, string>, lang) || s.key);
-  const nowLocal = (): string => {
-    const d = new Date();
-    const p = (n: number): string => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-  };
-
-  // Le workflow suit le dossier du patient : si aucun circuit n'existe encore, on le crée
-  // (première étape = celle sur laquelle l'utilisateur clique) puis on ouvre la fiche de l'étape.
-  const ensureCase = async (stepKey?: string): Promise<void> => {
-    if (q.data?.case || createdRef.current) return;
-    try {
-      const r = await api.post<{ id: number; alreadyOpen: boolean }>('/cases', { patientId: pid, ...(stepKey ? { firstStep: stepKey } : {}) });
-      createdRef.current = r.id;
-      if (!r.alreadyOpen) toast.success(t('workflow.caseCreated'));
-      await qc.invalidateQueries({ queryKey: ['case', pid] });
-      await qc.invalidateQueries({ queryKey: ['list', 'patients'] });
-    } catch (e) {
-      toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`));
-      throw e;
-    }
-  };
-
-  const openStep = (s: Step): void => {
-    if (!editable) return;
-    void (async () => {
-      try {
-        await ensureCase(s.key);
-        const st = ['done', 'in_progress', 'skipped', 'todo'].includes(String(s.status)) ? String(s.status) : 'done';
-        methods.reset({ status: st, at: s.done_at ? String(s.done_at).slice(0, 16) : nowLocal(), locationId: s.location_id ? String(s.location_id) : '', practitionerIds: Array.isArray(s.practitioners) ? (s.practitioners as unknown[]).map(String) : [], note: s.note ?? '' });
-        setFiche({ stepKey: s.key, label: stepLabelOf(s) });
-      } catch {
-        /* toast déjà émis par ensureCase */
-      }
-    })();
-  };
-
-  // annulation d'une étape : statut « todo », le current_step revient dessus (côté serveur) + historique
-  const cancelStep = useMutation({
-    mutationFn: async (s: Step) => {
-      await ensureCase(s.key);
-      return api.post('/cases/advance', { caseId: q.data?.case?.id ?? createdRef.current, stepKey: s.key, status: 'todo', note: null, at: null });
-    },
-    onSuccess: () => {
-      toast.success(t('workflow.stepCancelled'));
-      createdRef.current = null;
-      void qc.invalidateQueries({ queryKey: ['case', pid] });
-      void qc.invalidateQueries({ queryKey: ['list', 'patients'] });
-    },
-    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
-  });
-
-  const save = useMutation({
-    mutationFn: () => {
-      const v = methods.getValues();
-      return api.post('/cases/advance', {
-        caseId: q.data?.case?.id ?? createdRef.current,
-        stepKey: fiche?.stepKey,
-        status: String(v.status ?? 'done'),
-        note: typeof v.note === 'string' && v.note.trim() ? v.note.trim() : null,
-        locationId: v.locationId ? Number(v.locationId) : null,
-        practitionerIds: Array.isArray(v.practitionerIds) ? (v.practitionerIds as unknown[]).map(Number) : [],
-        at: v.at ? new Date(String(v.at)).toISOString() : null,
-      });
-    },
-    onSuccess: () => {
-      toast.success(t('workflow.advanced'));
-      setFiche(null);
-      createdRef.current = null;
-      void qc.invalidateQueries({ queryKey: ['case', pid] });
-      void qc.invalidateQueries({ queryKey: ['list', 'patients'] });
-    },
-    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
-  });
-
-  if (q.isLoading) return <Card><div className="skeleton h-24" /></Card>;
-  const steps = q.data?.steps ?? [];
-  const caseId = q.data?.case?.id ?? createdRef.current;
-  return (
-    <Card className="flex flex-col gap-4 overflow-x-auto">
-      <div className="flex min-w-max items-center gap-2">
-        {steps.map((s, i) => {
-          const done = s.status === 'done';
-          const cur = q.data?.case?.current_step === s.key;
-          return (
-            <React.Fragment key={s.key}>
-              <div className="flex flex-col items-center gap-1">
-                <motion.button
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => openStep(s)}
-                  title={done ? undefined : t('workflow.stepFiche')}
-                  className={done ? 'text-[rgb(var(--c-primary))]' : cur ? 'text-[rgb(var(--c-amber))]' : ''}
-                >
-                  <motion.span
-                    animate={cur ? { scale: [1, 1.12, 1] } : {}}
-                    transition={{ repeat: Infinity, duration: 2.4 }}
-                    className={`grid h-11 w-11 place-items-center rounded-2xl border-2 font-bold ${done ? 'border-[rgb(var(--c-ok))] bg-[rgb(var(--c-ok-soft))] text-[rgb(var(--c-ok))]' : cur ? 'border-[rgb(var(--c-amber))] bg-[rgb(var(--c-amber-soft))] text-[rgb(var(--c-amber))]' : 'border-[rgb(var(--c-line))] bg-[rgb(var(--c-surface))] text-[rgb(var(--c-muted))]'} `}
-                  >
-                    {done ? '✓' : i + 1}
-                  </motion.span>
-                </motion.button>
-                <span className={`max-w-[110px] text-center text-[11.5px] font-semibold ${cur ? 'text-[rgb(var(--c-amber))]' : ''}`}>{stepLabelOf(s)}</span>
-                {s.done_at ? <span dir="ltr" className="tabular-nums text-[10px] text-[rgb(var(--c-muted))]">{fmt(s.done_at, true)}</span> : null}
-                {editable && caseId && s.status !== 'todo' ? (
-                  <button
-                    className="text-[10px] font-semibold text-[rgb(var(--c-muted))] underline-offset-2 hover:text-[rgb(var(--c-coral))] hover:underline disabled:opacity-40"
-                    title={t('workflow.cancelStep')}
-                    disabled={cancelStep.isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cancelStep.mutate(s);
-                    }}
-                  >
-                    ↩ {t('workflow.cancelStep')}
-                  </button>
-                ) : null}
-              </div>
-              {i < steps.length - 1 ? <div className={`h-0.5 w-10 rounded ${done ? 'bg-[rgb(var(--c-ok))]' : 'bg-[rgb(var(--c-line))]'}`} /> : null}
-            </React.Fragment>
-          );
-        })}
-      </div>
-      {q.data?.case ? (
-        <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-[rgb(var(--c-muted))]">
-          <BizCode code={q.data.case.code} copy />
-          <Badge tone={q.data.case.status === 'closed' ? 'neutral' : 'info'}>{q.data.case.status === 'closed' ? t('workflow.closed') : t('workflow.open')}</Badge>
-          {q.data.case.status === 'closed' && editable ? (
-            <Button size="sm" variant="ghost" onClick={() => void api.post(`/cases/${q.data.case?.id}/reopen`, {}).then(() => qc.invalidateQueries({ queryKey: ['case', pid] }))}>
-              {t('workflow.reopen')}
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('workflow.none')}</p>
-          {editable ? <Button size="sm" variant="primary" onClick={() => void ensureCase(undefined)}>{t('workflow.start')}</Button> : null}
-        </div>
-      )}
-      {/* Fiche d'étape — modale large rendue en portail : plus jamais tronquée par la carte. */}
-      <Dialog
-        xwide
-        open={Boolean(fiche)}
-        onClose={() => setFiche(null)}
-        title={`${t('workflow.stepFiche')}${fiche ? ` — ${fiche.label}` : ''}`}
-        footer={
-          <>
-            <Button onClick={() => setFiche(null)}>{t('cancel')}</Button>
-            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()} disabled={!caseId}>
-              {t('workflow.saveStep')}
-            </Button>
-          </>
-        }
-      >
-        <FormProvider {...methods}>
-          <div className="grid grid-cols-2 gap-3 py-1">
-            <Field label={t('workflow.stepStatus')}>
-              <Select {...methods.register('status')} options={[{ value: 'done', label: t('workflow.stDone') }, { value: 'in_progress', label: t('workflow.stProgress') }, { value: 'skipped', label: t('workflow.stSkip') }, { value: 'todo', label: t('workflow.stTodo') }]} />
-            </Field>
-            <Field label={t('workflow.at')}>
-              <Input type="datetime-local" dir="ltr" {...methods.register('at')} />
-            </Field>
-            <Field label={t('workflow.location')}>
-              <Select {...methods.register('locationId')} options={[{ value: '', label: '—' }, ...(locations.data?.rows ?? []).map((l) => ({ value: String(l.id), label: `${l.code} — ${l.name}` }))]} />
-            </Field>
-            <Field label={t('workflow.practitioners')}>
-              <Multiselect
-                name="practitionerIds"
-                options={(practitioners.data?.rows ?? []).map((p) => ({
-                  value: String(p.id),
-                  label: (p.name as string) || `${String(p.last_name ?? '')} ${String(p.first_name ?? '')}`.trim() || String(p.code ?? p.id),
-                }))}
-              />
-            </Field>
-            <div className="col-span-2">
-              <Field label={t('workflow.stepNote')}>
-                <Textarea rows={3} {...methods.register('note')} />
-              </Field>
-            </div>
-          </div>
-        </FormProvider>
-      </Dialog>
-    </Card>
-  );
-}
 /* ------------------------------------------------ Mouvements */
 function MovementsTab({ pid }: { pid: number }): React.ReactElement {
   const { t } = useT('patient');
@@ -725,12 +519,136 @@ function GedUpload({ pid, onDone }: { pid: number; onDone: () => void }): React.
 
 /* ------------------------------------------------ Enregistrements (liste toutes catégories) */
 /** Bloc « Fiches » du dossier patient — export NON public : un page.tsx Next ne doit exporter que default + config de page. */
+interface Dossier {
+  id: number;
+  code: string;
+  title: string | null;
+  category_prefix: string | null;
+  category_label: string;
+  category_color: string | null;
+  category_icon: string | null;
+  status: string;
+  current_step: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  counts: { records: number; appointments: number; prescriptions: number; documents: number };
+}
+
+/* ------------------------------------------------ Dossiers (par catégorie) */
+function DossiersTab({ pid }: { pid: number }): React.ReactElement {
+  const { t } = useT('patient');
+  const { lang } = useT('common');
+  const router = useRouter();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['dossiers', pid], queryFn: () => api.get<{ rows: Dossier[] }>(`/patients/${pid}/dossiers`) });
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.get<{ categories: { prefix: string; label_json: Record<string, string>; color: string }[] }>('/refs/catalog') });
+  const [picker, setPicker] = useState(false);
+  const [cat, setCat] = useState('');
+  const create = useMutation({
+    mutationFn: (categoryPrefix: string | null) => api.post<{ id: number }>('/cases', { patientId: pid, categoryPrefix }),
+    onSuccess: (r) => {
+      setPicker(false);
+      void qc.invalidateQueries({ queryKey: ['dossiers', pid] });
+      router.push(`/patients/${pid}/dossiers/${r.id}`);
+    },
+    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
+  });
+  const rows = q.data?.rows ?? [];
+  const cats = catalog.data?.categories ?? [];
+  const existing = new Set(rows.map((r) => r.category_prefix).filter(Boolean) as string[]);
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[14px] font-bold">{t('tabs.dossiers')}</h3>
+        <Button size="sm" variant="primary" onClick={() => setPicker(true)}>
+          <Plus size={15} /> {t('dossier.new')}
+        </Button>
+      </div>
+      <p className="-mt-1 text-[12px] text-[rgb(var(--c-muted))]">{t('dossier.hint')}</p>
+      {q.isLoading ? <div className="skeleton h-40" /> : !rows.length ? <EmptyState icon={FolderOpen} title={t('dossier.empty')} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map((d, i) => (
+          <motion.button
+            key={d.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i, 12) * 0.02 }}
+            onClick={() => router.push(`/patients/${pid}/dossiers/${d.id}`)}
+            className="flex flex-col gap-2 rounded-2xl border border-[rgb(var(--c-line)/0.7)] p-3 text-start transition-colors hover:border-[rgb(var(--c-primary)/0.5)] hover:bg-[rgb(var(--c-primary-soft)/0.3)]"
+          >
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: d.category_color ?? 'rgb(var(--c-primary))' }}>
+                <FolderOpen size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13.5px] font-bold">{d.category_label}</span>
+                <BizCode code={d.code} />
+              </span>
+              <Badge tone={d.status === 'closed' ? 'neutral' : 'info'}>{d.status === 'closed' ? t('workflow.closed') : t('workflow.open')}</Badge>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[11px] text-[rgb(var(--c-muted))]">
+              <span className="badge">{d.counts.records} {t('dossier.records')}</span>
+              <span className="badge">{d.counts.appointments} {t('dossier.appointments')}</span>
+              <span className="badge">{d.counts.prescriptions} {t('dossier.prescriptions')}</span>
+              <span className="badge">{d.counts.documents} {t('dossier.documents')}</span>
+            </div>
+          </motion.button>
+        ))}
+      </div>
+      <Dialog
+        open={picker}
+        onClose={() => setPicker(false)}
+        title={t('dossier.new')}
+        footer={
+          <>
+            <Button onClick={() => setPicker(false)}>{t('cancel')}</Button>
+            <Button variant="primary" loading={create.isPending} disabled={!cat} onClick={() => create.mutate(cat || null)}>
+              {t('dossier.create')}
+            </Button>
+          </>
+        }
+      >
+        <Field label={t('dossier.pickCategory')}>
+          <Select
+            value={cat}
+            onChange={(e) => setCat(e.target.value)}
+            options={[{ value: '', label: t('dossier.selectCat') }, ...cats.filter((c) => !existing.has(c.prefix)).map((c) => ({ value: c.prefix, label: `${pickAny(c.label_json, lang)} — ${c.prefix}` }))]}
+          />
+        </Field>
+      </Dialog>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------ Fiches du patient */
 function PatientRecords({ pid }: { pid: number }): React.ReactElement {
   const fmt = useFmtDate();
   const { t } = useT('patient');
-  const { t: tc } = useT('common');
+  const { t: tc, lang } = useT('common');
   const router = useRouter();
+  const toast = useToast();
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['pat-records', pid], queryFn: () => api.get<{ rows: Record<string, unknown>[] }>(`/patients/${pid}/records`) });
+  const dq = useQuery({ queryKey: ['dossiers', pid], queryFn: () => api.get<{ rows: Dossier[] }>(`/patients/${pid}/dossiers`) });
+  // dossier lié par catégorie (pour l'affichage « à côté » + la navigation)
+  const byCat = useMemo(() => new Map<string, Dossier>((dq.data?.rows ?? []).filter((d) => d.category_prefix).map((d) => [d.category_prefix as string, d])), [dq.data]);
+  // cliquer une fiche ouvre le VRAI dossier du patient lié à sa catégorie (le crée si absent) — plus la liste de section globale
+  const openDossier = async (catPrefix: string): Promise<void> => {
+    if (!catPrefix) return;
+    const found = byCat.get(catPrefix);
+    if (found) {
+      router.push(`/patients/${pid}/dossiers/${found.id}`);
+      return;
+    }
+    try {
+      const r = await api.post<{ id: number }>('/cases', { patientId: pid, categoryPrefix: catPrefix });
+      void qc.invalidateQueries({ queryKey: ['dossiers', pid] });
+      router.push(`/patients/${pid}/dossiers/${r.id}`);
+    } catch (e) {
+      toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`));
+    }
+  };
   if (q.isLoading) return <Card><div className="skeleton h-40" /></Card>;
   const rows = q.data?.rows ?? [];
   return (
@@ -742,22 +660,32 @@ function PatientRecords({ pid }: { pid: number }): React.ReactElement {
         </Button>
       </div>
       {!rows.length ? <EmptyState icon={Activity} title={t('records.empty')} /> : null}
-      {rows.map((r, i) => (
-        <motion.button
-          key={String(r.id)}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: Math.min(i, 12) * 0.02 }}
-          onClick={() => router.push(`/records/${fmtVal(r.category_module ?? r.category_prefix ?? r.category)}?open=${r.id}`)}
-          className="flex items-center gap-3 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-2.5 text-start transition-colors hover:bg-[rgb(var(--c-primary-soft)/0.4)]"
-        >
-          <Badge tone="info">{fmtVal(r.category_prefix)}</Badge>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{fmtVal(r.title ?? r.summary) || tc('untitled')}</span>
-          <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(r.act_date, true)}</span>
-          <BizCode code={r.code as string} />
-          <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : 'text-[rgb(var(--c-muted))]'}`}>{fmtVal(r.status)}</span>
-        </motion.button>
-      ))}
+      {rows.map((r, i) => {
+        const cat = String(r.category_prefix ?? '');
+        const linked = byCat.get(cat);
+        return (
+          <motion.button
+            key={String(r.id)}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i, 12) * 0.02 }}
+            onClick={() => void openDossier(cat)}
+            title={linked ? `${t('dossier.linked')} : ${linked.category_label}` : t('dossier.openByCat')}
+            className="flex items-center gap-3 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-2.5 text-start transition-colors hover:bg-[rgb(var(--c-primary-soft)/0.4)]"
+          >
+            <Badge tone="info">{fmtVal(r.category_prefix)}</Badge>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{fmtVal(r.title ?? r.summary) || tc('untitled')}</span>
+            {linked ? (
+              <span className="badge hidden shrink-0 items-center gap-1 sm:inline-flex" title={t('dossier.linked')}>
+                <FolderOpen size={11} /> {pickAny({ fr: linked.category_label } as Record<string, string>, lang) || linked.category_label}
+              </span>
+            ) : null}
+            <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(r.act_date, true)}</span>
+            <BizCode code={r.code as string} />
+            <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : 'text-[rgb(var(--c-muted))]'}`}>{fmtVal(r.status)}</span>
+          </motion.button>
+        );
+      })}
     </Card>
   );
 }
