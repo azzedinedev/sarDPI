@@ -54,6 +54,7 @@ export function registerAppointments(): void {
       kind: i.kind ?? 'consultation',
       status: i.status ?? 'pending',
       notes: i.notes ?? null,
+      case_id: i.caseId ?? null,
       all_day: i.allDay ? 1 : 0,
     }),
     allocateCode: async (tx) => (await allocateSuffixed('appointment', 'RDV', tx)).code,

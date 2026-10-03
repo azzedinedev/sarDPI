@@ -16,6 +16,16 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/stores/auth';
 import { medicalRecordCreateZ } from '@sardpi/shared';
 import { pickLabel } from '@sardpi/shared';
+import { RecordFields, type FieldConfig } from '@/components/record-fields';
+
+/** Parse fields_json (objet ou chaîne JSON) en dictionnaire clé→valeur pour RecordFields. */
+function parseVals(v: unknown): Record<string, string | number | boolean | null | undefined> {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, string | number | boolean | null | undefined>;
+  if (typeof v === 'string' && v) {
+    try { const o = JSON.parse(v); return o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, string | number | boolean | null | undefined>) : {}; } catch { return {}; }
+  }
+  return {};
+}
 
 export default function RecordsModulePage(): React.ReactElement {
   const params = useParams<{ module: string }>();
@@ -131,11 +141,10 @@ export default function RecordsModulePage(): React.ReactElement {
               ))}
             </div>
           ) : null}
-          {r.fields_json ? (
-            <pre dir="ltr" className="max-h-64 overflow-auto rounded-xl bg-[rgb(var(--c-surface-2))] p-3 font-mono text-[11.5px]">
-              {JSON.stringify(r.fields_json, null, 2)}
-            </pre>
-          ) : null}
+          <div className="flex flex-col gap-1.5">
+            <h4 className="text-[12px] font-bold text-[rgb(var(--c-muted))]">{t('records.fields')}</h4>
+            <RecordFields config={(Array.isArray(r.type_fields) ? r.type_fields : []) as FieldConfig[]} value={parseVals(r.fields_json)} mode="read" lang={lang} emptyLabel={t('dossier.noValues')} />
+          </div>
           {Array.isArray(r.results) && (r.results as Record<string, unknown>[]).length ? (
             <table className="dt-table">
               <thead>

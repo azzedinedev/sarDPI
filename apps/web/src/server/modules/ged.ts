@@ -36,6 +36,7 @@ export function registerGed(): void {
       const title = get('title') ?? 'Document';
       const patientId = get('patientId') ? Number(get('patientId')) : null;
       const recordId = get('recordId') ? Number(get('recordId')) : null;
+      const caseId = get('caseId') ? Number(get('caseId')) : null;
       const tags = (get('tags') ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 12);
       const note = get('note') ?? null;
       const file = form.get('file');
@@ -56,6 +57,7 @@ export function registerGed(): void {
         type_prefix: typePrefix,
         patient_id: patientId,
         record_id: recordId,
+        case_id: caseId,
         title,
         tags_json: tags,
         note,

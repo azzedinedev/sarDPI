@@ -8,16 +8,20 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Activity, AlertCircle, AlertTriangle, ArrowLeft, BadgeCheck, CalendarRange, CheckCircle2, FileText, FolderOpen, HeartPulse, Undo2, Workflow as WorkflowIcon } from 'lucide-react';
+import { Activity, AlertCircle, AlertTriangle, ArrowLeft, BadgeCheck, CalendarRange, CheckCircle2, FileText, FolderOpen, HeartPulse, Pill, Plus, Undo2, Workflow as WorkflowIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, EmptyState, Tabs } from '@/components/ui';
 import { BizCode } from '@/components/biz-code';
 import { Card, fmtVal } from '@/components/crud';
 import { CaseStepper, type Step } from '@/components/case-stepper';
+import { RecordDialog } from '@/components/record-dialog';
+import { GedUploadButton } from '@/components/ged-upload';
+import { ApptQuickButton } from '@/components/appt-quick-dialog';
 import { useAuth } from '@/stores/auth';
+import { useToast } from '@/components/toast';
 import { useFmtDate } from '@/lib/display';
 
 interface DossierDetail {
@@ -46,9 +50,29 @@ export default function DossierPage(): React.ReactElement {
   const fmt = useFmtDate();
   const has = useAuth((s) => s.has);
   const [tab, setTab] = useState('suivi');
+  const qc = useQueryClient();
+  const toast = useToast();
+  // fiche ouverte dans la modale de détail/édition (edit=true → directement en édition)
+  const [recordDlg, setRecordDlg] = useState<{ id: number; edit: boolean } | null>(null);
 
   const dq = useQuery({ queryKey: ['dossier', did], queryFn: () => api.get<DossierDetail>(`/dossiers/${did}`), enabled: Number.isFinite(did) });
   const patient = useQuery({ queryKey: ['patient', pid], queryFn: () => api.get<Record<string, unknown>>(`/patients/${pid}`) });
+  // catalogue : module de la catégorie (permissions) + premier type actif (fiche par défaut)
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.get<{ categories: { prefix: string; module: string }[]; types: { id: number; category_prefix: string; active: number }[] }>('/refs/catalog') });
+
+  // Création d'une fiche par défaut : 1er type de la catégorie, aujourd'hui, brouillon, liée au dossier,
+  // puis ouverture immédiate en édition pour la compléter (champs clé→valeur).
+  const createDefaultRecord = useMutation({
+    mutationFn: (typeId: number) =>
+      api.post<{ id: number }>('/records', { patientId: pid, typeId, actDate: new Date().toISOString().slice(0, 10), caseId: did, status: 'draft', fields: {} }),
+    onSuccess: (r) => {
+      toast.success(t('dossier.recordCreated'));
+      void qc.invalidateQueries({ queryKey: ['dossier', did] });
+      void qc.invalidateQueries({ queryKey: ['dossiers', pid] });
+      setRecordDlg({ id: Number(r.id), edit: true });
+    },
+    onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
+  });
 
   if (dq.isLoading) {
     return (
@@ -66,6 +90,25 @@ export default function DossierPage(): React.ReactElement {
   const kase = d.case;
   const patientName = patient.data ? ((patient.data.full_name as string) ?? `${fmtVal(patient.data.last_name)} ${fmtVal(patient.data.first_name)}`) : '';
   const editable = has('patient_case', 'update');
+
+  // permissions d'ajout par sous-onglet (le module de fiches dépend de la catégorie du dossier)
+  const catModule = catalog.data?.categories.find((c) => c.prefix === kase.category_prefix)?.module ?? 'records';
+  const canAddRecord = has(catModule, 'create');
+  const canEditRecord = has(catModule, 'update');
+  const canAddDoc = has('ged', 'create');
+  const canAddAppt = has('appointment', 'create');
+  const canAddRx = has('prescription', 'create');
+  const defaultTypeId = catalog.data?.types.find((x) => x.category_prefix === kase.category_prefix && Number(x.active))?.id ?? null;
+  const refreshDossier = (): void => {
+    void qc.invalidateQueries({ queryKey: ['dossier', did] });
+  };
+  const onAddRecord = (): void => {
+    if (defaultTypeId == null) {
+      toast.error(t('dossier.noType'));
+      return;
+    }
+    createDefaultRecord.mutate(defaultTypeId);
+  };
 
   const KIND_ICON: Record<string, React.ReactNode> = {
     record: <Activity size={13} />, rx: <HeartPulse size={13} />, ged: <FileText size={13} />, consent: <BadgeCheck size={13} />,
@@ -118,10 +161,17 @@ export default function DossierPage(): React.ReactElement {
 
       {tab === 'records' ? (
         <Card className="flex flex-col gap-2">
+          {canAddRecord ? (
+            <div className="flex justify-end">
+              <Button size="sm" variant="primary" loading={createDefaultRecord.isPending} onClick={onAddRecord}>
+                <Plus size={14} /> {t('dossier.addRecord')}
+              </Button>
+            </div>
+          ) : null}
           {!d.records.length ? <EmptyState icon={Activity} title={t('dossier.noItems')} /> : null}
           {d.records.map((r, i) => (
             <motion.button key={r.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.02 }}
-              onClick={() => router.push(`/records/${r.category_prefix ?? 'CON'}?open=${r.id}`)} className={rowCls}>
+              onClick={() => setRecordDlg({ id: r.id, edit: false })} className={rowCls}>
               <Badge tone="info">{r.category_prefix}</Badge>
               <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{r.type_label || pickAny(r.summary, lang) || tc('untitled')}</span>
               <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{r.act_date ? fmt(r.act_date, true) : ''}</span>
@@ -134,6 +184,11 @@ export default function DossierPage(): React.ReactElement {
 
       {tab === 'documents' ? (
         <Card className="flex flex-col gap-2">
+          {canAddDoc ? (
+            <div className="flex justify-end">
+              <GedUploadButton pid={pid} caseId={did} label={t('dossier.addDocument')} onDone={refreshDossier} />
+            </div>
+          ) : null}
           {!d.documents.length ? <EmptyState icon={FileText} title={t('dossier.noItems')} /> : null}
           {d.documents.map((doc, i) => (
             <motion.div key={doc.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.02 }} className={rowCls}>
@@ -149,6 +204,11 @@ export default function DossierPage(): React.ReactElement {
 
       {tab === 'appts' ? (
         <Card className="flex flex-col gap-2">
+          {canAddAppt ? (
+            <div className="flex justify-end">
+              <ApptQuickButton pid={pid} caseId={did} label={t('dossier.addAppt')} onSaved={refreshDossier} />
+            </div>
+          ) : null}
           {!d.appointments.length ? <EmptyState icon={CalendarRange} title={t('dossier.noItems')} /> : null}
           {d.appointments.map((a, i) => (
             <motion.div key={a.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.02 }} className={rowCls}>
@@ -164,6 +224,13 @@ export default function DossierPage(): React.ReactElement {
 
       {tab === 'rx' ? (
         <Card className="flex flex-col gap-2">
+          {canAddRx ? (
+            <div className="flex justify-end">
+              <Button size="sm" variant="primary" onClick={() => router.push(`/prescriptions/new?patient=${pid}&case=${did}`)}>
+                <Pill size={14} /> {t('dossier.addRx')}
+              </Button>
+            </div>
+          ) : null}
           {!d.prescriptions.length ? <EmptyState icon={HeartPulse} title={t('dossier.noItems')} /> : null}
           {d.prescriptions.map((p, i) => (
             <motion.button key={p.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.02 }}
@@ -195,6 +262,16 @@ export default function DossierPage(): React.ReactElement {
           </ul>
         </Card>
       ) : null}
+
+      {/* détail / édition d'une fiche : clic sur une fiche (lecture) ou fiche par défaut venant d'être créée (édition) */}
+      <RecordDialog
+        recordId={recordDlg?.id ?? null}
+        open={recordDlg != null}
+        startInEdit={recordDlg?.edit ?? false}
+        editable={canEditRecord}
+        onClose={() => setRecordDlg(null)}
+        onSaved={refreshDossier}
+      />
     </div>
   );
 }

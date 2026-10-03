@@ -107,6 +107,7 @@ export default function RxNewPage(): React.ReactElement {
         await api.put(`/prescriptions/${editId}`, { practitionerId: Number(practitionerId), actDate: date, refills, notes: notes || null, lines: payloadLines });
         return { id: editId };
       }
+      const caseParam = sp.get('case');
       return await api.post<{ id: number }>('/prescriptions', {
         patientId: patient?.id,
         practitionerId: Number(practitionerId),
@@ -115,6 +116,7 @@ export default function RxNewPage(): React.ReactElement {
         refills,
         notes: notes || null,
         lines: payloadLines,
+        caseId: caseParam ? Number(caseParam) : null,
       });
     },
     onSuccess: (r) => {
@@ -132,10 +134,17 @@ export default function RxNewPage(): React.ReactElement {
   const preselect = sp.get('patient');
   React.useEffect(() => {
     if (preselect && !patient) {
-      void api.get<{ rows: { id: number; code: string; full_name: string }[] }>(`/patients/search?q=${encodeURIComponent(preselect)}`).then((r) => {
-        const hit = r.rows.find((x) => x.id === Number(preselect));
-        if (hit) setPatient(hit);
-      });
+      const pidNum = Number(preselect);
+      // deep-link depuis un dossier/patient : ?patient=<id> → chargement direct par id (fiable,
+      // car /patients/search n'indexe que le code métier, pas l'id).
+      if (Number.isFinite(pidNum) && pidNum > 0) {
+        void api
+          .get<Record<string, unknown>>(`/patients/${pidNum}`)
+          .then((p) => setPatient({ id: pidNum, code: String(p.code ?? ''), full_name: String(p.full_name ?? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim()) }))
+          .catch(() => {
+            /* patient introuvable : l'utilisateur le choisira manuellement */
+          });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselect]);

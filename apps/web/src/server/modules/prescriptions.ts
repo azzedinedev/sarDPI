@@ -71,6 +71,7 @@ export function registerPrescriptions(): void {
           code: alloc.code,
           patient_id: input.patientId,
           practitioner_id: input.practitionerId,
+          case_id: input.caseId ?? null,
           act_date: new Date(input.actDate.length <= 10 ? `${input.actDate}T12:00:00` : input.actDate).toISOString(),
           status: 'draft',
           template_id: input.templateId ?? null,

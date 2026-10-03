@@ -163,6 +163,8 @@ export const medicalRecordCreateZ = z.object({
   typeId: idZ,
   /** rendez-vous associé (agenda → action dans le dossier) — facultatif */
   apptId: idZ.optional().nullable(),
+  /** dossier de rattachement (patient_cases) — facultatif */
+  caseId: idZ.optional().nullable(),
   actDate: z.string().min(8).max(32), // date locale ISO (date ou datetime)
   status: recordStatusZ.default('draft'),
   summary: multiLabelZ.partial().optional(),
@@ -205,6 +207,7 @@ export const rxCreateZ = z.object({
   patientId: idZ,
   practitionerId: idZ,
   actDate: z.string().min(8).max(32),
+  caseId: idZ.optional().nullable(),
   templateId: idZ.optional().nullable(),
   locale: z.enum(['ar', 'fr', 'es', 'en']).optional(),
   lines: z.array(rxLineZ).min(1).max(30),
@@ -247,6 +250,7 @@ export const appointmentBaseZ = z.object({
   kind: z.string().max(40).default('consultation'),
   status: z.enum(['pending', 'confirmed', 'done', 'cancelled', 'no_show']).default('pending'),
   notes: z.string().max(500).optional().nullable(),
+  caseId: idZ.optional().nullable(),
   allDay: z.coerce.boolean().default(false),
 });
 export type AppointmentInput = z.infer<typeof appointmentBaseZ>;

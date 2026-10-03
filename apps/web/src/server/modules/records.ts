@@ -82,6 +82,13 @@ export function labFlag(valueNum: number, p: { ref_min: number | null; ref_max: 
   return 'normal';
 }
 
+/** Tableau sûr depuis une colonne *_json (texte ou déjà parsé). */
+function asArr(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v) { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
+  return [];
+}
+
 async function decorateRecords(rows: Record<string, unknown>[], ctx: Ctx): Promise<Record<string, unknown>[]> {
   const db = ctx.db;
   const types = await typesMap();
@@ -125,9 +132,11 @@ async function decorateRecords(rows: Record<string, unknown>[], ctx: Ctx): Promi
       type_name: t ? pickLabel((t.name_json ?? {}) as never, lang) : r.category_prefix,
       type_label: t ? pickLabel((t.name_json ?? {}) as never, lang) : r.category_prefix,
       type_code: t?.type_code ?? null,
+      type_fields: asArr(t?.fields_json),
       patient_code: p?.code ?? null,
       patient_name: p ? `${String(p.last_name ?? '').toUpperCase()} ${p.first_name ?? ''}` : null,
       summary: r.summary_json ? pickLabel(r.summary_json as never, lang) : null,
+      practitioner_ids: teamByRec.get(Number(r.id)) ?? [],
       team: (teamByRec.get(Number(r.id)) ?? []).map((id) => practById.get(id)).filter(Boolean),
       results,
       appt: (() => {
@@ -246,6 +255,7 @@ export function registerRecords(): void {
           type_id: input.typeId,
           category_prefix: catPrefix,
           appointment_id: input.apptId ?? null,
+          case_id: input.caseId ?? null,
           act_date: new Date(input.actDate.length <= 10 ? `${input.actDate}T12:00:00` : input.actDate).toISOString(),
           status: input.status,
           summary_json: input.summary ?? null,
@@ -343,6 +353,7 @@ export function registerRecords(): void {
         icd10_json: input.icd10 ?? before.icd10_json,
         location_id: input.locationId ?? null,
         appointment_id: input.apptId ?? before.appointment_id ?? null,
+        case_id: input.caseId ?? before.case_id ?? null,
       });
       await db.removeWhere('record_practitioners', { record_id: id });
       for (const pid of input.practitionerIds ?? []) await db.insert('record_practitioners', { record_id: id, practitioner_id: pid });
