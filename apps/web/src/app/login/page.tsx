@@ -47,6 +47,18 @@ function LoginForm(): React.ReactElement {
   };
   useEffect(loadCaptcha, []);
 
+  /**
+   * Secours audio du défi : lecture vocale de la question (Web Speech API — synthèse locale du
+   * navigateur, aucun service tiers, donc compatible on-prem / hors-ligne).
+   */
+  const speakQuestion = (): void => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !question) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t('captcha.speak', { question }));
+    u.lang = lang === 'ar' ? 'ar-SA' : lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR';
+    window.speechSynthesis.speak(u);
+  };
+
   useEffect(() => {
     if (error && errRef.current) errRef.current.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' }, { transform: 'translateX(0)' }], { duration: 240 });
   }, [error]);
@@ -116,41 +128,39 @@ function LoginForm(): React.ReactElement {
                 <Field label={t('login.password')}>
                   <div className="relative">
                     <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => pw(e.target.value)} autoComplete="current-password" required placeholder="••••••••" />
-                    <button type="button" className="absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] hover:text-[rgb(var(--c-ink))] ltr:right-2.5 rtl:left-2.5" onClick={() => setShowPw((v) => !v)} aria-label="show password">
+                    <button type="button" className="absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] hover:text-[rgb(var(--c-ink))] ltr:right-2.5 rtl:left-2.5" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? t('login.hidePassword') : t('login.showPassword')}
+                    title={showPw ? t('login.hidePassword') : t('login.showPassword')}>
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </Field>
                 {captchaSvg ? (
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <Field label={t('captcha.question')} hint={t('captcha.hint')}>
-                        <Input value={captchaSol} onChange={(e) => setCaptchaSol(e.target.value)} inputMode="numeric" placeholder="6824" />
-                      </Field>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="overflow-hidden rounded-xl border border-[rgb(var(--c-line))] bg-white [&>svg]:block" dangerouslySetInnerHTML={{ __html: captchaSvg }} />
-                      <div className="flex gap-1">
-                        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={loadCaptcha} title={t('captcha.refresh')}>
+                  <Field label={t('captcha.question')} hint={t('captcha.hint')}>
+                    {/* Saisie, défi visuel et actions sur UNE seule ligne, tous à la hauteur d'un
+                        champ (var(--row-h)) : l'ancien empilement image+boutons désalignait le tout. */}
+                    <div className="flex items-center gap-2">
+                      <Input
+                        className="min-w-0 flex-1"
+                        value={captchaSol}
+                        onChange={(e) => setCaptchaSol(e.target.value.replace(/[^\d-]/g, ''))}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        dir="ltr"
+                        placeholder="6824"
+                      />
+                      {/* Le défi est porté par le SVG : role="img" + libellé = la question elle-même,
+                          sinon il serait invisible aux lecteurs d'écran (l'audio seul ne suffit pas). */}
+                      <div className="captcha-box" role="img" aria-label={question || t('captcha.question')} dangerouslySetInnerHTML={{ __html: captchaSvg }} />
+                      <div className="captcha-actions">
+                        <button type="button" className="btn btn-ghost" onClick={loadCaptcha} title={t('captcha.refresh')} aria-label={t('captcha.refresh')}>
                           <Loader2 size={14} />
                         </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm btn-icon"
-                          title={t('captcha.audio')}
-                          onClick={() => {
-                            // secours audio : lecture vocale de la question (Web Speech API, locale, 100 % hors-ligne)
-                            if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-                            const u = new SpeechSynthesisUtterance(`${question}. Répétez le résultat.`);
-                            u.lang = lang === 'ar' ? 'ar-SA' : lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR';
-                            window.speechSynthesis.speak(u);
-                          }}
-                        >
+                        <button type="button" className="btn btn-ghost" title={t('captcha.audio')} aria-label={t('captcha.audio')} onClick={speakQuestion}>
                           <Volume2 size={14} />
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </Field>
                 ) : null}
               </>
             ) : (
@@ -165,15 +175,17 @@ function LoginForm(): React.ReactElement {
             <Button type="submit" variant="primary" loading={busy} className="mt-1 w-full" disabled={!needTotp && (!identifier || !password)}>
               <KeyRound size={16} /> {needTotp ? t('login.verify') : t('login.submit')}
             </Button>
-            {needTotp ? (
-              <button type="button" className="text-[12.5px] font-semibold text-[rgb(var(--c-primary))] underline-offset-2 hover:underline" onClick={() => window.location.replace('/login')}>
-                {t('login.back')}
-              </button>
-            ) : (
-              <Link href="/forgot" className="self-center text-[12.5px] font-medium text-[rgb(var(--c-muted))] hover:text-[rgb(var(--c-primary))] hover:underline">
-                {t('forgot.link')}
-              </Link>
-            )}
+            {/* Liens secondaires — rangée unique, centrée, style homogène (mot de passe oublié,
+                retour à la connexion en mode 2FA) : auparavant ils n'avaient ni le même style ni
+                le même alignement selon le mode affiché. */}
+            <div className="form-links">
+              {needTotp ? (
+                <button type="button" onClick={() => window.location.replace('/login')}>
+                  {t('auth.backToLogin')}
+                </button>
+              ) : null}
+              <Link href="/forgot">{t('forgot.link')}</Link>
+            </div>
           </form>
         </div>
         <p className="mt-3 text-center text-[11px] text-[rgb(var(--c-muted))]">{t('login.footer')}</p>

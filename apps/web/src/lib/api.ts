@@ -87,6 +87,19 @@ async function parse<T>(res: Response): Promise<T> {
   return (json ?? {}) as T;
 }
 
+/**
+ * Sérialise des conditions au format « filters » attendu par le CRUD serveur.
+ * IMPORTANT : les query params libres (?active=true&typePrefix=MED…) sont IGNORES par
+ * buildQuery() — seuls `q`, `scope`, `page/pageSize`, `sortBy/sortDir` et `filters` sont lus.
+ * Passer par ce helper évite de croire à tort qu'un filtre est appliqué.
+ */
+export function crudFilters(
+  items: { field: string; op?: 'contains' | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'empty' | 'notEmpty' | 'in'; value?: string | number | boolean; value2?: string | number }[],
+  combinator: 'AND' | 'OR' = 'AND',
+): string {
+  return JSON.stringify({ combinator, items: items.map((i) => ({ field: i.field, op: i.op ?? 'eq', ...(i.value !== undefined ? { value: i.value } : {}), ...(i.value2 !== undefined ? { value2: i.value2 } : {}) })) });
+}
+
 export const api = {
   async get<T>(path: string, query?: Record<string, string | number | undefined | null>): Promise<T> {
     const qs = query ? `?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]))}` : '';

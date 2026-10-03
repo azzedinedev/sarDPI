@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Plus, Save, Search, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, crudFilters } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Field, Input, Select, Spinner, Textarea } from '@/components/ui';
 import { useToast } from '@/components/toast';
@@ -18,10 +18,11 @@ import { useAuth } from '@/stores/auth';
 interface DrugHit {
   id: number;
   code: string;
-  dci: string;
+  dci: string | null;
   trade_name: string;
-  forms: string | null;
-  strengths: string | null;
+  form: string | null;
+  dosage: string | null;
+  pack: string | null;
   atc: string | null;
 }
 interface Line {
@@ -61,7 +62,16 @@ export default function RxNewPage(): React.ReactElement {
   const [drugSearch, setDrugSearch] = useState('');
 
   const patSearch = useQuery({ queryKey: ['rx-pat', patientQuery], queryFn: () => api.get<{ rows: { id: number; code: string; full_name: string }[] }>(`/patients/search?q=${encodeURIComponent(patientQuery)}`), enabled: patientQuery.length >= 2 });
-  const practs = useQuery({ queryKey: ['pract-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners?pageSize=100&active=true&typePrefix=MED') });
+  // Prescripteurs = médecins actifs uniquement. Clé de cache distincte de celle du calendrier
+  // (même nom « pract-lite » mais URL différente → données incohérentes selon qui charge en premier).
+  const practs = useQuery({
+    queryKey: ['pract-lite', 'MED'],
+    queryFn: () =>
+      api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners', {
+        pageSize: 100,
+        filters: crudFilters([{ field: 'type_prefix', value: 'MED' }, { field: 'active', value: 1 }]),
+      }),
+  });
   const templates = useQuery({ queryKey: ['rx-templates'], queryFn: () => api.get<{ rows: { id: number; name: string; practitioner_id: number | null }[] }>('/rx-templates?pageSize=50') });
   const drugs = useQuery({ queryKey: ['drug-search', drugSearch], queryFn: () => api.get<{ rows: DrugHit[] }>(`/drugs/search?q=${encodeURIComponent(drugSearch)}`), enabled: drugSearch.length >= 2 });
 
@@ -246,7 +256,8 @@ export default function RxNewPage(): React.ReactElement {
                     onClick={() => {
                       setLines((ls) => {
                         const last = ls[ls.length - 1];
-                        const line: Line = { key: lineSeq++, drugId: d.id, dci: d.dci, tradeName: d.trade_name, form: (d.forms ?? '').split(',')[0] ?? '', dosage: (d.strengths ?? '').split(',')[0] ?? '', quantity: 1, posology: '', durationDays: 7, instructions: '' };
+                        // tradeName doit être non vide : rxLineZ l'exige (min 1) — sinon 422 au save.
+                        const line: Line = { key: lineSeq++, drugId: d.id, dci: d.dci ?? '', tradeName: d.trade_name ?? '', form: d.form ?? '', dosage: d.dosage ?? '', quantity: 1, posology: '', durationDays: 7, instructions: '' };
                         if (last && !last.tradeName) return [...ls.slice(0, -1), line];
                         return [...ls, line];
                       });

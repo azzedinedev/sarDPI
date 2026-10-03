@@ -116,6 +116,7 @@ p.note{white-space:pre-wrap;background:#f4f8fa;border-radius:8px;padding:8px 10p
 ul.rx{list-style:none;padding:0;margin:0}
 ul.rx li{padding:6px 0;border-bottom:1px dashed #dbe7ec}
 ul.rx .dn{font-weight:600}
+ul.rx .qty{font-weight:700;color:#0f766e;unicode-bidi:isolate;white-space:nowrap}
 ul.rx .ps{color:#3c5665}
 footer.ftr{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-top:16px;border-top:1px solid #dbe7ec;padding-top:10px}
 .qrbox{text-align:center}

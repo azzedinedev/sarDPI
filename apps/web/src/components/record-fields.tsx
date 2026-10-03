@@ -7,9 +7,12 @@
  * (typé selon `kind`) + champs personnalisés clé→valeur ajoutables/supprimables.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Plus, Trash2 } from 'lucide-react';
 import { pickLabel } from '@sardpi/shared';
 import { Button, Input, Select, Textarea } from '@/components/ui';
+import { ValueView } from '@/components/value-view';
+import { cn } from '@/lib/utils';
 
 export interface FieldConfig {
   key: string;
@@ -20,7 +23,12 @@ export interface FieldConfig {
   options?: string[] | { value: string; label: string }[];
 }
 
-type Vals = Record<string, string | number | boolean | null | undefined>;
+/**
+ * Valeurs d'une fiche : le JSONB peut légitimement contenir des objets et des tableaux
+ * (listes de médicaments, mesures répétées, libellés multilingues) — le type ne doit donc pas
+ * les exclure, sinon toute valeur structurée était rendue en « [object Object] ».
+ */
+type Vals = Record<string, unknown>;
 
 function labelOf(c: { key: string; label?: Record<string, string> | string }, lang: string): string {
   if (typeof c.label === 'string' && c.label) return c.label;
@@ -33,10 +41,28 @@ function normOptions(o: FieldConfig['options']): { value: string; label: string 
   return o.map((x) => (typeof x === 'string' ? { value: x, label: x } : { value: String(x.value), label: x.label ?? String(x.value) }));
 }
 
+/**
+ * Valeur destinée à un CHAMP DE SAISIE : les scalaires passent tels quels ; une valeur
+ * structurée est sérialisée pour rester modifiable sans perte au prochain enregistrement.
+ * (L'affichage en lecture, lui, passe par ValueView — jamais de JSON à l'écran.)
+ */
 function displayValue(v: unknown): string {
   if (v == null || v === '') return '';
   if (typeof v === 'boolean') return v ? '✓' : '✗';
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return '';
+    }
+  }
   return String(v);
+}
+
+/** Vrai si la valeur mérite un rendu structuré (objet ou tableau non vide). */
+function isStructured(v: unknown): boolean {
+  if (v === null || typeof v !== 'object') return false;
+  return Array.isArray(v) ? v.length > 0 : Object.keys(v as Record<string, unknown>).length > 0;
 }
 
 export function RecordFields({
@@ -54,6 +80,7 @@ export function RecordFields({
   lang?: string;
   emptyLabel?: string;
 }): React.ReactElement {
+  const reduce = useReducedMotion();
   const vals: Vals = useMemo(() => ({ ...(value ?? {}) }), [value]);
   const cfgKeys = useMemo(() => new Set(config.map((c) => c.key)), [config]);
 
@@ -119,17 +146,35 @@ export function RecordFields({
     if (!cfgRows.length && !extraKeys.length) {
       return <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{emptyLabel}</p>;
     }
+    const rows = [
+      ...cfgRows.map((c) => ({ k: c.key, label: labelOf(c, lang), unit: c.unit, v: vals[c.key] })),
+      ...extraKeys.map((k) => ({ k, label: k, unit: undefined, v: vals[k] })),
+    ];
     return (
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-        {[...cfgRows.map((c) => ({ k: c.key, label: labelOf(c, lang), unit: c.unit, v: vals[c.key] })), ...extraKeys.map((k) => ({ k, label: k, unit: undefined, v: vals[k] }))].map((row) => (
-          <div key={row.k} className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--c-line)/0.5)] py-1 last:border-0">
-            <dt className="shrink-0 text-[12px] font-semibold text-[rgb(var(--c-muted))]">{row.label}</dt>
-            <dd className="min-w-0 flex-1 text-end text-[13px] font-medium break-words">
-              {displayValue(row.v)}
-              {row.unit ? <span className="ms-1 text-[11px] text-[rgb(var(--c-muted))]">{row.unit}</span> : null}
-            </dd>
-          </div>
-        ))}
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2">
+        {rows.map((row, i) => {
+          // Valeur structurée (tableau, objet, libellé multilingue) → rendu clé→valeur ou tableau
+          // sur toute la largeur ; jamais de JSON brut ni de « [object Object] ».
+          const structured = isStructured(row.v);
+          return (
+            <motion.div
+              key={row.k}
+              className={cn(
+                'flex items-baseline justify-between gap-3 border-b border-[rgb(var(--c-line)/0.5)] py-1.5 last:border-0',
+                structured && 'flex-col items-stretch gap-1 sm:col-span-2',
+              )}
+              initial={{ opacity: 0, y: reduce ? 0 : 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.2, delay: reduce ? 0 : Math.min(i * 0.025, 0.3), ease: [0.22, 1, 0.36, 1] }}
+            >
+              <dt className="shrink-0 text-[12px] font-semibold text-[rgb(var(--c-muted))]">{row.label}</dt>
+              <dd className={cn('min-w-0 flex-1 break-words text-[13px] font-medium', structured ? 'text-start' : 'text-end')}>
+                {structured ? <ValueView value={row.v} lang={lang} /> : displayValue(row.v)}
+                {!structured && row.unit ? <span className="ms-1 text-[11px] text-[rgb(var(--c-muted))]">{row.unit}</span> : null}
+              </dd>
+            </motion.div>
+          );
+        })}
       </dl>
     );
   }

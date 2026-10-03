@@ -178,12 +178,23 @@ export function registerCatalog(): void {
     async handler(ctx: Ctx) {
       const general = await getSection('general');
       const wf = (await getSection('workflowSteps')) as unknown as { steps?: { key: string; order?: number; label?: Record<string, string> }[] };
+      // Étiquettes du calendrier (types + statuts) — libellés déjà localisés ici : la route
+      // publique de lecture ne doit pas exiger la permission « setting:view ».
+      const cal = (await getSection('calendarKinds')) as unknown as {
+        kinds?: { key: string; order?: number; color?: string; durationMin?: number; active?: boolean; label?: Record<string, string> }[];
+        statuses?: { key: string; order?: number; color?: string; label?: Record<string, string> }[];
+      };
       const lang = ctx.user?.locale ?? 'fr';
+      const byOrder = (a: { order?: number }, b: { order?: number }): number => (a.order ?? 0) - (b.order ?? 0);
       return {
         ok: true,
         dateDisplay: (general as { dateDisplay?: string }).dateDisplay ?? 'DD/MM/YYYY',
         timeDisplay: (general as { timeDisplay?: boolean }).timeDisplay !== false,
-        steps: [...(wf.steps ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s) => ({ key: s.key, label: s.label?.[lang] ?? s.label?.fr ?? s.key })),
+        steps: [...(wf.steps ?? [])].sort(byOrder).map((s) => ({ key: s.key, label: s.label?.[lang] ?? s.label?.fr ?? s.key })),
+        calendarKinds: {
+          kinds: [...(cal.kinds ?? [])].filter((k) => k.active !== false).sort(byOrder).map((k) => ({ key: k.key, label: k.label?.[lang] ?? k.label?.fr ?? k.key, color: k.color ?? '#3b82f6', durationMin: k.durationMin ?? 30 })),
+          statuses: [...(cal.statuses ?? [])].sort(byOrder).map((s) => ({ key: s.key, label: s.label?.[lang] ?? s.label?.fr ?? s.key, color: s.color ?? '#64748b' })),
+        },
       };
     },
   }),

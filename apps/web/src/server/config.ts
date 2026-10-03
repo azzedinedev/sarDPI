@@ -24,6 +24,59 @@ function findRoot(): string {
 
 export const ROOT = findRoot();
 
+/**
+ * Chargement des fichiers .env du monorepo.
+ * ------------------------------------------------------------------
+ * Next.js ne charge que les .env du répertoire de l'application (apps/web), alors que les scripts
+ * (vite-node : seed, db:sync, db:export) ont pour racine celle du monorepo : un .env.local placé
+ * d'un seul côté était donc lu par l'un et IGNORE par l'autre, silencieusement. Conséquence la
+ * plus grave observée : AUTH_SECRET / ENC_KEYS absents du serveur web → JWT dérivé d'un repli et
+ * chiffrement au repos des champs sensibles désactivé (exigence loi 18-07), sans aucun message.
+ * Ce chargeur aligne les deux environnements sur les MÊMES valeurs.
+ *
+ * Règle de priorité (la première valeur trouvée gagne) :
+ *   1. une variable déjà présente dans process.env n'est JAMAIS écrasée
+ *      (pm2, systemd, Docker, `$env:` PowerShell gardent la main) ;
+ *   2. `<racine>/.env.local` puis `<racine>/.env` ;
+ *   3. `<racine>/apps/web/.env.local` puis `<racine>/apps/web/.env` (emplacement du README).
+ * N'utilisez qu'UN seul de ces emplacements en pratique ; les autres servent de repli.
+ */
+export function loadRootEnv(root: string): string[] {
+  const appDir = path.join(root, 'apps', 'web');
+  const candidates = [
+    path.join(root, '.env.local'),
+    path.join(root, '.env'),
+    path.join(appDir, '.env.local'),
+    path.join(appDir, '.env'),
+  ];
+  const loaded: string[] = [];
+  for (const file of candidates) {
+    let text: string;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue; // fichier absent : normal en production (variables fournies par l'environnement)
+    }
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.trim().replace(/^export\s+/, '');
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq <= 0) continue;
+      const key = line.slice(0, eq).trim();
+      if (!key || process.env[key] !== undefined) continue;
+      let val = line.slice(eq + 1).trim();
+      // Guillemets entourant la valeur : retirés, sans interprétation des séquences d'échappement.
+      if ((val.startsWith('"') && val.endsWith('"') && val.length > 1) || (val.startsWith("'") && val.endsWith("'") && val.length > 1)) val = val.slice(1, -1);
+      process.env[key] = val;
+    }
+    loaded.push(path.relative(root, file) || file);
+  }
+  return loaded;
+}
+
+/** Fichiers .env effectivement chargés (journalisé au démarrage pour diagnostic). */
+export const ENV_FILES = loadRootEnv(ROOT);
+
 export const paths = {
   root: ROOT,
   locales: path.join(ROOT, 'locales'),
@@ -108,10 +161,17 @@ export function assertBootConfig() {
   if (gBoot.__sardpiBootWarned) return;
   gBoot.__sardpiBootWarned = true;
   const log = createLogger();
+  // Traçabilité de la configuration : quels fichiers .env ont réellement alimenté process.env.
+  // Utile en support — c'est l'ambiguïté « Next ne lit que apps/web/.env* » qui rendait muet un
+  // .env.local posé à la racine (AUTH_SECRET / ENC_KEYS alors ignorés sans aucun message).
+  if (ENV_FILES.length) log.info(`configuration chargée depuis ${ENV_FILES.join(' + ')} (racine : ${ROOT})`);
+  else log.info('aucun .env à la racine : configuration lue depuis l’environnement du processus.');
   if (env.adapter === 'json' || env.adapter === 'memory') {
     log.warn(`Adaptateur « ${env.adapter} » : mode démo / hors-ligne / mono-utilisateur. Utilisez DATA_ADAPTER=mysql pour la production.`);
   }
   if (env.encKeys.length === 0) {
     log.warn('ENC_KEYS absent : chiffrement AES-256-GCM des champs sensibles désactivé (loi 18-07 : à activer en production).');
+  } else {
+    log.info(`chiffrement au repos actif — ${env.encKeys.length} clé(s) AES-256-GCM chargée(s) (ids : ${env.encKeys.map((k) => k.id).join(', ')}).`);
   }
 }

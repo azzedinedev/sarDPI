@@ -27,11 +27,12 @@ import { Dialog } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { BizCode } from '@/components/biz-code';
+import { humanize, humanKey, ValueView } from '@/components/value-view';
 import { PopMenu, usePop } from '@/components/popover';
 import { fmtDisplay, looksLikeDate, useDisplayCfg, type DisplayCfg } from '@/lib/display';
 import { CrudForm } from './form';
 import { FilterBuilder } from './filters';
-import type { CrudProps, RowData } from './types';
+import type { ColDef, CrudProps, FieldDef, RenderCtx, RowData } from './types';
 import type { FilterGroup } from '@sardpi/shared';
 
 const EMPTY_GROUP: FilterGroup = { combinator: 'AND', items: [] };
@@ -589,7 +590,8 @@ export function CrudModule(props: CrudProps): React.ReactElement {
       <Dialog open={Boolean(drawer?.mode === 'view' && drawer.row)} onClose={() => setDrawer(null)} title={<span className="flex items-center gap-2">{drawer?.row?.code ? <BizCode code={drawer.row.code as string} /> : null}</span>} wide>
         {drawer?.mode === 'view' && drawer.row ? (
           <div className="flex flex-col gap-3">
-            {detail?.(drawer.row)}
+            {/* Rendu détaillé propre à la page, sinon fiche générique clé→valeur (jamais vide). */}
+            {detail ? detail(drawer.row) : <GenericDetail row={drawer.row} columns={columns} fields={fields} disp={disp} ctx={tctx} reduce={reduce} />}
             {props.canUpdate !== false && fields.length ? (
               <div className="flex justify-end">
                 <Button variant="primary" size="sm" onClick={() => setDrawer({ mode: 'edit', row: drawer.row })}>
@@ -724,15 +726,110 @@ export function Card({ children, className, soft, ...rest }: React.HTMLAttribute
   );
 }
 
+/** Clés techniques écartées du détail générique (sans intérêt métier, ou sensibles). */
+const DETAIL_SKIP = new Set(['id', 'deleted_at', 'deleted_by', 'password', 'password_hash', 'otp_secret', 'secret', 'verify_token']);
+/** Horodatages affichés en pied de fiche plutôt que dans la liste des valeurs. */
+const DETAIL_TIMES = ['created_at', 'updated_at'];
+
+/**
+ * Fiche détail générique « clé → valeur ».
+ * Utilisée quand une page ne fournit pas de rendu `detail` : auparavant la vue « œil »
+ * n'affichait alors QUE le code métier (dialogue quasi vide).
+ *  - libellés : ceux des colonnes déclarées, sinon ceux des champs du formulaire, sinon la clé
+    humanisée ;
+ *  - valeurs scalaires : même formatage que le tableau (dates selon les réglages, codes métier,
+    booléens en badge) ;
+ *  - valeurs structurées (objets / tableaux JSONB) : ValueView → liste clé→valeur ou tableau,
+    JAMAIS de JSON brut ;
+ *  - rendus déclarés par les colonnes réutilisés (badges de statut…) pour une apparence cohérente.
+ */
+function GenericDetail({
+  row,
+  columns,
+  fields,
+  disp,
+  ctx,
+  reduce,
+}: {
+  row: RowData;
+  columns: ColDef[];
+  fields: FieldDef[];
+  disp: DisplayCfg;
+  ctx: RenderCtx;
+  reduce: boolean | null;
+}): React.ReactElement {
+  const labelFor = useMemo(() => {
+    const m = new Map<string, React.ReactNode>();
+    for (const c of columns) m.set(c.key, c.label);
+    for (const f of fields) if (!m.has(f.key)) m.set(f.key, f.label ?? humanKey(f.key));
+    return m;
+  }, [columns, fields]);
+
+  const entries = useMemo(
+    () => Object.entries(row).filter(([k, v]) => !DETAIL_SKIP.has(k) && !DETAIL_TIMES.includes(k) && v !== null && v !== undefined && v !== ''),
+    [row],
+  );
+  const times = DETAIL_TIMES.filter((k) => row[k] !== null && row[k] !== undefined && row[k] !== '');
+
+  return (
+    <div className="flex flex-col gap-3">
+      <dl className="flex flex-col gap-0.5">
+        {entries.map(([k, v], i) => {
+          const col = columns.find((c) => c.key === k);
+          return (
+            <motion.div
+              key={k}
+              className="grid grid-cols-1 items-start gap-x-4 rounded-lg px-2 py-1.5 odd:bg-[rgb(var(--c-surface-2)/0.55)] sm:grid-cols-[minmax(9rem,auto)_1fr]"
+              initial={{ opacity: 0, y: reduce ? 0 : 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.22, delay: reduce ? 0 : Math.min(i * 0.028, 0.28), ease: [0.22, 1, 0.36, 1] }}
+            >
+              <dt className="text-[11.5px] font-bold uppercase tracking-wide text-[rgb(var(--c-muted))]">{labelFor.get(k) ?? humanKey(k)}</dt>
+              <dd className="min-w-0 text-[13px] text-[rgb(var(--c-ink))]">
+                {col?.render ? col.render(row, ctx) : typeof v === 'object' ? <ValueView value={v} lang={ctx.lang} /> : formatCell(v, disp)}
+              </dd>
+            </motion.div>
+          );
+        })}
+        {entries.length === 0 ? (
+          <div className="px-2 py-3 text-center text-[12.5px] text-[rgb(var(--c-muted))]">{ctx.t('list.emptyHint')}</div>
+        ) : null}
+      </dl>
+
+      {times.length ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[rgb(var(--c-line)/0.6)] pt-2 text-[11.5px] text-[rgb(var(--c-muted))]">
+          {times.map((k) => (
+            <span key={k} className="inline-flex items-center gap-1.5">
+              <b className="font-semibold">{labelFor.get(k) ?? humanKey(k)}</b>
+              <span dir="ltr" className="font-mono tabular-nums">
+                {fmtDisplay(String(row[k]), disp)}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function fmtVal(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'object') return JSON.stringify(v);
-  if (typeof v === 'boolean') return v ? '✓' : '—';
-  return String(v);
+  // Valeur lisible pour TOUT type : objets et tableaux sont résumés, les libellés multilingues
+  // sont traduits dans la langue active. (Avant : JSON.stringify → du JSON brut comme valeur.)
+  return humanize(v);
 }
 function formatCell(v: unknown, disp?: DisplayCfg): React.ReactNode {
   if (v === null || v === undefined || v === '') return <span className="text-[rgb(var(--c-muted)/0.5)]">—</span>;
-  if (typeof v === 'object') return <span className="font-mono text-[12.5px]">{JSON.stringify(v)}</span>;
+  if (typeof v === 'object') {
+    // Cellule de tableau : trop étroite pour un rendu clé→valeur complet (réservé aux fiches
+    // détaillées) → résumé lisible tronqué, avec la valeur entière en infobulle.
+    const txt = humanize(v);
+    if (!txt) return <span className="text-[rgb(var(--c-muted)/0.5)]">—</span>;
+    return (
+      <span className="block max-w-[320px] truncate align-middle" title={txt}>
+        {txt}
+      </span>
+    );
+  }
   if (typeof v === 'boolean') return v ? <Badge tone="ok">✓</Badge> : <Badge>—</Badge>;
   const s = String(v);
   // horodatages ISO → format des réglages (jamais le brut « 2026-09-28T11:10 »)

@@ -9,11 +9,12 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarPlus } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, crudFilters } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Button, Field, Input, Select, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
+import { useCalendarKinds } from '@/lib/display';
 
 /** Date/heure locale → valeur `datetime-local` (YYYY-MM-DDTHH:mm). */
 function toLocalInput(d: Date): string {
@@ -38,6 +39,8 @@ export function ApptQuickButton({
   const { t: tc } = useT('common');
   const toast = useToast();
   const qc = useQueryClient();
+  // Étiquettes configurables (réglage « calendarKinds ») — mêmes listes que le calendrier.
+  const ck = useCalendarKinds();
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState(() => toLocalInput(new Date(Date.now() + 3600_000)));
   const [end, setEnd] = useState(() => toLocalInput(new Date(Date.now() + 2 * 3600_000)));
@@ -47,8 +50,8 @@ export function ApptQuickButton({
   const [locationId, setLocationId] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
 
-  const practs = useQuery({ queryKey: ['pract-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners?pageSize=100&active=true'), enabled: open });
-  const locs = useQuery({ queryKey: ['loc-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; kind: string }[] }>('/locations?pageSize=100&active=true'), enabled: open });
+  const practs = useQuery({ queryKey: ['pract-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
+  const locs = useQuery({ queryKey: ['loc-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; kind: string }[] }>('/locations', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
 
   const valid = start.length >= 16 && end.length >= 16 && new Date(end) > new Date(start);
 
@@ -77,9 +80,24 @@ export function ApptQuickButton({
     onError: (e: unknown) => toast.error(t(`errors.${(e as { code?: string }).code ?? 'network'}`)),
   });
 
+  /**
+   * Ouvre la fiche en repartant de valeurs saines : premier type/statut configuré (les listes
+   * viennent de la base, « consultation » peut donc ne plus exister) et fin = durée du type.
+   */
+  const openDialog = (): void => {
+    const st = new Date(Date.now() + 3600_000);
+    const k = ck.kinds[0]?.key ?? 'consultation';
+    setKind(k);
+    setStatus(ck.statuses[0]?.key ?? 'pending');
+    setStart(toLocalInput(st));
+    setEnd(toLocalInput(new Date(st.getTime() + ck.kindDuration(k) * 60_000)));
+    setNotes('');
+    setOpen(true);
+  };
+
   return (
     <>
-      <Button size="sm" variant={variant} onClick={() => setOpen(true)}>
+      <Button size="sm" variant={variant} onClick={openDialog}>
         <CalendarPlus size={14} /> {label ?? t('appt.new')}
       </Button>
       <Dialog
@@ -104,20 +122,14 @@ export function ApptQuickButton({
             <Select
               value={kind}
               onChange={(e) => setKind(e.target.value)}
-              options={[
-                { value: 'consultation', label: t('appt.k.consultation') },
-                { value: 'control', label: t('appt.k.control') },
-                { value: 'procedure', label: t('appt.k.procedure') },
-                { value: 'lab', label: t('appt.k.lab') },
-                { value: 'radio', label: t('appt.k.radio') },
-              ]}
+              options={ck.kindOptions}
             />
           </Field>
           <Field label={t('appt.statusField')}>
             <Select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              options={['pending', 'confirmed', 'done', 'cancelled', 'no_show'].map((st) => ({ value: st, label: t(`appt.status.${st}`) }))}
+              options={ck.statusOptions}
             />
           </Field>
           <Field label={t('appt.practitioner')}>

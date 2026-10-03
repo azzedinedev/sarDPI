@@ -274,10 +274,13 @@ async function buildSpecFor(code: string, lang: string, ctx: Ctx): Promise<DocSp
         {
           heading: t(lang, 'pdf', 'pdf.patient'),
           html: `<ul class="rx">${lines
-            .map(
-              (l, i) =>
-                `<li><span class="dn">${i + 1}. ${l.dci ? `<span class="code">${l.dci}</span> — ` : ''}${l.trade_name}${l.dosage ? ` ${l.dosage}` : ''}${l.form ? ` (${l.form})` : ''}</span><br><span class="ps">${l.posology}</span>${l.instructions ? `<br><span class="co">${l.instructions}</span>` : ''}</li>`,
-            )
+            .map((l, i) => {
+              // La quantité (colonne « qty ») manquait sur le document imprimé : le pharmacien
+              // n'avait aucun moyen de connaître le nombre de boîtes à délivrer.
+              const qty = Number(l.qty ?? 0);
+              const qtyHtml = Number.isFinite(qty) && qty > 0 ? `<span class="qty"> · ${t(lang, 'pharmacy', 'pharmacy.quantity')} : ${qty}</span>` : '';
+              return `<li><span class="dn">${i + 1}. ${l.dci ? `<span class="code">${l.dci}</span> — ` : ''}${l.trade_name}${l.dosage ? ` ${l.dosage}` : ''}${l.form ? ` (${l.form})` : ''}</span>${qtyHtml}<br><span class="ps">${l.posology}</span>${l.instructions ? `<br><span class="co">${l.instructions}</span>` : ''}</li>`;
+            })
             .join('')}</ul>`,
         },
         ...(rx.notes ? [{ heading: t(lang, 'common', 'common.notes'), note: String(rx.notes) }] : []),

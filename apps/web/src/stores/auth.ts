@@ -27,7 +27,12 @@ interface AuthState {
   role: { id: number; key: string; name?: Record<string, string> } | null;
   perms: string[];
   license: { state: string; expiresAt?: string } | null;
-  status: 'anonymous' | 'authenticating' | 'authed' | 'needs-totp';
+  /**
+   * 'checking' = vérification de session en cours (au démarrage, avant /auth/refresh).
+   * Distinct de 'anonymous' : sans cet état, un utilisateur reconnecté avec un cookie de
+   * refresh valide était expulsé vers /login le temps que la promesse se résolve.
+   */
+  status: 'checking' | 'anonymous' | 'authenticating' | 'authed' | 'needs-totp';
   error: string | null;
   totpPending: boolean;
   init: () => Promise<void>;
@@ -47,7 +52,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   role: null,
   perms: [],
   license: null,
-  status: 'anonymous',
+  status: 'checking',
   error: null,
   totpPending: false,
 

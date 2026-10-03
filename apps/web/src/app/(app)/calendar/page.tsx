@@ -12,14 +12,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { api } from '@/lib/api';
+import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Tags } from 'lucide-react';
+import { api, crudFilters } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Field, Select, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { AsyncAutocomplete, type ComboOption } from '@/components/combo';
+import { CalendarKindsDialog } from '@/components/calendar-kinds-editor';
+import { useCalendarKinds } from '@/lib/display';
 import { useToast } from '@/components/toast';
-import { cn } from '@/lib/utils';
+import { cn, withAlpha } from '@/lib/utils';
 import { workingDays } from '@/lib/format';
 import { useAuth } from '@/stores/auth';
 
@@ -88,8 +90,12 @@ export default function CalendarPage(): React.ReactElement {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [dialog, setDialog] = useState<{ mode: 'create' | 'edit'; start?: string; end?: string; appt?: Appt } | null>(null);
   const [drag, setDrag] = useState<Drag>(null);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const canWrite = has('calendar', 'create');
   const canUpdate = has('calendar', 'update');
+  // Étiquettes (types + statuts de RDV) configurables en base — réglage « calendarKinds ».
+  const ck = useCalendarKinds();
+  const canEditLabels = has('setting', 'update');
   const colRefs = useRef<(HTMLDivElement | null)[]>([]);
   const draggedRef = useRef(false); // supprime le « clic » qui suit un glisser (sinon la fiche s'ouvrirait)
 
@@ -262,11 +268,32 @@ export default function CalendarPage(): React.ReactElement {
           {days[0]!.toLocaleDateString()} → {days[6]!.toLocaleDateString()}
         </span>
         <span className="hidden text-[11.5px] text-[rgb(var(--c-muted))] md:inline">{t('cal.dragHint')}</span>
-        {canWrite ? (
-          <Button size="sm" variant="primary" className="ms-auto" onClick={() => setDialog({ mode: 'create', start: toLocalInput(new Date(weekStart.getTime() + 9 * 3600_000)), end: toLocalInput(new Date(weekStart.getTime() + 9.5 * 3600_000)) })}>
-            <Plus size={14} /> {t('appt.new')}
-          </Button>
-        ) : null}
+        <div className="ms-auto flex flex-wrap items-center gap-2">
+          {canEditLabels ? (
+            <Button size="sm" variant="ghost" onClick={() => setLabelsOpen(true)}>
+              <Tags size={14} /> {t('cal.editLabels')}
+            </Button>
+          ) : null}
+          {canWrite ? (
+            <Button size="sm" variant="primary" onClick={() => setDialog({ mode: 'create', start: toLocalInput(new Date(weekStart.getTime() + 9 * 3600_000)), end: toLocalInput(new Date(weekStart.getTime() + 9.5 * 3600_000)) })}>
+              <Plus size={14} /> {t('appt.new')}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Légende — couleurs, libellés et durées proviennent du réglage « calendarKinds » (base). */}
+      <div className="glass-card flex flex-wrap items-center gap-x-3 gap-y-1.5 !px-3 !py-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--c-muted))]">{t('cal.legend')}</span>
+        {ck.kinds.map((k) => (
+          <span key={k.key} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[rgb(var(--c-ink))]">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: k.color }} />
+            {k.label}
+            <span dir="ltr" className="font-mono text-[10.5px] font-medium text-[rgb(var(--c-muted))]">
+              {k.durationMin}′
+            </span>
+          </span>
+        ))}
       </div>
 
       <div className="glass-card overflow-x-auto !p-0">
@@ -321,10 +348,18 @@ export default function CalendarPage(): React.ReactElement {
                       a.status === 'done' && 'opacity-60',
                       a.status === 'cancelled' && 'opacity-30 line-through',
                       canUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                      statusColor(a.status),
                     )}
-                    style={{ top, height }}
-                    title={`${a.patient_name ?? ''} — ${a.kind}`}
+                    // Couleurs pilotées par le réglage « calendarKinds » : le statut teint le bloc,
+                    // le type de RDV marque le bord d'attaque (logique, donc inversé en RTL).
+                    style={{
+                      top,
+                      height,
+                      background: withAlpha(ck.statusColor(a.status), 0.14),
+                      borderColor: withAlpha(ck.statusColor(a.status), 0.5),
+                      borderInlineStartColor: withAlpha(ck.kindColor(a.kind), 0.95),
+                      borderInlineStartWidth: 3,
+                    }}
+                    title={`${a.patient_name ?? ''} — ${ck.kindLabel(a.kind)} · ${ck.statusLabel(a.status)}`}
                     onPointerDown={(e) => startBlockDrag(e, a, di, 'move')}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -344,7 +379,7 @@ export default function CalendarPage(): React.ReactElement {
                       </button>
                     </div>
                     <div className="flex items-center gap-1 text-[9px] opacity-80">
-                      <span className="truncate">{a.kind}</span>
+                      <span className="truncate">{ck.kindLabel(a.kind)}</span>
                       {has('calendar', 'update') ? (
                         <select
                           className="ms-auto w-16 rounded border-0 bg-transparent text-[9px] font-bold outline-none"
@@ -353,9 +388,9 @@ export default function CalendarPage(): React.ReactElement {
                           onPointerDown={(e) => e.stopPropagation()}
                           onChange={(e) => setStatus.mutate({ id: a.id, status: e.target.value })}
                         >
-                          {['pending', 'confirmed', 'done', 'cancelled', 'no_show'].map((st) => (
-                            <option key={st} value={st}>
-                              {t(`appt.status.${st}`)}
+                          {ck.statuses.map((st) => (
+                            <option key={st.key} value={st.key}>
+                              {st.label}
                             </option>
                           ))}
                         </select>
@@ -388,6 +423,9 @@ export default function CalendarPage(): React.ReactElement {
         }}
         patientHint={sp.get('patient') ? Number(sp.get('patient')) : undefined}
       />
+
+      {/* Étiquettes (types + statuts) — réservées aux profils pouvant modifier les réglages. */}
+      {canEditLabels ? <CalendarKindsDialog open={labelsOpen} onClose={() => setLabelsOpen(false)} /> : null}
     </div>
   );
 }
@@ -398,20 +436,8 @@ function fmtMin(m: number): string {
   return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-function statusColor(status: string): string {
-  switch (status) {
-    case 'confirmed':
-      return 'border-[rgb(var(--c-ok)/0.5)] bg-[rgb(var(--c-ok-soft))]';
-    case 'done':
-      return 'border-[rgb(var(--c-info)/0.4)] bg-[rgb(var(--c-info-soft))]';
-    case 'cancelled':
-      return 'border-[rgb(var(--c-coral)/0.4)] bg-[rgb(var(--c-coral-soft))]';
-    case 'no_show':
-      return 'border-[rgb(var(--c-muted)/0.4)] bg-[rgb(var(--c-surface-2))]';
-    default:
-      return 'border-[rgb(var(--c-amber)/0.5)] bg-[rgb(var(--c-amber-soft))]';
-  }
-}
+/* statusColor() a disparu : les couleurs des blocs viennent désormais du réglage
+   « calendarKinds » (voir useCalendarKinds() + withAlpha()), donc configurables en base. */
 
 /** Fiche RDV — création (plage pré-remplie) ou édition (bloc existant). */
 function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: 'create' | 'edit'; start?: string; end?: string; appt?: Appt } | null; onClose: () => void; onSaved: () => void; patientHint?: number }): React.ReactElement {
@@ -429,9 +455,13 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
   const [status, setStatus] = useState('pending');
   const [notes, setNotes] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
+  // Types/statuts configurables ; le premier de chaque liste sert de valeur par défaut.
+  const ck = useCalendarKinds();
+  const defaultKind = ck.kinds[0]?.key ?? 'consultation';
+  const defaultStatus = ck.statuses[0]?.key ?? 'pending';
 
-  const practs = useQuery({ queryKey: ['pract-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners?pageSize=100&active=true'), enabled: open });
-  const locs = useQuery({ queryKey: ['loc-lite'], queryFn: () => api.get<{ rows: { id: number; code: string; kind: string }[] }>('/locations?pageSize=100&active=true'), enabled: open });
+  const practs = useQuery({ queryKey: ['pract-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
+  const locs = useQuery({ queryKey: ['loc-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; kind: string }[] }>('/locations', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
 
   // (ré)initialisation à chaque ouverture
   useEffect(() => {
@@ -443,8 +473,8 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
       setLoc(editing.location_id ? Number(editing.location_id) : null);
       setStart(toLocalInput(new Date(editing.start_at)));
       setEnd(toLocalInput(new Date(editing.end_at)));
-      setKind(editing.kind ?? 'consultation');
-      setStatus(editing.status ?? 'pending');
+      setKind(editing.kind ?? defaultKind);
+      setStatus(editing.status ?? defaultStatus);
       setNotes(editing.notes ?? '');
     } else {
       setPatient(patientHint ? { value: String(patientHint), label: `#${patientHint}` } : null);
@@ -452,8 +482,8 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
       setLoc(null);
       setStart(state.start ?? '');
       setEnd(state.end ?? '');
-      setKind('consultation');
-      setStatus('pending');
+      setKind(defaultKind);
+      setStatus(defaultStatus);
       setNotes('');
       if (patientHint) void resolvePatient(patientHint).then(setPatient);
     }
@@ -467,7 +497,8 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
   const mut = useMutation({
     mutationFn: async () => {
       const st = new Date(start);
-      const en = end ? new Date(end) : new Date(st.getTime() + 30 * 60_000);
+      // fin par défaut = durée configurée du type de RDV (réglage « calendarKinds »)
+      const en = end ? new Date(end) : new Date(st.getTime() + ck.kindDuration(kind) * 60_000);
       const body = {
         patientId: patient ? Number(patient.value) : null,
         practitionerId: practitioner ? Number(practitioner.value) : null,
@@ -525,11 +556,11 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('appt.kind')}>
-            <Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: 'consultation', label: t('appt.k.consultation') }, { value: 'control', label: t('appt.k.control') }, { value: 'procedure', label: t('appt.k.procedure') }, { value: 'lab', label: t('appt.k.lab') }, { value: 'radio', label: t('appt.k.radio') }]} />
+            <Select value={kind} onChange={(e) => setKind(e.target.value)} options={ck.kindOptions} />
           </Field>
           {editing ? (
             <Field label={t('appt.statusField')}>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} options={['pending', 'confirmed', 'done', 'cancelled', 'no_show'].map((st) => ({ value: st, label: t(`appt.status.${st}`) }))} />
+              <Select value={status} onChange={(e) => setStatus(e.target.value)} options={ck.statusOptions} />
             </Field>
           ) : null}
         </div>

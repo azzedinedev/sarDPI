@@ -1,14 +1,14 @@
 'use client';
 /**
  * Shell applicatif : garde d'authentification + navigation (sidebar / topbar / rail — data-nav),
- * topbar (recherche globale, langue, thème, thème visuel, user), blobs de fond animés, bannière licence.
+ * topbar (recherche globale, langue, thème, thème visuel, menu profil), fil d'Ariane avec bouton
+ * retour mis en évidence, blobs de fond animés, bannière licence.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  ArrowLeft,
   CalendarRange,
   ChevronFirst,
   FlaskConical,
@@ -32,7 +32,9 @@ import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { useT, useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { Spinner } from '@/components/ui';
+import { SessionLoader } from '@/components/loaders';
+import { Breadcrumb } from '@/components/breadcrumb';
+import { ProfileMenu } from '@/components/profile-menu';
 
 interface NavItem {
   key: string;
@@ -58,7 +60,6 @@ const NAV_ADMIN: NavItem[] = [
 
 export function Shell({ children }: { children: React.ReactNode }): React.ReactElement {
   const status = useAuth((s) => s.status);
-  const user = useAuth((s) => s.user);
   const has = useAuth((s) => s.has);
   const license = useAuth((s) => s.license);
   const router = useRouter();
@@ -69,20 +70,10 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
   const reduce = useReducedMotion();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (status === 'anonymous') router.replace(`/login?next=${encodeURIComponent(pathname ?? '/')}`);
   }, [status, router, pathname]);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    window.addEventListener('mousedown', h);
-    return () => window.removeEventListener('mousedown', h);
-  }, []);
 
   const items = useMemo(() => {
     const vis = NAV_MAIN.filter((n) => !n.module || has(n.module, 'view'));
@@ -96,13 +87,10 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
   if (status !== 'authed') {
     // plein écran sobre pendant la vérification de session (login rend lui-même son propre écran)
     if (pathname === '/login' || pathname === '/' || pathname.startsWith('/verify/')) return <>{children}</>;
-    return (
-      <div className="grid min-h-dvh place-items-center">
-        <div className="flex items-center gap-3 text-[rgb(var(--c-muted))]">
-          <Spinner className="h-6 w-6" /> <span className="text-sm">{tAuth('login.loading')}</span>
-        </div>
-      </div>
-    );
+    // 'checking' = /auth/refresh en cours ; 'authenticating' = connexion en cours.
+    // On n'expulse vers /login QUE sur 'anonymous' (voir useEffect) : sinon un utilisateur
+    // muni d'un cookie de refresh valide était renvoyé à la connexion à chaque rechargement.
+    return <SessionLoader label={status === 'authenticating' ? tAuth('login.submitting') : undefined} />;
   }
 
   const sidebar = (
@@ -168,83 +156,35 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
 
         <div className="min-w-0 flex-1">
           {/* Topbar */}
-          <header className="glass-soft sticky top-0 z-30 flex items-center gap-2 rounded-none border-x-0 border-t-0 px-3 py-2">
-            <button className="btn btn-ghost btn-sm btn-icon lg:hidden" onClick={() => setMobileOpen(true)} aria-label={t('nav.openMenu')}>
-              <Menu size={18} />
-            </button>
-            {pathname && pathname !== '/dashboard' ? (
-              <button
-                className="btn btn-ghost btn-sm btn-icon shrink-0"
-                title={t('ui.back')}
-                aria-label={t('ui.back')}
-                onClick={() => {
-                  if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-                  else router.push('/dashboard');
+          <header className="glass-soft sticky top-0 z-30 rounded-none border-x-0 border-t-0 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <button className="btn btn-ghost btn-sm btn-icon lg:hidden" onClick={() => setMobileOpen(true)} aria-label={t('nav.openMenu')}>
+                <Menu size={18} />
+              </button>
+              <form
+                className="relative min-w-0 flex-1 max-w-md"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (q.trim()) router.push(`/patients?q=${encodeURIComponent(q.trim())}`);
                 }}
               >
-                <ArrowLeft size={18} className="rtl:rotate-180" />
-              </button>
-            ) : null}
-            <form
-              className="relative min-w-0 flex-1 max-w-md"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (q.trim()) router.push(`/patients?q=${encodeURIComponent(q.trim())}`);
-              }}
-            >
-              <Search size={15} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] ltr:left-2.5 rtl:right-2.5" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search.global')} className="field ps-8 max-md:ps-8" style={{ paddingInlineStart: '2.1rem' }} />
-            </form>
-            <div className="ms-auto flex items-center gap-1.5">
-              <button className="btn btn-ghost btn-sm btn-icon" title={t('ui.toggleDark')} onClick={() => ui.set({ themeMode: ui.themeMode === 'dark' ? 'light' : 'dark' })}>
-                {ui.themeMode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-              <Link className="btn btn-ghost btn-sm btn-icon" href="/admin/themes" title={t('ui.theme')}>
-                <Palette size={16} />
-              </Link>
-              {LangSwitch}
-              <div className="relative" ref={menuRef}>
-                <button className="btn btn-ghost btn-sm gap-2" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-[rgb(var(--c-primary))] text-[11px] font-bold text-white">{(user?.fullName ?? '?').slice(0, 1).toUpperCase()}</span>
-                  <span className="hidden md:inline">{user?.fullName}</span>
+                <Search size={15} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[rgb(var(--c-muted))] ltr:left-2.5 rtl:right-2.5" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search.global')} className="field ps-8 max-md:ps-8" style={{ paddingInlineStart: '2.1rem' }} />
+              </form>
+              <div className="ms-auto flex items-center gap-1.5">
+                <button className="btn btn-ghost btn-sm btn-icon" title={t('ui.toggleDark')} onClick={() => ui.set({ themeMode: ui.themeMode === 'dark' ? 'light' : 'dark' })}>
+                  {ui.themeMode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                <AnimatePresence>
-                  {menuOpen ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: reduce ? 0 : -6, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                      transition={{ duration: reduce ? 0 : 0.15 }}
-                      className="glass-card absolute end-0 top-[46px] z-50 w-64 p-2"
-                    >
-                      <div className="px-2 py-1.5 text-[13px]">
-                        <b>{useAuth.getState().user?.fullName}</b>
-                        <div className="text-[11.5px] text-[rgb(var(--c-muted))]">{useAuth.getState().role?.key}</div>
-                      </div>
-                      <Link className="btn btn-ghost w-full justify-start" href="/profile" onClick={() => setMenuOpen(false)}>
-                        {t('user.profile')}
-                      </Link>
-                      <div className="mt-1 flex gap-1 border-t border-[rgb(var(--c-line)/0.6)] pt-2">
-                        <button className="btn btn-ghost flex-1" onClick={() => ui.set({ motion: !ui.motion })}>
-                          {ui.motion ? t('ui.motionOn') : t('ui.motionOff')}
-                        </button>
-                        <button
-                          className="btn btn-ghost flex-1"
-                          onClick={() => {
-                            ui.set({ density: ui.density === 'compact' ? 'comfortable' : 'compact' });
-                          }}
-                        >
-                          {ui.density === 'compact' ? t('ui.comfortable') : t('ui.compact')}
-                        </button>
-                      </div>
-                      <button className="btn btn-danger mt-2 w-full" onClick={() => void useAuth.getState().logout()}>
-                        {tAuth('logout')}
-                      </button>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                <Link className="btn btn-ghost btn-sm btn-icon" href="/admin/themes" title={t('ui.theme')}>
+                  <Palette size={16} />
+                </Link>
+                {LangSwitch}
+                <ProfileMenu />
               </div>
             </div>
+
+            {/* Bouton retour mis en évidence + chemin complet (fil d'Ariane) — rien sur /dashboard. */}
+            <Breadcrumb className="mt-1.5" />
           </header>
 
           {/* Nav horizontale (mode topbar) */}

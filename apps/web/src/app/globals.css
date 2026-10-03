@@ -435,3 +435,215 @@ html[data-nav='rail'] .app-sidebar {
 html[data-nav='rail'] .app-sidebar .nav-label {
   display: none;
 }
+
+/* ============================================================ Chargeurs stylés */
+/* Anneau conique tournant (vérification de session / attentes longues) */
+.loader-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.loader-ring::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0%, rgb(var(--c-primary) / 0.15) 35%, rgb(var(--c-primary)) 78%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+}
+.motion-on .loader-ring::before {
+  animation: loaderSpin 1.05s linear infinite;
+}
+@keyframes loaderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respiration douce du logo pendant le chargement */
+.motion-on .loader-pulse {
+  animation: loaderPulse 2.1s ease-in-out infinite;
+}
+@keyframes loaderPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: var(--shadow-glow);
+  }
+  50% {
+    transform: scale(1.055);
+    box-shadow: 0 0 0 7px rgb(var(--c-primary) / 0.09), var(--shadow-glow);
+  }
+}
+
+/* Barre de progression indéterminée (changement de page) */
+.loader-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(var(--c-line) / 0.55);
+}
+.loader-bar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inline-size: 38%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgb(var(--c-primary) / 0.35), rgb(var(--c-primary)), rgb(var(--c-mint)));
+}
+.motion-on .loader-bar::after {
+  animation: loaderSlide 1.25s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+}
+@keyframes loaderSlide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+html[dir='rtl'] .motion-on .loader-bar::after {
+  animation-name: loaderSlideRtl;
+}
+@keyframes loaderSlideRtl {
+  0% {
+    transform: translateX(110%);
+  }
+  100% {
+    transform: translateX(-320%);
+  }
+}
+
+/* Entrée en fondu/enchaîné des lignes de squelette */
+.motion-on .skeleton-stagger > * {
+  animation: skeletonIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.motion-on .skeleton-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.motion-on .skeleton-stagger > *:nth-child(2) { animation-delay: 0.07s; }
+.motion-on .skeleton-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.motion-on .skeleton-stagger > *:nth-child(4) { animation-delay: 0.17s; }
+.motion-on .skeleton-stagger > *:nth-child(5) { animation-delay: 0.22s; }
+.motion-on .skeleton-stagger > *:nth-child(6) { animation-delay: 0.27s; }
+@keyframes skeletonIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============================================================ Fil d'Ariane */
+.crumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.14rem 0.5rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--c-muted));
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.crumb-link:hover {
+  background: rgb(var(--c-primary) / 0.1);
+  color: rgb(var(--c-primary));
+}
+.crumb-current {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.55rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgb(var(--c-ink));
+  background: rgb(var(--c-surface-2) / 0.9);
+  border: 1px solid rgb(var(--c-line) / 0.7);
+}
+.crumb-sep {
+  color: rgb(var(--c-muted) / 0.6);
+  font-size: 11px;
+  user-select: none;
+}
+
+/* Bouton retour mis en évidence */
+.btn-back {
+  position: relative;
+  border: 1px solid rgb(var(--c-primary) / 0.32) !important;
+  background: rgb(var(--c-primary) / 0.09) !important;
+  color: rgb(var(--c-primary)) !important;
+}
+.btn-back:hover {
+  background: rgb(var(--c-primary) / 0.17) !important;
+  border-color: rgb(var(--c-primary) / 0.55) !important;
+}
+
+/* ============================================================ Captcha (connexion) */
+/* La boîte du captcha et ses actions partagent EXACTEMENT la hauteur d'un champ
+   (var(--row-h), 44 px en confort / 36 px en compact) : la ligne reste alignée
+   quelle que soit la densité choisie, et le SVG est mis à l'échelle sans déformation. */
+.captcha-box {
+  height: var(--row-h);
+  inline-size: 132px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--r-field);
+  border: 1px solid rgb(var(--c-line));
+  background: #fff; /* le défi est dessiné en couleurs claires : fond blanc imposé */
+}
+.captcha-box > svg {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+}
+.captcha-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  block-size: var(--row-h);
+  flex: none;
+}
+.captcha-actions .btn {
+  flex: 1 1 0;
+  block-size: auto;
+  min-block-size: 0;
+  min-inline-size: 34px;
+  padding: 0;
+}
+
+/* Pied de formulaire : liens secondaires alignés et homogènes */
+.form-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
+  border-block-start: 1px solid rgb(var(--c-line) / 0.6);
+  padding-block-start: 0.65rem;
+  font-size: 12.5px;
+}
+.form-links a,
+.form-links button {
+  font-weight: 600;
+  color: rgb(var(--c-muted));
+  border-radius: 7px;
+  padding: 0.15rem 0.4rem;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+.form-links a:hover,
+.form-links button:hover {
+  color: rgb(var(--c-primary));
+  background: rgb(var(--c-primary) / 0.09);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.form-links a:focus-visible,
+.form-links button:focus-visible {
+  outline: 2px solid rgb(var(--c-primary) / 0.5);
+  outline-offset: 1px;
+}

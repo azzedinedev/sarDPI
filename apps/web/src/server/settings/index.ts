@@ -77,6 +77,36 @@ export const workflowsZ = z.object({
     .default([]),
   allowSkip: z.boolean().default(true),
 });
+/**
+ * Étiquettes du calendrier — types de RDV (kind) et statuts (status) configurables en base :
+ * libellés multilingues (fr/ar/es/en), couleur et durée par défaut. Aucune modification de code
+ * n'est nécessaire pour ajouter un type (même principe que les étapes du suivi / workflowSteps).
+ * Les `key` existants restent stables : ils sont stockés dans appointments.kind / .status.
+ */
+export const calendarKindsZ = z.object({
+  kinds: z
+    .array(
+      z.object({
+        key: z.string().regex(/^[a-z_]{2,30}$/),
+        order: z.number().int(),
+        color: z.string().max(9).default('#3b82f6'),
+        durationMin: z.number().int().min(5).max(480).default(30),
+        active: z.boolean().default(true),
+        label: z.record(z.string()),
+      }),
+    )
+    .default([]),
+  statuses: z
+    .array(
+      z.object({
+        key: z.string().regex(/^[a-z_]{2,30}$/),
+        order: z.number().int(),
+        color: z.string().max(9).default('#64748b'),
+        label: z.record(z.string()),
+      }),
+    )
+    .default([]),
+});
 export const backupZ = z.object({ retentionDays: z.number().int().min(1).max(999).default(30), auto: z.boolean().default(false), cronTime: z.string().default('03:30') });
 
 export type GeneralSettings = z.infer<typeof generalZ>;
@@ -106,6 +136,26 @@ const SECTIONS = {
         { key: 'treatment', order: 5, color: '#10b981', label: { fr: 'Traitement', ar: 'علاج', es: 'Tratamiento', en: 'Treatment' } },
         { key: 'followup', order: 6, color: '#14b8a6', label: { fr: 'Suivi', ar: 'متابعة', es: 'Seguimiento', en: 'Follow-up' } },
         { key: 'closure', order: 7, color: '#64748b', label: { fr: 'Clôture', ar: 'إغلاق', es: 'Cierre', en: 'Closure' } },
+      ],
+    }),
+  },
+  calendarKinds: {
+    zod: calendarKindsZ,
+    // Valeurs par défaut = celles qui étaient codées en dur dans le calendrier.
+    factory: () => ({
+      kinds: [
+        { key: 'consultation', order: 1, color: '#3b82f6', durationMin: 30, active: true, label: { fr: 'Consultation', ar: 'استشارة', es: 'Consulta', en: 'Consultation' } },
+        { key: 'control', order: 2, color: '#14b8a6', durationMin: 20, active: true, label: { fr: 'Visite de contrôle', ar: 'زيارة متابعة', es: 'Visita de control', en: 'Follow-up' } },
+        { key: 'procedure', order: 3, color: '#8b5cf6', durationMin: 45, active: true, label: { fr: 'Procédure', ar: 'إجراء', es: 'Procedimiento', en: 'Procedure' } },
+        { key: 'lab', order: 4, color: '#f59e0b', durationMin: 15, active: true, label: { fr: 'Analyse', ar: 'تحليل', es: 'Análisis', en: 'Lab test' } },
+        { key: 'radio', order: 5, color: '#0ea5b7', durationMin: 30, active: true, label: { fr: 'Radiologie', ar: 'أشعة', es: 'Radiología', en: 'Imaging' } },
+      ],
+      statuses: [
+        { key: 'pending', order: 1, color: '#f59e0b', label: { fr: 'En attente', ar: 'قيد الانتظار', es: 'Pendiente', en: 'Pending' } },
+        { key: 'confirmed', order: 2, color: '#3b82f6', label: { fr: 'Confirmé', ar: 'مؤكد', es: 'Confirmado', en: 'Confirmed' } },
+        { key: 'done', order: 3, color: '#10b981', label: { fr: 'Terminé', ar: 'تم', es: 'Hecho', en: 'Done' } },
+        { key: 'cancelled', order: 4, color: '#ef4444', label: { fr: 'Annulé', ar: 'ملغى', es: 'Cancelado', en: 'Cancelled' } },
+        { key: 'no_show', order: 5, color: '#64748b', label: { fr: 'Non présenté', ar: 'لم يحضر', es: 'No presentado', en: 'No show' } },
       ],
     }),
   },

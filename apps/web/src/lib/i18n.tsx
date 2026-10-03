@@ -51,6 +51,16 @@ function interpolate(tpl: string, vars?: Record<string, string | number>): strin
   return tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k as string] ?? `{${k}}`));
 }
 
+/**
+ * Langue active, lisible HORS composant (exports CSV, infobulles, fonctions utilitaires qui ne
+ * peuvent pas appeler de hook). Maintenue à jour par I18nProvider ; les rendus de valeurs
+ * structurées (components/value-view) s'y réfèrent lorsque l'appelant ne transmet pas la langue.
+ */
+let ACTIVE_LANG = 'fr';
+export function activeLang(): string {
+  return ACTIVE_LANG;
+}
+
 export function I18nProvider({
   initialLang,
   initialDicts,
@@ -104,6 +114,11 @@ export function I18nProvider({
     },
     [lang, loadNs, dicts, loadedNs],
   );
+
+  // Miroir de la langue courante pour les appels hors composant (voir activeLang()).
+  useEffect(() => {
+    ACTIVE_LANG = lang;
+  }, [lang]);
 
   useEffect(() => {
     void ensure('common');

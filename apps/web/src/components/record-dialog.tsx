@@ -18,7 +18,8 @@ import { useToast } from '@/components/toast';
 import { useFmtDate } from '@/lib/display';
 import { RecordFields, type FieldConfig } from '@/components/record-fields';
 
-type Vals = Record<string, string | number | boolean | null | undefined>;
+/** Valeurs de fiche : objets/tableaux JSONB inclus (même définition que record-fields). */
+type Vals = Record<string, unknown>;
 
 function asObj(v: unknown): Record<string, unknown> {
   if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;

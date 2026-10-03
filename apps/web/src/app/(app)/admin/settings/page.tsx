@@ -14,7 +14,7 @@ import { Badge, Button, Card, Field, Input, Select, Switch, Tabs, Textarea } fro
 import { Drawer } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 
-const SECTIONS = ['general', 'ui', 'codification', 'medicalRefs', 'gedTypes', 'practitionerTypes', 'languages', 'workflowSteps', 'smtp', 'captcha', 'security', 'backups', 'license', 'vaccination'] as const;
+const SECTIONS = ['general', 'ui', 'codification', 'medicalRefs', 'gedTypes', 'practitionerTypes', 'languages', 'workflowSteps', 'calendarKinds', 'smtp', 'captcha', 'security', 'backups', 'license', 'vaccination'] as const;
 type Section = (typeof SECTIONS)[number];
 
 export default function SettingsPage(): React.ReactElement {
@@ -53,7 +53,7 @@ function SectionEditor({ section }: { section: Section }): React.ReactElement {
       setData(q.data);
       setJson(JSON.stringify(q.data, null, 2));
       setErr(null);
-      setMode(['gedTypes', 'practitionerTypes', 'workflowSteps', 'vaccination', 'security', 'license', 'captcha'].includes(section) ? 'json' : 'form');
+      setMode(['gedTypes', 'practitionerTypes', 'workflowSteps', 'calendarKinds', 'vaccination', 'security', 'license', 'captcha'].includes(section) ? 'json' : 'form');
     }
   }, [q.data, section]);
 

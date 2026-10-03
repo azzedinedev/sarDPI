@@ -320,7 +320,7 @@ async function main(): Promise<void> {
       let seq = 1;
       for (const [dci, qty, posology, days, instructions] of lines) {
         const drug = await tx.findOne<{ id: number; dci: string; trade_name: string; form: string; dosage: string; reimbursable: number }>('drugs', { dci });
-        await tx.insert('prescription_lines', { prescription_id: r.id, seq: seq++, drug_id: drug?.id ?? null, dci, trade_name: drug?.trade_name ?? dci, form: drug?.form ?? null, dosage: drug?.dosage ?? null, quantity: qty, posology, duration_days: days, instructions, reimbursable: drug?.reimbursable ?? 1 });
+        await tx.insert('prescription_lines', { prescription_id: r.id, seq: seq++, drug_id: drug?.id ?? null, dci, trade_name: drug?.trade_name ?? dci, form: drug?.form ?? null, dosage: drug?.dosage ?? null, qty, posology, duration_days: days, instructions, reimbursable: drug?.reimbursable ?? 1 });
       }
       return r.id as number;
     });

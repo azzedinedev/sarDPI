@@ -15,6 +15,16 @@ import { sanitizeRow } from '../http/crud';
 import { getDb } from '../data';
 import { bumpTag } from '../cache';
 
+/**
+ * Ligne d'ordonnance DB → API.
+ * Le schéma stocke la quantité dans la colonne « qty » alors que tout le front (éditeur,
+ * fiche, impression) lit « quantity » : on expose les DEUX pour supprimer la divergence.
+ */
+function rxLineOut(l: Record<string, unknown>): Record<string, unknown> {
+  const qty = l.qty == null || l.qty === '' ? 1 : Number(l.qty);
+  return { ...l, qty: Number.isFinite(qty) ? qty : 1, quantity: Number.isFinite(qty) ? qty : 1 };
+}
+
 /** Contrôle allergie + interaction pour une ligne de prescription (ATC classes). */
 async function checkRx(patientId: number, lines: { dci?: string | null; tradeName: string; drugId?: number | null }[]): Promise<{ warnings: { kind: 'allergy' | 'interaction'; text: string; refs: string[] }[] }> {
   const db = await getDb();
@@ -96,7 +106,9 @@ export function registerPrescriptions(): void {
             trade_name: line.tradeName,
             form: line.form ?? null,
             dosage: line.dosage ?? null,
-            quantity: line.quantity,
+            // la colonne du schéma est « qty » : serializeRow() ignore silencieusement toute
+            // colonne inconnue — écrire « quantity » faisait perdre la quantité à chaque save.
+            qty: line.quantity,
             posology: line.posology,
             duration_days: line.durationDays,
             instructions: line.instructions ?? null,
@@ -153,7 +165,7 @@ export function registerPrescriptions(): void {
       const lines = await db.find<Record<string, unknown>>('prescription_lines', { where: { prescription_id: Number(row.id) }, orderBy: [['seq', 'asc']] });
       const patient = await db.findOne<Record<string, unknown>>('patients', { id: Number(row.patient_id) });
       const pract = await db.findOne<Record<string, unknown>>('practitioners', { id: Number(row.practitioner_id) });
-      return { ...sanitizeRow(row), lines, patient: patient ? { code: patient.code, last_name: patient.last_name, first_name: patient.first_name, birth_date: patient.birth_date, sex: patient.sex } : null, practitioner: pract ? { code: pract.code, name: `${pract.last_name} ${pract.first_name}`, order_number: pract.order_number } : null };
+      return { ...sanitizeRow(row), lines: lines.map(rxLineOut), patient: patient ? { code: patient.code, last_name: patient.last_name, first_name: patient.first_name, birth_date: patient.birth_date, sex: patient.sex } : null, practitioner: pract ? { code: pract.code, name: `${pract.last_name} ${pract.first_name}`, order_number: pract.order_number } : null };
     },
   });
 
@@ -243,7 +255,7 @@ export function registerPrescriptions(): void {
               trade_name: line.tradeName,
               form: line.form ?? null,
               dosage: line.dosage ?? null,
-              quantity: line.quantity,
+              qty: line.quantity, // colonne réelle = « qty » (voir POST)
               posology: line.posology,
               duration_days: line.durationDays,
               instructions: line.instructions ?? null,
@@ -317,18 +329,21 @@ export function registerPrescriptions(): void {
       } else {
         rows = await db.find<Record<string, unknown>>('drugs', { where: { reimbursable: 1 }, limit: 20, orderBy: [['trade_name', 'asc']] });
       }
+      // Nommage snake_case aligné sur le reste de l'API (les lignes DB sont servies telles quelles).
+      // L'éditeur d'ordonnance lisait auparavant « trade_name » alors que la route renvoyait
+      // « tradeName » → nom vide dans la liste et tradeName undefined envoyé au POST (422).
       return {
         rows: rows.map((d) => ({
           id: d.id,
           code: d.code,
-          tradeName: d.trade_name,
+          trade_name: d.trade_name,
           dci: d.dci,
           form: d.form,
           dosage: d.dosage,
           pack: d.pack,
           reimbursable: Boolean(Number(d.reimbursable)),
-          refundRate: d.refund_rate != null ? Number(d.refund_rate) : null,
-          priceDzd: d.price_dzd != null ? Number(d.price_dzd) : null,
+          refund_rate: d.refund_rate != null ? Number(d.refund_rate) : null,
+          price_dzd: d.price_dzd != null ? Number(d.price_dzd) : null,
           atc: d.atc,
         })),
       };
