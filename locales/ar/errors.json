@@ -1,0 +1,18 @@
+{
+  "errors.network": "الشبكة غير متاحة.",
+  "errors.unauthorized": "انتهت الجلسة. أعد الدخول.",
+  "errors.forbidden": "الإجراء غير مسموح لدورك.",
+  "errors.notFound": "المورد غير موجود.",
+  "errors.conflict": "تعارض في البيانات.",
+  "errors.locked": "عنصر مقفل أو معتمد — رُفض التعديل.",
+  "errors.validation": "بيانات غير صالحة.",
+  "errors.server": "خطأ في الخادم: {id}",
+  "errors.rateLimited": "طلبات كثيرة، انتظر {seconds} ث.",
+  "errors.uploadTooLarge": "ملف كبير (أقصى {mb} م.ب).",
+  "errors.badFileType": "نوع الملف غير مسموح.",
+  "errors.invalidToken": "رابط/رمز غير صالح.",
+  "errors.csrf": "رمز الحماية مفقود أو منتهي. أعد تحميل الصفحة ثم أعد المحاولة.",
+  "errorBoundary.title": "حدث خطأ في هذا القسم.",
+  "errorBoundary.reset": "إعادة تحميل القسم",
+  "errorBoundary.detail": "تفصيل تقني"
+}

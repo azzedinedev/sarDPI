@@ -1,0 +1,17 @@
+{
+  "pdf.clinic": "Practice",
+  "pdf.patient": "Patient",
+  "pdf.practitioner": "Practitioner",
+  "pdf.code": "Document code",
+  "pdf.date": "Date",
+  "pdf.verify": "Verify authenticity",
+  "pdf.verifyHint": "Scan the QR. No personal data is exposed.",
+  "pdf.signature": "Signature & stamp",
+  "pdf.page": "Page {n}/{total}",
+  "pdf.printHint": "Tip: “Print → Save as PDF” renders faithfully (Arabic included).",
+  "pdf.confidential": "Confidential medical document — law 18-07",
+  "pdf.verified.ok": "Authentic document",
+  "pdf.verified.ko": "Unknown signature or expired",
+  "pdf.verified.issued": "Issued on",
+  "pdf.verified.kind": "Type"
+}

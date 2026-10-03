@@ -1,0 +1,50 @@
+{
+  "$schema": "./docs/schema-languages.json",
+  "default": "fr",
+  "fallback": "fr",
+  "namespaces": ["common", "auth", "patient", "lab", "pharmacy", "cardio", "radio", "settings", "pdf", "errors"],
+  "languages": [
+    {
+      "code": "ar",
+      "name": "العربية",
+      "nameEn": "Arabic",
+      "dir": "rtl",
+      "font": "'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif",
+      "locale": "ar-DZ",
+      "htmlLang": "ar-DZ",
+      "numberingSystem": "latn",
+      "notes": "Chiffres latins par défaut (configurable via Paramètres > Langues : latn | arab)."
+    },
+    {
+      "code": "fr",
+      "name": "Français",
+      "nameEn": "French",
+      "dir": "ltr",
+      "font": "'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+      "locale": "fr-DZ",
+      "htmlLang": "fr",
+      "numberingSystem": "latn"
+    },
+    {
+      "code": "es",
+      "name": "Español",
+      "nameEn": "Spanish",
+      "dir": "ltr",
+      "font": "'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+      "locale": "es",
+      "htmlLang": "es",
+      "numberingSystem": "latn"
+    },
+    {
+      "code": "en",
+      "name": "English",
+      "nameEn": "English",
+      "dir": "ltr",
+      "font": "'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+      "locale": "en",
+      "htmlLang": "en",
+      "numberingSystem": "latn"
+    }
+  ],
+  "adding": "Pour ajouter une langue : déposer /locales/xx/*.json (mêmes namespaces) + une entrée ici (code, nom, dir, font). Rechargement à chaud : l'API i18n invalide le cache à la modification des fichiers."
+}

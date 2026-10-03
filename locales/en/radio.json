@@ -1,0 +1,14 @@
+{
+  "radio.title": "Radiology / Imaging",
+  "radio.modality": "Modality",
+  "radio.xray": "X-ray",
+  "radio.ct": "CT",
+  "radio.mri": "MRI",
+  "radio.ultrasound": "Ultrasound",
+  "radio.mammo": "Mammography",
+  "radio.pano": "Dental panorama",
+  "radio.images": "Images",
+  "radio.compare": "Compare studies",
+  "radio.viewer": "Viewer",
+  "radio.dicomNote": "DICOM later: viewer shows uploaded JPG/PNG."
+}

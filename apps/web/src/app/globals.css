@@ -1,0 +1,649 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   DESIGN TOKENS — valeurs par défaut (thème « medical-blue » embarqué).
+   Un thème externe (/themes/<nom>/theme.json) écrase ces variables ; voir server/themes.
+   Les couleurs sont en "r g b" pour fonctionner avec <alpha-value>.
+   ============================================================ */
+:root {
+  --c-bg: 243 248 250;
+  --c-surface: 255 255 255;
+  --c-surface-2: 236 246 249;
+  --c-glass: 255 255 255 / 0.62;
+  --c-line: 203 225 234;
+  --c-ink: 16 43 58;
+  --c-muted: 96 125 141;
+  --c-primary: 14 165 183;
+  --c-primary-soft: 217 242 246;
+  --c-primary-ink: 255 255 255;
+  --c-mint: 52 199 123;
+  --c-mint-soft: 224 247 236;
+  --c-coral: 240 92 78;
+  --c-coral-soft: 253 231 228;
+  --c-amber: 232 160 32;
+  --c-amber-soft: 252 243 222;
+  --c-ok: 37 179 116;
+  --c-ok-soft: 220 245 233;
+  --c-info: 59 130 246;
+  --c-info-soft: 224 236 254;
+
+  --r-card: 10px; /* arrondis discrets — le thème abuse moins des coins ronds */
+  --r-field: 7px;
+  --shadow-soft: 0 6px 24px -12px rgb(9 40 56 / 0.25);
+  --shadow-lift: 0 18px 48px -18px rgb(9 40 56 / 0.35);
+  --shadow-glow: 0 0 0 1px rgb(var(--c-primary) / 0.25), 0 8px 32px -12px rgb(var(--c-primary) / 0.45);
+
+  --row-h: 44px; /* zone tactile minimale (WCAG / mobile ≥ 44px) */
+
+  /* piles de polices par langue (la langue applique la sienne via langStack()) */
+  --font-sans: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html[lang='ar'] {
+  --font-sans: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+/* Densité compacte (Paramètres > Interface) */
+html[data-density='compact'] {
+  --row-h: 36px;
+  font-size: 14.5px;
+}
+
+* {
+  border-color: rgb(var(--c-line));
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-ink));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Arabe : interlignage augmenté */
+html[lang='ar'] body,
+html[lang='ar'] .prose {
+  line-height: 1.85;
+}
+
+::selection {
+  background: rgb(var(--c-primary) / 0.25);
+}
+
+/* ============================================================ Glassmorphism */
+.glass-card {
+  background: rgb(var(--c-glass));
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid rgb(var(--c-line) / 0.7);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-soft);
+}
+.glass-soft {
+  background: linear-gradient(155deg, rgb(var(--c-surface) / 0.9), rgb(var(--c-surface-2) / 0.7));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgb(var(--c-line) / 0.6);
+  border-radius: var(--r-card);
+}
+
+/* Fond animé : sphères floues (désactivables — voir data-motion) */
+.bg-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+.motion-on .bg-blob {
+  animation: blobFloat 26s ease-in-out infinite alternate;
+}
+.motion-on .bg-blob.blob-2 {
+  animation-duration: 34s;
+  animation-delay: -8s;
+}
+.motion-on .bg-blob.blob-3 {
+  animation-duration: 42s;
+  animation-delay: -18s;
+}
+@keyframes blobFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, -4%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-4%, 5%, 0) scale(0.97);
+  }
+}
+
+/* ============================================================ RTL */
+[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}
+/* Les codes métier restent LTR même en arabe (§5) */
+.biz-code,
+code.inline-code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* Composants génériques */
+.field {
+  width: 100%;
+  min-height: var(--row-h);
+  border-radius: var(--r-field);
+  border: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-surface) / 0.85);
+  color: rgb(var(--c-ink));
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
+  outline: none;
+}
+.field:focus-visible,
+.field:focus {
+  border-color: rgb(var(--c-primary));
+  box-shadow: 0 0 0 3px rgb(var(--c-primary) / 0.18);
+}
+.field::placeholder {
+  color: rgb(var(--c-muted) / 0.8);
+}
+.field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.field[aria-invalid='true'] {
+  border-color: rgb(var(--c-coral));
+  box-shadow: 0 0 0 3px rgb(var(--c-coral) / 0.16);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: var(--row-h);
+  padding: 0.45rem 0.95rem;
+  border-radius: calc(var(--r-field) + 1px);
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 160ms ease, background 160ms ease, opacity 160ms;
+  user-select: none;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.975);
+}
+.btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.btn-primary {
+  background: linear-gradient(140deg, rgb(var(--c-primary)), rgb(var(--c-primary) / 0.82));
+  color: rgb(var(--c-primary-ink));
+  box-shadow: 0 8px 20px -10px rgb(var(--c-primary) / 0.65);
+}
+.btn-primary:hover {
+  box-shadow: 0 10px 26px -8px rgb(var(--c-primary) / 0.75);
+}
+.btn-ghost {
+  background: transparent;
+  border-color: rgb(var(--c-line) / 0.9);
+  color: rgb(var(--c-ink) / 0.9);
+}
+.btn-ghost:hover {
+  background: rgb(var(--c-surface-2) / 0.8);
+}
+.btn-danger {
+  background: rgb(var(--c-coral));
+  color: #fff;
+}
+.btn-ok {
+  background: rgb(var(--c-ok));
+  color: #fff;
+}
+.btn-sm {
+  min-height: 33px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  border-radius: 7px;
+}
+.btn-icon {
+  min-width: var(--row-h);
+  padding: 0.3rem;
+}
+
+/* Scrollbars discrètes */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-line)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-line));
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Skeleton loaders */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--c-surface-2) / 0.9);
+  border-radius: 8px;
+}
+.motion-on .skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
+  animation: shimmer 1.4s infinite;
+}
+html.dark .motion-on .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.08), transparent);
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Badges de statut (couleurs par catégorie/état) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.16rem 0.55rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid rgb(var(--c-line) / 0.8);
+  background: rgb(var(--c-surface) / 0.8);
+}
+
+/* Table (TanStack) */
+.dt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.92rem;
+}
+.dt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgb(var(--c-surface) / 0.92);
+  backdrop-filter: blur(8px);
+  color: rgb(var(--c-muted));
+  font-weight: 650;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid rgb(var(--c-line));
+  white-space: nowrap;
+  user-select: none;
+}
+[dir='rtl'] .dt-table thead th {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.dt-table tbody td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid rgb(var(--c-line) / 0.5);
+  vertical-align: middle;
+}
+.dt-table tbody tr {
+  transition: background 120ms ease;
+  height: var(--row-h);
+}
+.dt-table tbody tr:hover {
+  background: rgb(var(--c-primary-soft) / 0.35);
+}
+.dt-table tbody tr[data-selected='true'] {
+  background: rgb(var(--c-primary-soft) / 0.7);
+}
+
+/* Motion off / prefers-reduced-motion : tout se calme (60fps garanti sur petits postes) */
+html[data-motion='off'] *,
+html[data-motion='off'] *::before,
+html[data-motion='off'] *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+  .bg-blob {
+    animation: none !important;
+  }
+}
+
+/* Editeur riche (allergies / antécédents / notes) */
+.richtext {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.richtext:empty::before,
+.richtext > br:only-child {
+  display: none;
+}
+.richtext ul {
+  list-style: disc;
+  padding-inline-start: 1.4em;
+  margin: 0.2em 0;
+}
+.richtext ol {
+  list-style: decimal;
+  padding-inline-start: 1.5em;
+  margin: 0.2em 0;
+}
+.richtext p,
+.richtext div {
+  margin: 0.15em 0;
+}
+.richtext b,
+.richtext strong {
+  font-weight: 700;
+}
+/* Contenu riche stocké (allergies, antécédents…) hors éditeur */
+.rich-view ul {
+  list-style: disc;
+  padding-inline-start: 1.3em;
+}
+.rich-view ol {
+  list-style: decimal;
+  padding-inline-start: 1.4em;
+}
+.rich-view p,
+.rich-view div {
+  margin: 0.1em 0;
+}
+
+/* Focus visible AA */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-primary));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Ligne « cartes » / compactes réutilisées par CrudModule */
+.list-card {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.motion-on .list-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Impression : masquer la chrome applicative (les documents s'impriment via /documents/:code/print) */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
+
+/* Modes de navigation (Paramètres > Interface) : sidebar | topbar | rail */
+.app-topnav {
+  display: none;
+}
+html[data-nav='topbar'] .app-sidebar {
+  display: none !important;
+}
+html[data-nav='topbar'] .app-topnav {
+  display: flex;
+}
+html[data-nav='rail'] .app-sidebar {
+  width: 68px;
+}
+html[data-nav='rail'] .app-sidebar .nav-label {
+  display: none;
+}
+
+/* ============================================================ Chargeurs stylés */
+/* Anneau conique tournant (vérification de session / attentes longues) */
+.loader-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.loader-ring::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0%, rgb(var(--c-primary) / 0.15) 35%, rgb(var(--c-primary)) 78%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+}
+.motion-on .loader-ring::before {
+  animation: loaderSpin 1.05s linear infinite;
+}
+@keyframes loaderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respiration douce du logo pendant le chargement */
+.motion-on .loader-pulse {
+  animation: loaderPulse 2.1s ease-in-out infinite;
+}
+@keyframes loaderPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: var(--shadow-glow);
+  }
+  50% {
+    transform: scale(1.055);
+    box-shadow: 0 0 0 7px rgb(var(--c-primary) / 0.09), var(--shadow-glow);
+  }
+}
+
+/* Barre de progression indéterminée (changement de page) */
+.loader-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(var(--c-line) / 0.55);
+}
+.loader-bar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inline-size: 38%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgb(var(--c-primary) / 0.35), rgb(var(--c-primary)), rgb(var(--c-mint)));
+}
+.motion-on .loader-bar::after {
+  animation: loaderSlide 1.25s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+}
+@keyframes loaderSlide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+html[dir='rtl'] .motion-on .loader-bar::after {
+  animation-name: loaderSlideRtl;
+}
+@keyframes loaderSlideRtl {
+  0% {
+    transform: translateX(110%);
+  }
+  100% {
+    transform: translateX(-320%);
+  }
+}
+
+/* Entrée en fondu/enchaîné des lignes de squelette */
+.motion-on .skeleton-stagger > * {
+  animation: skeletonIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.motion-on .skeleton-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.motion-on .skeleton-stagger > *:nth-child(2) { animation-delay: 0.07s; }
+.motion-on .skeleton-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.motion-on .skeleton-stagger > *:nth-child(4) { animation-delay: 0.17s; }
+.motion-on .skeleton-stagger > *:nth-child(5) { animation-delay: 0.22s; }
+.motion-on .skeleton-stagger > *:nth-child(6) { animation-delay: 0.27s; }
+@keyframes skeletonIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============================================================ Fil d'Ariane */
+.crumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.14rem 0.5rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--c-muted));
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.crumb-link:hover {
+  background: rgb(var(--c-primary) / 0.1);
+  color: rgb(var(--c-primary));
+}
+.crumb-current {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.55rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgb(var(--c-ink));
+  background: rgb(var(--c-surface-2) / 0.9);
+  border: 1px solid rgb(var(--c-line) / 0.7);
+}
+.crumb-sep {
+  color: rgb(var(--c-muted) / 0.6);
+  font-size: 11px;
+  user-select: none;
+}
+
+/* Bouton retour mis en évidence */
+.btn-back {
+  position: relative;
+  border: 1px solid rgb(var(--c-primary) / 0.32) !important;
+  background: rgb(var(--c-primary) / 0.09) !important;
+  color: rgb(var(--c-primary)) !important;
+}
+.btn-back:hover {
+  background: rgb(var(--c-primary) / 0.17) !important;
+  border-color: rgb(var(--c-primary) / 0.55) !important;
+}
+
+/* ============================================================ Captcha (connexion) */
+/* La boîte du captcha et ses actions partagent EXACTEMENT la hauteur d'un champ
+   (var(--row-h), 44 px en confort / 36 px en compact) : la ligne reste alignée
+   quelle que soit la densité choisie, et le SVG est mis à l'échelle sans déformation. */
+.captcha-box {
+  height: var(--row-h);
+  inline-size: 132px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--r-field);
+  border: 1px solid rgb(var(--c-line));
+  background: #fff; /* le défi est dessiné en couleurs claires : fond blanc imposé */
+}
+.captcha-box > svg {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+}
+.captcha-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  block-size: var(--row-h);
+  flex: none;
+}
+.captcha-actions .btn {
+  flex: 1 1 0;
+  block-size: auto;
+  min-block-size: 0;
+  min-inline-size: 34px;
+  padding: 0;
+}
+
+/* Pied de formulaire : liens secondaires alignés et homogènes */
+.form-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
+  border-block-start: 1px solid rgb(var(--c-line) / 0.6);
+  padding-block-start: 0.65rem;
+  font-size: 12.5px;
+}
+.form-links a,
+.form-links button {
+  font-weight: 600;
+  color: rgb(var(--c-muted));
+  border-radius: 7px;
+  padding: 0.15rem 0.4rem;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+.form-links a:hover,
+.form-links button:hover {
+  color: rgb(var(--c-primary));
+  background: rgb(var(--c-primary) / 0.09);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.form-links a:focus-visible,
+.form-links button:focus-visible {
+  outline: 2px solid rgb(var(--c-primary) / 0.5);
+  outline-offset: 1px;
+}

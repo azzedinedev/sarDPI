@@ -1,0 +1,36 @@
+{
+  "name": "clinical-green",
+  "displayName": { "fr": "Vert clinique", "ar": "أخضر سريري", "es": "Verde clínico", "en": "Clinical green" },
+  "version": "1.0.0",
+  "author": "sarDPI",
+  "modes": ["light", "dark"],
+  "accent": "#16a06e",
+  "variables": {
+    "light": {
+      "--c-bg": "242 249 245",
+      "--c-surface": "255 255 255",
+      "--c-surface-2": "232 245 238",
+      "--c-glass": "255 255 255 / 0.66",
+      "--c-line": "201 228 213",
+      "--c-ink": "17 48 36",
+      "--c-muted": "88 128 110",
+      "--c-primary": "22 160 110",
+      "--c-primary-soft": "216 242 230",
+      "--c-primary-ink": "255 255 255",
+      "--c-info": "20 140 170"
+    },
+    "dark": {
+      "--c-bg": "8 21 16",
+      "--c-surface": "15 35 27",
+      "--c-surface-2": "20 46 35",
+      "--c-glass": "20 46 35 / 0.62",
+      "--c-line": "35 70 55",
+      "--c-ink": "223 242 233",
+      "--c-muted": "138 176 158",
+      "--c-primary": "62 214 153",
+      "--c-primary-soft": "16 56 40",
+      "--c-primary-ink": "6 30 20",
+      "--c-info": "96 190 214"
+    }
+  }
+}

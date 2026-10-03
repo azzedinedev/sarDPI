@@ -1,0 +1,17 @@
+{
+  "code": "XX",
+  "enabled": false,
+  "name": { "fr": "Nouveau pays", "ar": "دولة جديدة", "es": "Nuevo país", "en": "New country" },
+  "currency": { "code": "XXX", "symbol": "¤", "symbolAfter": false, "decimals": 2, "intl": "usd" },
+  "timezone": "UTC",
+  "dialCode": "+000",
+  "phone": { "pattern": "^[0-9+ ]{6,20}$", "patternHint": {} },
+  "dates": { "firstDayOfWeek": 1, "weekendDays": [0, 6], "gregorianFormat": "dd/MM/yyyy", "hijri": { "enabledByDefault": false } },
+  "address": { "administrativeDivision": { "enabled": false, "levels": [], "importable": false } },
+  "identifiers": { "patient": [], "practitioner": [] },
+  "documents": { "defaultBilingual": false, "languages": ["en"], "numbering": ["latn"] },
+  "medication": { "searchByDci": true, "reimbursementFlag": false },
+  "vaccination": { "defaultSchedule": [] },
+  "legal": { "retentionYearsDefault": 10 },
+  "_comment": "Copier ce fichier sous country-profiles/<CC>.json, passer enabled=true et sélectionner le pays dans Paramètres > Pays. Aucune modification de code n'est nécessaire."
+}

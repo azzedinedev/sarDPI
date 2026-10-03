@@ -1,0 +1,14 @@
+{
+  "radio.title": "التصوير الطبي",
+  "radio.modality": "الطريقة",
+  "radio.xray": "أشعة عادية",
+  "radio.ct": "تصوير محوري",
+  "radio.mri": "رنين مغناطيسي",
+  "radio.ultrasound": "صدى",
+  "radio.mammo": "ماموغرافيا",
+  "radio.pano": "بانوراما أسنان",
+  "radio.images": "الصور",
+  "radio.compare": "مقارنة الفحوصات",
+  "radio.viewer": "عارضة الصور",
+  "radio.dicomNote": "DICOM لاحقاً؛ عارض JPG/PNG متاح."
+}

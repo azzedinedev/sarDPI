@@ -1,0 +1,18 @@
+{
+  "errors.network": "Réseau indisponible. L’application fonctionne hors-ligne si activée.",
+  "errors.unauthorized": "Session expirée. Reconnectez-vous.",
+  "errors.forbidden": "Action non autorisée pour votre rôle.",
+  "errors.notFound": "Ressource introuvable.",
+  "errors.conflict": "Conflit de données (élément modifié simultanément).",
+  "errors.locked": "Élément verrouillé ou validé — modification refusée.",
+  "errors.validation": "Données invalides.",
+  "errors.server": "Erreur serveur. Identifiant : {id}",
+  "errors.rateLimited": "Trop de requêtes, attendez {seconds} s.",
+  "errors.uploadTooLarge": "Fichier trop volumineux (max {mb} Mo).",
+  "errors.badFileType": "Type de fichier non autorisé.",
+  "errors.invalidToken": "Lien ou jeton invalide.",
+  "errors.csrf": "Jeton de sécurité manquant ou périmé. Rechargez la page puis réessayez.",
+  "errorBoundary.title": "Cette section a rencontré un problème.",
+  "errorBoundary.reset": "Recharger la section",
+  "errorBoundary.detail": "Détail technique"
+}

@@ -1,0 +1,17 @@
+{
+  "pdf.clinic": "Cabinet / Établissement",
+  "pdf.patient": "Patient",
+  "pdf.practitioner": "Praticien",
+  "pdf.code": "Code document",
+  "pdf.date": "Date",
+  "pdf.verify": "Vérifier l’authenticité",
+  "pdf.verifyHint": "Scannez le QR ou ouvrez le lien. Aucune donnée personnelle n’est exposée.",
+  "pdf.signature": "Signature & cachet",
+  "pdf.page": "Page {n} / {total}",
+  "pdf.printHint": "Astuce : « Imprimer → Enregistrer au format PDF » pour un rendu fidèle (arabe inclus).",
+  "pdf.confidential": "Document médical confidentiel — loi 18-07 (Algérie)",
+  "pdf.verified.ok": "Document authentique",
+  "pdf.verified.ko": "Signature inconnue ou document expiré",
+  "pdf.verified.issued": "Émis le",
+  "pdf.verified.kind": "Type"
+}

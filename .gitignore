@@ -1,0 +1,28 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+
+# Données runtime de l'adaptateur JSON / stockage fichiers / logs (mode démo & on-premise)
+/data/
+/storage/
+/logs/
+
+# Sauvegardes locales
+/backups/
+
+# Électron (empaquetage plus tard)
+electron/dist/
+
+# Divers
+.DS_Store
+*.log
+playwright-report/
+test-results/
+apps/web/public/fonts/

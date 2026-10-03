@@ -1,0 +1,17 @@
+{
+  "pdf.clinic": "العيادة / المؤسسة",
+  "pdf.patient": "المريض",
+  "pdf.practitioner": "الممارس",
+  "pdf.code": "رمز الوثيقة",
+  "pdf.date": "التاريخ",
+  "pdf.verify": "تحقق من الأصالة",
+  "pdf.verifyHint": "امسح الرمز. لا تُعرض بيانات شخصية.",
+  "pdf.signature": "التوقيع والختم",
+  "pdf.page": "صفحة {n}/{total}",
+  "pdf.printHint": "تلميح: اطبع واحفظ PDF (يشمل العربية).",
+  "pdf.confidential": "وثيقة طبية سرية — قانون 18-07",
+  "pdf.verified.ok": "وثيقة أصلية",
+  "pdf.verified.ko": "توقيع غير معروف أو منتهي",
+  "pdf.verified.issued": "أُصدر في",
+  "pdf.verified.kind": "النوع"
+}

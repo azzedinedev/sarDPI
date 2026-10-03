@@ -1,0 +1,8 @@
+{
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "files.exclude": { "**/.next": true, "**/node_modules": true, "data": true, "storage": true },
+  "search.exclude": { "**/node_modules": true, "**/.next": true, "**/locales": false },
+  "emmet.includeLanguages": {},
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

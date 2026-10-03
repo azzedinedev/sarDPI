@@ -1,0 +1,36 @@
+{
+  "name": "sardpi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "sarDPI — Dossier Patient Informatisé (mini-EMR) pour l'Algérie. Next.js 15 + TypeScript strict, MySQL par défaut, adapters JSON/Postgres, i18n FR/AR/ES/EN avec RTL, sans Redis ni cloud obligatoire.",
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @sardpi/web",
+    "build": "npm run build -w @sardpi/web",
+    "start": "npm run start -w @sardpi/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "seed": "vite-node scripts/seed.ts",
+    "db:sync": "vite-node scripts/db-sync.ts",
+    "fonts": "node scripts/gen-fonts.mjs",
+    "locales": "node scripts/gen-locales.mjs",
+    "db:migrate": "vite-node scripts/db-migrate.ts",
+    "db:export": "vite-node scripts/db-export.ts",
+    "install:pdf": "npm i puppeteer -w @sardpi/web",
+    "pm2": "pm2 start config/pm2.config.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

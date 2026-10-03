@@ -1,0 +1,17 @@
+{
+  "pdf.clinic": "Consultorio",
+  "pdf.patient": "Paciente",
+  "pdf.practitioner": "Profesional",
+  "pdf.code": "Código",
+  "pdf.date": "Fecha",
+  "pdf.verify": "Verificar autenticidad",
+  "pdf.verifyHint": "Escanee el QR. No se exponen datos personales.",
+  "pdf.signature": "Firma y sello",
+  "pdf.page": "Pág. {n}/{total}",
+  "pdf.printHint": "Consejo: «Imprimir → Guardar como PDF».",
+  "pdf.confidential": "Documento médico confidencial — ley 18-07",
+  "pdf.verified.ok": "Documento auténtico",
+  "pdf.verified.ko": "Firma desconocida o caducado",
+  "pdf.verified.issued": "Emitido el",
+  "pdf.verified.kind": "Tipo"
+}
