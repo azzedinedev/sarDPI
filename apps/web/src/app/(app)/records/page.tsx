@@ -54,7 +54,7 @@ export default function RecordsHubPage(): React.ReactElement {
           // normalisation, la sous-ligne affichait « record.lab » et le rapport de clés manquantes se remplissait
           // à chaque ouverture. Repli : libellé localisé de la catégorie si la forme courte reste inconnue
           // (catégorie créée après coup en admin) — jamais d'identifiant brut à l'écran.
-          const short = c.module.replace(/^record\./, '');
+          const short = String(c.module ?? '').replace(/^record\./, '');
           const permKey = `records.perms.${short}`;
           const permLabel = t(permKey);
           return (
