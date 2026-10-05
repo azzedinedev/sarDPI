@@ -1171,6 +1171,9 @@ const D = {
     'errors.badFileType': ['Type de fichier non autorisé.', 'نوع الملف غير مسموح.', 'Tipo de archivo no permitido.', 'File type not allowed.'],
     'errors.invalidToken': ['Lien ou jeton invalide.', 'رابط/رمز غير صالح.', 'Enlace o token inválido.', 'Invalid link or token.'],
     'errors.csrf': ['Jeton de sécurité manquant ou périmé. Rechargez la page puis réessayez.', 'رمز الحماية مفقود أو منتهي. أعد تحميل الصفحة ثم أعد المحاولة.', 'Token de seguridad ausente o caducado. Recargue la página e inténtelo de nuevo.', 'Security token missing or stale. Reload the page and try again.'],
+    // Codes levés par le serveur (ApiError) sans libellé → le code brut s'affichait dans le bandeau.
+    'errors.config': ['Configuration serveur incomplète — contactez l’administrateur.', 'إعداد الخادم غير مكتمل — اتصل بالمسؤول.', 'Configuración del servidor incompleta: contacte con el administrador.', 'Incomplete server configuration — contact your administrator.'],
+    'errors.licenseRequired': ['Licence expirée ou invalide — accès bloqué.', 'الترخيص منتهٍ أو غير صالح — الوصول محظور.', 'Licencia caducada o no válida: acceso bloqueado.', 'Expired or invalid license — access blocked.'],
     'errorBoundary.title': ['Cette section a rencontré un problème.', 'حدث خطأ في هذا القسم.', 'Esta sección encontró un problema.', 'This section hit a problem.'],
     'errorBoundary.reset': ['Recharger la section', 'إعادة تحميل القسم', 'Recargar sección', 'Reload section'],
     'errorBoundary.detail': ['Détail technique', 'تفصيل تقني', 'Detalle técnico', 'Technical detail'],
@@ -1359,6 +1362,8 @@ const EXTRA2 = {
     'admin.title': ['Administration', 'الإدارة', 'Administración', 'Administration'],
     'admin.subtitle': ['Configuration de la plateforme, catalogue, utilisateurs et supervision.', 'ضبط المنصة والكتالوج والمستخدمين والمتابعة.', 'Configuración de la plataforma, catálogo, usuarios y supervisión.', 'Platform configuration, catalog, users and monitoring.'],
     'admin.systemTitle': ['Supervision système', 'متابعة النظام', 'Supervisión del sistema', 'System monitoring'],
+    // Carte du hub /admin (SECTIONS dans admin/page.tsx) : la clé suit le href '/admin/system'.
+    'admin.system': ['Supervision système (tâches, sauvegardes, licence)', 'مراقبة النظام (المهام، النسخ الاحتياطي، الترخيص)', 'Supervisión del sistema (tareas, copias, licencia)', 'System monitoring (jobs, backups, license)'],
     'admin.localOnly': ['Notification locale uniquement — aucun service cloud requis.', 'إشعار محلي فقط — لا حاجة لأي خدمة سحابية.', 'Solo notificación local: no se requiere ningún servicio en la nube.', 'Local notification only — no cloud service required.'],
     'settings.appName': ['Nom de l’application', 'اسم التطبيق', 'Nombre de la aplicación', 'Application name'],
     'settings.orgName': ['Nom de l’établissement', 'اسم المؤسسة', 'Nombre del establecimiento', 'Organisation name'],

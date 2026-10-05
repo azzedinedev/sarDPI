@@ -12,6 +12,8 @@
   "errors.badFileType": "نوع الملف غير مسموح.",
   "errors.invalidToken": "رابط/رمز غير صالح.",
   "errors.csrf": "رمز الحماية مفقود أو منتهي. أعد تحميل الصفحة ثم أعد المحاولة.",
+  "errors.config": "إعداد الخادم غير مكتمل — اتصل بالمسؤول.",
+  "errors.licenseRequired": "الترخيص منتهٍ أو غير صالح — الوصول محظور.",
   "errorBoundary.title": "حدث خطأ في هذا القسم.",
   "errorBoundary.reset": "إعادة تحميل القسم",
   "errorBoundary.detail": "تفصيل تقني"

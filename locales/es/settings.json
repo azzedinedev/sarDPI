@@ -273,5 +273,6 @@
   "catalog.fieldRequired": "Obligatorio",
   "catalog.fieldUnit": "Unidad",
   "catalog.fieldOptions": "Opciones",
-  "catalog.rawJson": "JSON sin procesar"
+  "catalog.rawJson": "JSON sin procesar",
+  "admin.system": "Supervisión del sistema (tareas, copias, licencia)"
 }

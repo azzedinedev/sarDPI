@@ -49,6 +49,14 @@ export default function RecordsHubPage(): React.ReactElement {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cats.map((c, i) => {
           const Icon = CAT_ICON[c.prefix] ?? CAT_ICON.CON!;
+          // `c.module` porte la clé de permission complète (« record.lab », cf. packages/shared/permissions) ;
+          // les libellés de traduction sont indexés par la forme courte (« records.perms.lab »). Sans cette
+          // normalisation, la sous-ligne affichait « record.lab » et le rapport de clés manquantes se remplissait
+          // à chaque ouverture. Repli : libellé localisé de la catégorie si la forme courte reste inconnue
+          // (catégorie créée après coup en admin) — jamais d'identifiant brut à l'écran.
+          const short = c.module.replace(/^record\./, '');
+          const permKey = `records.perms.${short}`;
+          const permLabel = t(permKey);
           return (
             <motion.div key={c.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.035, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
               <Link href={`/records/${c.module}`} className="glass-card list-card flex items-center gap-3.5 p-4">
@@ -58,7 +66,7 @@ export default function RecordsHubPage(): React.ReactElement {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-bold">{pickLabel(c.label_json, lang)}</span>
                   <span className="mt-0.5 block text-[11.5px] text-[rgb(var(--c-muted))]">
-                    {c.prefix} · {t(`records.perms.${c.module}`) === `records.perms.${c.module}` ? c.module : t(`records.perms.${c.module}`)}
+                    {c.prefix} · {permLabel === permKey ? pickLabel(c.label_json, lang) : permLabel}
                   </span>
                 </span>
                 <Badge tone="info">{c.prefix}</Badge>

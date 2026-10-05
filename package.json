@@ -19,6 +19,7 @@
     "db:sync": "vite-node scripts/db-sync.ts",
     "fonts": "node scripts/gen-fonts.mjs",
     "locales": "node scripts/gen-locales.mjs",
+    "i18n:scan": "node scripts/scan-i18n-keys.mjs",
     "db:migrate": "vite-node scripts/db-migrate.ts",
     "db:export": "vite-node scripts/db-export.ts",
     "install:pdf": "npm i puppeteer -w @sardpi/web",

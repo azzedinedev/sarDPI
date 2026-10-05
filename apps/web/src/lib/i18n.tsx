@@ -46,6 +46,17 @@ function writeSnapshot(lang: string, dicts: Record<string, Dict>): void {
   }
 }
 
+/**
+ * Clé canonique d'un message d'erreur : les écrans appellent t(`errors.${code}`) dans LEUR namespace,
+ * or les codes serveur sont 'errors.validation' → la clé demandée devient 'errors.errors.validation'.
+ * Cette fonction ramène les deux formes ('errors.errors.validation', 'errors.validation') à la clé
+ * canonique du namespace « errors » — ou null si la clé n'est pas un code d'erreur.
+ */
+export function canonicalErrorKey(key: string): string | null {
+  const canonical = key.startsWith('errors.errors.') ? `errors.${key.slice('errors.errors.'.length)}` : key;
+  return canonical.startsWith('errors.') && canonical.length > 'errors.'.length ? canonical : null;
+}
+
 function interpolate(tpl: string, vars?: Record<string, string | number>): string {
   if (!vars) return tpl;
   return tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k as string] ?? `{${k}}`));
@@ -138,6 +149,17 @@ export function I18nProvider({
       }
       const v = dict[key];
       if (v === undefined) {
+        // Repli « erreurs » : le serveur renvoie des CODES ('errors.validation', 'errors.locked'…)
+        // que chaque écran traduit via t(`errors.${code}`) dans SON namespace — sans que les 18
+        // messages soient dupliqués partout. Avant d'afficher le code brut, on cherche la forme
+        // canonique dans le namespace « errors » (préchargé par le layout, rechargé à chaud).
+        const canonical = canonicalErrorKey(key);
+        if (canonical) {
+          const errDict = dicts['errors'];
+          const ev = errDict?.[canonical];
+          if (ev !== undefined) return interpolate(ev, vars);
+          void ensure('errors');
+        }
         // Cas réel : l'espace de noms est chargé et la clé n'y figure pas.
         missing.add(`${lang}/${ns}/${key}`);
         void ensure(ns); // la clé a pu être ajoutée depuis le chargement (i18n à chaud)

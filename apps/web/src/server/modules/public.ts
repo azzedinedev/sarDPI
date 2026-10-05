@@ -135,10 +135,17 @@ route({
   },
 });
 
-/** GET /qr?data=… — rendu SVG d’un QR (badges, ordonnances, étiquettes) — jamais de données sensibles dans l’URL publique. */
+/**
+ * GET /qr?data=… — rendu SVG d’un QR (badges, ordonnances, étiquettes) — jamais de données sensibles dans l’URL publique.
+ * Route PUBLIQUE à dessein : l’image est appelée par `<img src>` (aucun en-tête Authorization possible) et le
+ * contenu du QR est déjà destiné à être scanné par un tiers non authentifié (page /verify/:token publique).
+ * Sans `auth: false`, toute vignette QR de l’application répondait 401 (constaté dans la console navigateur).
+ */
 route({
   method: 'GET',
   path: '/qr',
+  auth: false,
+  licenseFree: true,
   async handler(ctx: Ctx) {
     const data = String(ctx.query.get('data') ?? '').slice(0, 900);
     if (!data) throw new ApiError(400, 'errors.validation');

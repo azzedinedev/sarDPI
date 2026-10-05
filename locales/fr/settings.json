@@ -273,5 +273,6 @@
   "catalog.fieldRequired": "Obligatoire",
   "catalog.fieldUnit": "Unité",
   "catalog.fieldOptions": "Options",
-  "catalog.rawJson": "JSON brut"
+  "catalog.rawJson": "JSON brut",
+  "admin.system": "Supervision système (tâches, sauvegardes, licence)"
 }

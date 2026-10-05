@@ -12,6 +12,8 @@
   "errors.badFileType": "Tipo de archivo no permitido.",
   "errors.invalidToken": "Enlace o token inválido.",
   "errors.csrf": "Token de seguridad ausente o caducado. Recargue la página e inténtelo de nuevo.",
+  "errors.config": "Configuración del servidor incompleta: contacte con el administrador.",
+  "errors.licenseRequired": "Licencia caducada o no válida: acceso bloqueado.",
   "errorBoundary.title": "Esta sección encontró un problema.",
   "errorBoundary.reset": "Recargar sección",
   "errorBoundary.detail": "Detalle técnico"

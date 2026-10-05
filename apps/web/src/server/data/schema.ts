@@ -606,7 +606,7 @@ const TABLE_DEFS: TableSpec[] = [
       c('start_at', 'dt!i'),
       c('end_at', 'dt!i'),
       c('case_id', 'big', 'dossier de rattachement (patient_cases)'),
-      c('status', 'str16!~scheduled+i', 'scheduled | confirmed | waiting | done | cancelled | noshow'),
+      c('status', 'str16!i~pending', 'pending | confirmed | done | cancelled | no_show — cf. réglage admin calendarKinds (alias historiques normalisés : scheduled→pending, waiting→confirmed, noshow→no_show)'),
       c('reason', 'str160'),
       c('notes', 'txt'),
       c('created_by', 'big'),

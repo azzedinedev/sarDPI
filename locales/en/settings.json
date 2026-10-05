@@ -273,5 +273,6 @@
   "catalog.fieldRequired": "Required",
   "catalog.fieldUnit": "Unit",
   "catalog.fieldOptions": "Options",
-  "catalog.rawJson": "Raw JSON"
+  "catalog.rawJson": "Raw JSON",
+  "admin.system": "System monitoring (jobs, backups, license)"
 }

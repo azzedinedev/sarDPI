@@ -12,6 +12,8 @@
   "errors.badFileType": "Type de fichier non autorisé.",
   "errors.invalidToken": "Lien ou jeton invalide.",
   "errors.csrf": "Jeton de sécurité manquant ou périmé. Rechargez la page puis réessayez.",
+  "errors.config": "Configuration serveur incomplète — contactez l’administrateur.",
+  "errors.licenseRequired": "Licence expirée ou invalide — accès bloqué.",
   "errorBoundary.title": "Cette section a rencontré un problème.",
   "errorBoundary.reset": "Recharger la section",
   "errorBoundary.detail": "Détail technique"

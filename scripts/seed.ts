@@ -343,7 +343,7 @@ async function main(): Promise<void> {
   for (const [pi, pra, start, kind, notes] of APPTS) {
     const end = new Date(new Date(start).getTime() + 30 * 60_000).toISOString();
     const { code } = await allocateSuffixed('appointment', 'RDV');
-    await ins('appointments', { code, patient_id: pi, practitioner_id: pra, location_id: locIds[0], start_at: start, end_at: end, kind, status: 'scheduled', notes, all_day: 0, created_by: userIds.sec });
+    await ins('appointments', { code, patient_id: pi, practitioner_id: pra, location_id: locIds[0], start_at: start, end_at: end, kind, status: 'confirmed', notes, all_day: 0, created_by: userIds.sec });
   }
   for (const [pi, from, to, reason, status, at] of [
     [pat5, locIds[0], locIds[2], 'Transfert vers imagerie pour Rx', 'done', DAY(-2, 9, 45)],

@@ -273,5 +273,6 @@
   "catalog.fieldRequired": "إلزامي",
   "catalog.fieldUnit": "الوحدة",
   "catalog.fieldOptions": "الخيارات",
-  "catalog.rawJson": "JSON الخام"
+  "catalog.rawJson": "JSON الخام",
+  "admin.system": "مراقبة النظام (المهام، النسخ الاحتياطي، الترخيص)"
 }

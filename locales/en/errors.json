@@ -12,6 +12,8 @@
   "errors.badFileType": "File type not allowed.",
   "errors.invalidToken": "Invalid link or token.",
   "errors.csrf": "Security token missing or stale. Reload the page and try again.",
+  "errors.config": "Incomplete server configuration — contact your administrator.",
+  "errors.licenseRequired": "Expired or invalid license — access blocked.",
   "errorBoundary.title": "This section hit a problem.",
   "errorBoundary.reset": "Reload section",
   "errorBoundary.detail": "Technical detail"

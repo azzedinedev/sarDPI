@@ -241,6 +241,30 @@ export type RxTemplateInput = z.infer<typeof rxTemplateZ>;
 
 /* ---------------------------------------------------------------- rendez-vous */
 
+/**
+ * Statuts d'un rendez-vous — la liste AFFICHÉE est un réglage admin (« calendarKinds » → statuses) :
+ * l'API ne peut donc pas figer un enum fermé (sinon 422 sur toute clé personnalisée, et sur les
+ * valeurs écrites par les anciennes versions / le seed). Défauts livrés :
+ * pending | confirmed | done | cancelled | no_show.
+ * ALIAS : les bases existantes peuvent contenir l'ancien vocabulaire (scheduled, waiting, noshow) —
+ * on le normalise à l'écriture pour converger sans casser la donnée (voir migrations/).
+ */
+export const APPOINTMENT_STATUS_ALIASES: Record<string, string> = {
+  scheduled: 'pending',
+  waiting: 'confirmed',
+  noshow: 'no_show',
+};
+
+export function normalizeAppointmentStatus(status: string): string {
+  return APPOINTMENT_STATUS_ALIASES[status] ?? status;
+}
+
+export const appointmentStatusZ = z
+  .string()
+  .min(1)
+  .max(16)
+  .transform((s) => normalizeAppointmentStatus(s));
+
 export const appointmentBaseZ = z.object({
   patientId: idZ,
   practitionerId: idZ.optional().nullable(),
@@ -248,7 +272,7 @@ export const appointmentBaseZ = z.object({
   startAt: z.string().min(16).max(32),
   endAt: z.string().min(16).max(32),
   kind: z.string().max(40).default('consultation'),
-  status: z.enum(['pending', 'confirmed', 'done', 'cancelled', 'no_show']).default('pending'),
+  status: appointmentStatusZ.default('pending'),
   notes: z.string().max(500).optional().nullable(),
   caseId: idZ.optional().nullable(),
   allDay: z.coerce.boolean().default(false),
