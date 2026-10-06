@@ -1424,6 +1424,53 @@ for (const [ns, keys] of Object.entries(EXTRA3)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA4 — refonte de la page Paramètres (navigation latérale collante + barre d'enregistrement).
+ *  - settings.nav.groups.* : regroupements du sous-menu (Plateforme / Clinique / Communication /
+ *    Sécurité / Exploitation) — 15 sections à plat étaient illisibles sur petit écran ;
+ *  - settings.nav.filter / .empty : filtre des sections (annuaire trop long au-delà de 10 entrées) ;
+ *  - settings.save.* : état « modifications non enregistrées », rétablissement et garde-fou au
+ *    changement de section (on ne perd plus silencieusement une saisie en cliquant ailleurs) ;
+ *  - settings.groups.* : intertitres des formulaires, réorganisés en blocs sur grand écran ;
+ *  - settings.jsonOnlyHint : message CORRECT des sections sans formulaire — l'écran affichait
+ *    « settings.useJson », dont le texte parle du stockage JSON local (« démonstration, poste
+ *    unique »), sans rapport avec la raison réelle (structure libre non représentable en formulaire).
+ *  - settings.subtitle : le texte annonçait « 13 sections » alors qu'il y en a 15.
+ */
+const EXTRA4 = {
+  settings: {
+    'settings.subtitle': ['Sections typées — chaque valeur est validée avant écriture.', 'أقسام مُنمّطة — تُتحقَّق كل قيمة قبل الحفظ.', 'Secciones tipadas: cada valor se valida antes de guardarse.', 'Typed sections — every value is validated before it is written.'],
+    'settings.nav.sections': ['Sections', 'الأقسام', 'Secciones', 'Sections'],
+    // Interrupteurs SMTP (le formulaire les présentait en champs texte — « secure » est un booléen)
+    'settings.smtp.enabled': ['Activer l’envoi d’e-mails', 'تفعيل إرسال البريد', 'Activar el envío de correos', 'Enable e-mail sending'],
+    'settings.nav.filter': ['Filtrer les sections…', 'تصفية الأقسام…', 'Filtrar secciones…', 'Filter sections…'],
+    'settings.nav.empty': ['Aucune section ne correspond.', 'لا يوجد قسم مطابق.', 'Ninguna sección coincide.', 'No matching section.'],
+    'settings.nav.groups.platform': ['Plateforme', 'المنصة', 'Plataforma', 'Platform'],
+    'settings.nav.groups.clinical': ['Activité clinique', 'النشاط الطبي', 'Actividad clínica', 'Clinical activity'],
+    'settings.nav.groups.communication': ['Communication', 'التواصل', 'Comunicación', 'Communication'],
+    'settings.nav.groups.security': ['Sécurité & conformité', 'الأمن والامتثال', 'Seguridad y cumplimiento', 'Security & compliance'],
+    'settings.nav.groups.maintenance': ['Exploitation', 'التشغيل والصيانة', 'Explotación', 'Operations'],
+    'settings.save.dirty': ['Modifications non enregistrées', 'تغييرات غير محفوظة', 'Cambios sin guardar', 'Unsaved changes'],
+    'settings.save.upToDate': ['À jour', 'محدَّث', 'Al día', 'Up to date'],
+    'settings.save.discard': ['Rétablir', 'استرجاع', 'Restaurar', 'Revert'],
+    'settings.save.leaveTitle': ['Modifications non enregistrées', 'تغييرات غير محفوظة', 'Cambios sin guardar', 'Unsaved changes'],
+    'settings.save.leaveHint': ['Les modifications de « {section} » seront perdues. Continuer et changer de section ?', 'ستفقد تعديلات «{section}». هل تريد المتابعة وتغيير القسم؟', 'Se perderán los cambios de «{section}». ¿Continuar y cambiar de sección?', 'Changes to “{section}” will be lost. Continue and switch section?'],
+    'settings.save.leaveGo': ['Changer de section', 'تغيير القسم', 'Cambiar de sección', 'Switch section'],
+    'settings.save.stay': ['Rester ici', 'البقاء هنا', 'Quedarme aquí', 'Stay here'],
+    'settings.groups.identity': ['Identité de l’établissement', 'هوية المؤسسة', 'Identidad del establecimiento', 'Organisation identity'],
+    'settings.groups.contact': ['Coordonnées', 'بيانات الاتصال', 'Datos de contacto', 'Contact details'],
+    'settings.groups.display': ['Affichage & formats', 'العرض والصيغ', 'Visualización y formatos', 'Display & formats'],
+    'settings.groups.appearance': ['Apparence', 'المظهر', 'Aspecto', 'Appearance'],
+    'settings.groups.behaviour': ['Comportement', 'السلوك', 'Comportamiento', 'Behaviour'],
+    'settings.groups.locale': ['Langues & chiffres', 'اللغات والأرقام', 'Idiomas y números', 'Languages & digits'],
+    'settings.groups.smtpServer': ['Serveur d’envoi', 'خادم الإرسال', 'Servidor de envío', 'Sending server'],
+    'settings.jsonOnlyHint': ['Cette section s’édite en JSON validé : structure libre (listes, étapes, seuils) que le formulaire ne représente pas.', 'تُحرَّر هذا القسم بصيغة JSON مُتحقَّق منها: بنية حرّة (قوائم، خطوات، عتبات) لا يمثّلها النموذج.', 'Esta sección se edita en JSON validado: estructura libre (listas, pasos, umbrales) que el formulario no representa.', 'This section is edited as validated JSON: free-form structure (lists, steps, thresholds) the form cannot represent.'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA4)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

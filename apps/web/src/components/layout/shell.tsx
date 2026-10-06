@@ -70,6 +70,7 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
   const reduce = useReducedMotion();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [q, setQ] = useState('');
+  const topbarRef = React.useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (status === 'anonymous') router.replace(`/login?next=${encodeURIComponent(pathname ?? '/')}`);
@@ -80,6 +81,35 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
     const adm = NAV_ADMIN.filter((n) => !n.module || has(n.module, 'view'));
     return { vis, adm };
   }, [has]);
+
+  /**
+   * Publie la hauteur RÉELLE de la chrome collante (bandeau licence + topbar + fil d'Ariane) dans
+   * « --app-sticky-top » : la sous-navigation des Paramètres s'y colle sans marge codée en dur
+   * (voir .sticky-under-topbar). Recalculé au redimensionnement, au zoom, au changement de
+   * densité (data-density), de mode de navigation, et à l'apparition du bandeau licence.
+   */
+  useEffect(() => {
+    const el = topbarRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let raf = 0;
+    const apply = (): void => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = Math.round(el.getBoundingClientRect().bottom) + 12;
+        document.documentElement.style.setProperty('--app-sticky-top', `${Math.max(48, h)}px`);
+      });
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    ro.observe(document.body); // bandeau licence, polices, libellés longs
+    window.addEventListener('resize', apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, [license?.state, items.vis.length, items.adm.length, ui.density, ui.nav]);
 
 
   const LangSwitch: React.ReactElement = <LanguageSwitcher />;
@@ -156,7 +186,7 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
 
         <div className="min-w-0 flex-1">
           {/* Topbar */}
-          <header className="glass-soft sticky top-0 z-30 rounded-none border-x-0 border-t-0 px-3 py-2">
+          <header ref={topbarRef} className="glass-soft sticky top-0 z-30 rounded-none border-x-0 border-t-0 px-3 py-2">
             <div className="flex items-center gap-2">
               <button className="btn btn-ghost btn-sm btn-icon lg:hidden" onClick={() => setMobileOpen(true)} aria-label={t('nav.openMenu')}>
                 <Menu size={18} />

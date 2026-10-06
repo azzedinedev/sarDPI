@@ -647,3 +647,39 @@ html[dir='rtl'] .motion-on .loader-bar::after {
   outline: 2px solid rgb(var(--c-primary) / 0.5);
   outline-offset: 1px;
 }
+
+/* ============================================================ Sous-navigation collante
+   Utilisée par les écrans à sections (Paramètres) : la barre se colle SOUS la topbar.
+   « --app-sticky-top » est publiée par le Shell (mesure réelle de la topbar + bandeau licence),
+   donc aucune hauteur codée en dur ne peut se désynchroniser d'un changement de densité/zoom. */
+.sticky-under-topbar {
+  position: sticky;
+  top: var(--app-sticky-top, 7rem);
+}
+/* Pile de défilement horizontale (pastilles de sections sur mobile/tablette) :
+   barre masquée + aimantation douce, l'élément actif est recentré par le JS. */
+.nav-scroll-x {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.nav-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+.nav-scroll-x > * {
+  scroll-snap-align: center;
+}
+/* Colonne de navigation : barre de défilement discrète (elle défile seule, pas la page). */
+.nav-scroll-y {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-line)) transparent;
+}
+.nav-scroll-y::-webkit-scrollbar {
+  width: 6px;
+}
+.nav-scroll-y::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-line));
+  border-radius: 999px;
+}
