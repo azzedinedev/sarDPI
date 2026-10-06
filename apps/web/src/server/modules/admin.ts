@@ -164,6 +164,7 @@ export function registerAdmin(): void {
       if (db.demoMode) return { ok: true, note: 'Adaptateur JSON : les tables sont créées à la volée, aucune migration SQL nécessaire.' };
       // generateDDL est idempotent (IF NOT EXISTS / ADD INDEX tolérés) → sert de migration « expand only »
       const { generateDDL } = await import('../data/schema');
+      const { isAlreadyAppliedError, migrationFiles } = await import('../data/migrations');
       const ddl = generateDDL(db.dialect ?? 'mysql');
       let applied = 0;
       let skipped = 0;
@@ -178,7 +179,32 @@ export function registerAdmin(): void {
           else throw e;
         }
       }
-      return { ok: true, applied, skipped };
+      /**
+       * Le DDL généré ne sait qu'AJOUTER DES TABLES (CREATE TABLE IF NOT EXISTS) : il ne peut pas
+       * ajouter une colonne à une table existante. Les migrations SQL de `migrations/` comblent
+       * exactement ce trou (ex. 0002 : appointments.kind / .all_day, sans quoi les valeurs écrites
+       * par le module rendez-vous étaient perdues). Elles sont donc appliquées ICI aussi, pour que
+       * l'administrateur puisse mettre à niveau sa base sans accès shell. Seuls les fichiers du
+       * dialecte courant sont exécutés, et « déjà appliqué » n'est pas une erreur (rejeu sûr).
+       */
+      const migDir = path.join(paths.root, 'migrations');
+      const migrations: { file: string; state: 'appliquée' | 'déjà appliquée' }[] = [];
+      if (fs.existsSync(migDir)) {
+        const dialect = db.dialect ?? 'mysql';
+        for (const f of migrationFiles(fs.readdirSync(migDir), dialect)) {
+          const sql = fs.readFileSync(path.join(migDir, f), 'utf8').trim();
+          if (!sql) continue;
+          try {
+            await execRaw(sql);
+            migrations.push({ file: f, state: 'appliquée' });
+          } catch (e) {
+            const msg = (e as Error).message ?? '';
+            if (!isAlreadyAppliedError(msg)) throw e;
+            migrations.push({ file: f, state: 'déjà appliquée' });
+          }
+        }
+      }
+      return { ok: true, applied, skipped, migrations };
     },
   });
 

@@ -61,8 +61,10 @@ Le mot de passe d’admin peut être imposé via `SARDPI_ADMIN_PASSWORD` avant `
 
 ## Configuration
 
-Tout passe par env (voir `.env.example`) ou **Admin » Paramètres** (13 sections Zod-validées,
-aperçu live des codes, base de données à chaud avec test + rollback). Points clés :
+Tout passe par env (voir `.env.example`) ou **Admin » Paramètres** (15 sections Zod-validées,
+formulaires par champ + listes en CRUD, aperçu live des codes, base de données à chaud avec test +
+rollback). Chaque section s'édite au formulaire **ou** en JSON validé (mode avancé) : les deux
+passent par le même schéma, donc les mêmes contraintes. Points clés :
 
 - `DATA_ADAPTER=mysql|postgres|json|memory` — `json/memory` = **démo mono-poste uniquement**
   (auto-incrément *émulé* par compteur persisté ; aucune garantie multi-utilisateurs).
@@ -71,6 +73,9 @@ aperçu live des codes, base de données à chaud avec test + rollback). Points 
 - `SMTP_ENABLED=1` + host/port/user/pass — sinon les e-mails restent en file (statut « skipped » visible
   dans Admin » Système).
 - Pays : déposer `country-profiles/XX.json` (d’après `_TEMPLATE.json`) — **aucun code à écrire**.
+- Mise à niveau d’une base existante : `npm run db:migrate` (ou bouton **Migrer** dans l’admin)
+  applique `migrations/*.sql` — les variantes `.mysql.sql` / `.postgres.sql` ne sont exécutées que
+  sur le dialecte concerné, et « déjà appliqué » n’est pas une erreur (rejeu sûr).
 
 ## Sécurité (rappel des invariants)
 

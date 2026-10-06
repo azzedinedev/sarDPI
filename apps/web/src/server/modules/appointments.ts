@@ -44,6 +44,18 @@ async function findConflicts(input: { practitionerId?: number | null; locationId
  * À la CRÉATION, les défauts viennent du schéma Zod (kind/status/allDay) ; on ne complète
  * ici que si nécessaire. Exporté pour les tests de non-régression.
  */
+/**
+ * Ligne d'agenda NORMALISÉE : `kind` et `all_day` sont toujours présents côté API, quelle que soit
+ * la base interrogée — installation antérieure à la migration 0002 (colonnes ajoutées, NULL sur les
+ * lignes historiques), fichier JSON de démonstration d'une version précédente, ou export importé.
+ * Le calendrier ne peut donc plus tomber sur un type indéfini ; le défaut reste « consultation ».
+ */
+export function normalizeAppointment<T extends Record<string, unknown>>(r: T): T & { kind: string; all_day: 0 | 1 } {
+  const raw = r.all_day;
+  const allDay = raw === true || raw === 'true' || Number(raw) === 1 ? 1 : 0;
+  return { ...r, kind: r.kind ? String(r.kind) : 'consultation', all_day: allDay };
+}
+
 export function appointmentPatch(i: Record<string, unknown>, mode: 'create' | 'update'): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   if (i.patientId !== undefined) patch.patient_id = i.patientId;
@@ -92,13 +104,15 @@ export function registerAppointments(): void {
       const locIds = [...new Set(rows.map((r) => r.location_id).filter(Boolean).map(Number))];
       const locs = locIds.length ? await db.find<Record<string, unknown>>('locations', { where: { id: locIds } }) : [];
       const locBy = new Map(locs.map((l) => [Number(l.id), l]));
-      return rows.map((r) => ({
-        ...r,
-        patient_name: pBy.get(Number(r.patient_id)) ? `${String(pBy.get(Number(r.patient_id))!.last_name).toUpperCase()} ${pBy.get(Number(r.patient_id))!.first_name}` : null,
-        patient_code: pBy.get(Number(r.patient_id))?.code ?? null,
-        practitioner_name: r.practitioner_id ? `${prBy.get(Number(r.practitioner_id))?.last_name ?? ''} ${prBy.get(Number(r.practitioner_id))?.first_name ?? ''}`.trim() : null,
-        location_name: r.location_id ? locBy.get(Number(r.location_id))?.building ?? null : null,
-      }));
+      return rows.map((r) =>
+        normalizeAppointment({
+          ...r,
+          patient_name: pBy.get(Number(r.patient_id)) ? `${String(pBy.get(Number(r.patient_id))!.last_name).toUpperCase()} ${pBy.get(Number(r.patient_id))!.first_name}` : null,
+          patient_code: pBy.get(Number(r.patient_id))?.code ?? null,
+          practitioner_name: r.practitioner_id ? `${prBy.get(Number(r.practitioner_id))?.last_name ?? ''} ${prBy.get(Number(r.practitioner_id))?.first_name ?? ''}`.trim() : null,
+          location_name: r.location_id ? locBy.get(Number(r.location_id))?.building ?? null : null,
+        }),
+      );
     },
     bump: ['calendar'],
   });
@@ -122,7 +136,8 @@ export function registerAppointments(): void {
       if (locationId) where.push({ field: 'location_id', op: 'eq', value: Number(locationId) });
       if (patientId) where.push({ field: 'patient_id', op: 'eq', value: Number(patientId) });
       const rows = await ctx.db.find<Record<string, unknown>>('appointments', { where: where as never, orderBy: [['start_at', 'asc']], limit: 800 });
-      return { rows };
+      // la vue alimente DIRECTEMENT le calendrier : kind/all_day doivent y être garantis aussi
+      return { rows: rows.map(normalizeAppointment) };
     },
   });
 

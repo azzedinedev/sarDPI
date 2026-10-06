@@ -66,8 +66,22 @@ const GENERAL = {
   dateDisplay: 'DD/MM/YYYY',
   timeDisplay: true,
 };
-const SECURITY = { sessionMinutes: 30, passwordMinLength: 12, lockAfterFails: 5 };
-const PAYLOADS: Record<string, Record<string, unknown>> = { general: GENERAL, security: SECURITY };
+const SECURITY = {
+  captcha: { provider: 'internal' },
+  passwordMinLength: 12,
+  lockout: { maxAttempts: 5, stepsMinutes: [1, 5, 15, 60] },
+  enforceTotpForAdmin: false,
+  signedUrlTtlMin: 15,
+  encryptSensitiveFields: true,
+};
+/** Étiquettes du calendrier : module autrefois éditable en JSON brut, désormais en formulaire + CRUD. */
+const CALENDAR_KINDS = {
+  kinds: [
+    { key: 'consultation', order: 1, color: '#3b82f6', durationMin: 30, active: true, label: { fr: 'Consultation', ar: 'استشارة', es: 'Consulta', en: 'Consultation' } },
+  ],
+  statuses: [{ key: 'pending', order: 1, color: '#f59e0b', label: { fr: 'En attente', ar: 'قيد الانتظار', es: 'Pendiente', en: 'Pending' } }],
+};
+const PAYLOADS: Record<string, Record<string, unknown>> = { general: GENERAL, security: SECURITY, calendarKinds: CALENDAR_KINDS };
 
 /**
  * Faux serveur : la lecture renvoie l'état courant, l'écriture le met à jour. C'est indispensable
@@ -153,7 +167,7 @@ beforeEach(() => {
     };
   }
   for (const [k, v] of Object.entries(PAYLOADS)) store[k] = structuredClone(v);
-  for (const k of ['ui', 'languages', 'codification', 'medicalRefs', 'smtp', 'captcha', 'backups', 'license']) store[k] ??= {};
+  for (const k of ['ui', 'languages', 'codification', 'medicalRefs', 'smtp', 'gedTypes', 'practitionerTypes', 'workflowSteps', 'vaccination', 'captcha', 'backups', 'license']) store[k] ??= {};
   get.mockImplementation(async (p: string) => structuredClone(store[p.split('/').pop() ?? ''] ?? {}));
   put.mockImplementation(async (p: string, body: unknown) => {
     const key = p.split('/').pop() ?? '';
@@ -267,22 +281,73 @@ describe('page Paramètres — enregistrement (barre collante, état, garde-fou)
   });
 });
 
-describe('page Paramètres — sections sans formulaire', () => {
-  it('bascule en JSON validé avec l’explication, sans sélecteur Formulaire/JSON', async () => {
+describe('page Paramètres — modules autrefois en JSON brut', () => {
+  it('la sécurité s’édite par champs (plus de bloc JSON imposé) et respecte les bornes du serveur', async () => {
     const el = await mount();
     await click(tab('security'));
 
     const panel = document.getElementById('settings-panel') as HTMLElement;
-    expect(panel.textContent).toContain(dicts.settings['settings.jsonOnlyHint']!);
-    expect(panel.textContent).not.toContain(dicts.settings['settings.form']!); // pas d'onglet formulaire
-    const area = panel.querySelector('textarea')!;
-    expect(area.getAttribute('dir')).toBe('ltr');
-    expect(area.value).toContain('"sessionMinutes": 30');
+    // les champs du module sont rendus avec leurs valeurs
+    expect(panel.textContent).toContain(dicts.settings['settings.security.signedUrlTtlMin']!);
+    expect(panel.textContent).toContain(dicts.settings['settings.security.stepsMinutes']!);
+    expect([...panel.querySelectorAll('input')].some((i) => i.value === '1, 5, 15, 60')).toBe(true);
+    // le JSON reste accessible en mode avancé (même validation)
+    expect(panel.textContent).toContain(dicts.settings['settings.jsonAdvanced']!);
 
-    // une saisie invalide bloque l'enregistrement sans casser la page
-    await type(area, '{ "sessionMinutes": }');
-    expect(document.body.textContent).toContain(dicts.settings['settings.save.dirty']!);
+    // une valeur hors bornes est signalée champ par champ et bloque l'enregistrement
+    const ttl = [...panel.querySelectorAll('input')].find((i) => i.type === 'number')!;
+    await type(ttl, '5000');
+    expect(panel.textContent).toContain(dicts.settings['settings.save.invalid']!.replace('{n}', '1'));
+    expect(saveButton().disabled).toBe(true);
     await click(saveButton());
     expect(put).not.toHaveBeenCalled();
+
+    // corriger la valeur réactive l'enregistrement, et la charge utile part au format attendu
+    await type(ttl, '30');
+    await click(saveButton());
+    expect(put).toHaveBeenCalledTimes(1);
+    const [url, body] = put.mock.calls[0]! as [string, Record<string, unknown>];
+    expect(url).toBe('/admin/settings/security');
+    expect(body.signedUrlTtlMin).toBe(30);
+    expect(body.lockout).toMatchObject({ maxAttempts: 5, stepsMinutes: [1, 5, 15, 60] });
+  });
+
+  it('CRUD d’une liste : ajout d’un type de RDV, validation de la clé, enregistrement', async () => {
+    const el = await mount();
+    await click(tab('calendarKinds'));
+    const panel = document.getElementById('settings-panel') as HTMLElement;
+
+    // la liste existante est affichée (clé + libellé)
+    expect(panel.textContent).toContain('consultation');
+    expect(panel.textContent).toContain('Consultation');
+
+    // --- ajout : le tiroir s'ouvre, la clé est saisie puis un libellé
+    await click(byText('button', dicts.settings['settings.crud.add']!));
+    const dialog = (): HTMLElement => document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dialog().textContent).toContain('Nouvelle entrée');
+    await type(dialog().querySelector('input')!, 'Radio');
+    // clé en majuscules : refusée par le schéma partagé (elle est stockée dans appointments.kind)
+    expect(dialog().textContent).toContain(dicts.settings['settings.validation.kindKey']!);
+    await type(dialog().querySelector('input')!, 'radio');
+    const labelInput = [...dialog().querySelectorAll('input')].find((i) => i.getAttribute('aria-label')?.startsWith(dicts.settings['settings.field.label']!))!;
+    await type(labelInput, 'Radiologie');
+    await click(byText('[role="dialog"] button', dicts.common.save!));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    // --- la ligne ajoutée est visible et part dans la charge utile
+    expect(panel.textContent).toContain('radio');
+    expect(panel.textContent).toContain('Radiologie');
+    await click(saveButton());
+    const [, body] = put.mock.calls[0]! as [string, { kinds: { key: string; order: number; label: Record<string, string> }[] }];
+    expect(body.kinds.map((k) => k.key)).toEqual(['consultation', 'radio']);
+    expect(body.kinds[1]).toMatchObject({ order: 2, label: { fr: 'Radiologie' } });
+
+    // --- réordonnancement (la ligne ajoutée remonte en tête, l'ordre suit la position)
+    const up = [...panel.querySelectorAll('button')].filter((b) => b.title === dicts.settings['settings.crud.moveUp']!);
+    await click(up[1]!);
+    await click(saveButton());
+    const [, body2] = put.mock.calls[1]! as [string, { kinds: { key: string; order: number }[] }];
+    expect(body2.kinds.map((k) => k.key)).toEqual(['radio', 'consultation']);
+    expect(body2.kinds.map((k) => k.order)).toEqual([1, 2]);
   });
 });

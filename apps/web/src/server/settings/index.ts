@@ -6,7 +6,24 @@
 import { z } from 'zod';
 import { env, paths } from '../config';
 import { getDb } from '../data';
-import { DEFAULT_GED_TYPES, DEFAULT_PRACTITIONER_TYPES, DEFAULT_BLOOD_GROUPS, DEFAULT_SS_FUNDS, medicalRefsZ, smtpSettingsZ, securitySettingsZ, type CodificationConfig } from '@sardpi/shared';
+import {
+  DEFAULT_GED_TYPES,
+  DEFAULT_PRACTITIONER_TYPES,
+  DEFAULT_BLOOD_GROUPS,
+  DEFAULT_SS_FUNDS,
+  medicalRefsZ,
+  smtpSettingsZ,
+  securitySettingsZ,
+  backupZ,
+  calendarKindsZ,
+  captchaSectionZ,
+  gedTypesZ,
+  licenseSectionZ,
+  practitionerTypesZ,
+  vaccinationSectionZ,
+  workflowsZ,
+  type CodificationConfig,
+} from '@sardpi/shared';
 import { cacheGet, cacheSet, bumpTag } from '../cache';
 
 /* --------------------------------------------------------------- définitions */
@@ -51,64 +68,7 @@ export const codificationZ = z.object({
   prefixOverrides: z.record(z.string(), z.string().regex(/^[A-Z]{1,8}$/)).default({}),
   drugPadding: z.number().int().min(4).max(8).default(6),
 });
-export const gedTypesZ = z.object({
-  types: z
-    .array(
-      z.object({
-        prefix: z.string().regex(/^[A-Z]{2,5}$/),
-        path: z.string().regex(/^[a-z0-9_-]{1,30}$/),
-        label: z.record(z.string()),
-      }),
-    )
-    .default([]),
-});
-export const practitionerTypesZ = gedTypesZ.extend({ types: z.array(z.object({ prefix: z.string().regex(/^[A-Z]{2,5}$/), label: z.record(z.string()) })).default([]) });
 export const languagesSectionZ = z.object({ default: z.string().default(env.defaultLocale), fallback: z.string().default('fr'), enabled: z.array(z.string()).default(['ar', 'fr', 'es', 'en']) });
-export const workflowsZ = z.object({
-  steps: z
-    .array(
-      z.object({
-        key: z.string().regex(/^[a-z_]{2,30}$/),
-        order: z.number().int(),
-        color: z.string().max(9).default('#0ea5b7'),
-        label: z.record(z.string()),
-      }),
-    )
-    .default([]),
-  allowSkip: z.boolean().default(true),
-});
-/**
- * Étiquettes du calendrier — types de RDV (kind) et statuts (status) configurables en base :
- * libellés multilingues (fr/ar/es/en), couleur et durée par défaut. Aucune modification de code
- * n'est nécessaire pour ajouter un type (même principe que les étapes du suivi / workflowSteps).
- * Les `key` existants restent stables : ils sont stockés dans appointments.kind / .status.
- */
-export const calendarKindsZ = z.object({
-  kinds: z
-    .array(
-      z.object({
-        key: z.string().regex(/^[a-z_]{2,30}$/),
-        order: z.number().int(),
-        color: z.string().max(9).default('#3b82f6'),
-        durationMin: z.number().int().min(5).max(480).default(30),
-        active: z.boolean().default(true),
-        label: z.record(z.string()),
-      }),
-    )
-    .default([]),
-  statuses: z
-    .array(
-      z.object({
-        key: z.string().regex(/^[a-z_]{2,30}$/),
-        order: z.number().int(),
-        color: z.string().max(9).default('#64748b'),
-        label: z.record(z.string()),
-      }),
-    )
-    .default([]),
-});
-export const backupZ = z.object({ retentionDays: z.number().int().min(1).max(999).default(30), auto: z.boolean().default(false), cronTime: z.string().default('03:30') });
-
 export type GeneralSettings = z.infer<typeof generalZ>;
 export type UiSettings = z.infer<typeof uiZ>;
 export type CodificationSettings = z.infer<typeof codificationZ> & CodificationConfig;
@@ -164,24 +124,20 @@ const SECTIONS = {
   security: { zod: securitySettingsZ.extend({ enforceTotpForAdmin: z.boolean().default(false) }) },
   backups: { zod: backupZ },
   license: { zod: licenseZ() },
-  vaccination: { zod: z.object({ schedule: z.array(z.record(z.unknown())).default([]), enabled: z.boolean().default(true) }) },
+  vaccination: { zod: vaccinationSectionZ },
 } as const;
 
+/**
+ * Le schéma captcha est partagé avec le formulaire d'administration (`@sardpi/shared`), mais la
+ * valeur par défaut du fournisseur reste celle de l'ENVIRONNEMENT : `resolveProvider()` lit la
+ * section puis retombe sur `env.captchaProvider`, ce qui ne fonctionne que si rien n'est imposé
+ * côté schéma. On l'ajoute donc ici, au moment où le serveur enregistre la section.
+ */
 function captchaZ() {
-  return z.object({
-    provider: z.enum(['none', 'internal', 'turnstile', 'hcaptcha', 'recaptcha']).default(env.captchaProvider),
-    sitekey: z.string().max(120).optional(),
-    secret: z.string().max(200).optional(),
-  });
+  return captchaSectionZ.extend({ provider: captchaSectionZ.shape.provider.default(env.captchaProvider) });
 }
 function licenseZ() {
-  return z.object({
-    key: z.string().max(200).optional(),
-    state: z.enum(['valid', 'trial', 'expired', 'invalid', 'none']).default('trial'),
-    expiresAt: z.string().optional(),
-    maxUsers: z.number().int().default(100),
-    org: z.string().max(160).optional(),
-  });
+  return licenseSectionZ;
 }
 
 export type SectionName = keyof typeof SECTIONS;

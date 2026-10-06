@@ -49,12 +49,14 @@ describe('catalogue des sections de paramètres', () => {
     expect(nextSection([], 'general', 'ArrowDown')).toBeUndefined();
   });
 
-  it('les sections sans formulaire basculent en JSON validé (et l’inverse)', () => {
-    expect(FORM_SECTIONS.has('general')).toBe(true);
-    expect(FORM_SECTIONS.has('smtp')).toBe(true);
-    expect(FORM_SECTIONS.has('security')).toBe(false);
-    expect(FORM_SECTIONS.has('workflowSteps')).toBe(false);
-    // toute section hors formulaire doit avoir un libellé « sections.<clé> » : vérifié par
-    // tests/i18n-locales.test.ts (parité des dictionnaires) + balayage des clés dynamiques.
+  it('toutes les sections ont un formulaire typé (le JSON n’est plus qu’un mode avancé)', () => {
+    for (const s of SETTINGS_SECTIONS) expect(FORM_SECTIONS.has(s.key), s.key).toBe(true);
+    expect(FORM_SECTIONS.size).toBe(SETTINGS_SECTIONS.length);
+    // les modules autrefois éditables en JSON brut (ajoutés par les formulaires par champ)
+    for (const key of ['security', 'captcha', 'backups', 'license', 'gedTypes', 'workflowSteps', 'calendarKinds', 'vaccination', 'practitionerTypes']) {
+      expect(FORM_SECTIONS.has(key), key).toBe(true);
+    }
+    // chaque section a un libellé « sections.<clé> » : vérifié par tests/i18n-locales.test.ts
+    // (parité des dictionnaires) + balayage des clés dynamiques.
   });
 });

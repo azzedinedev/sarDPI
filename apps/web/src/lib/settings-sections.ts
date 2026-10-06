@@ -15,8 +15,13 @@ export const SECTION_GROUPS: SectionGroup[] = ['platform', 'clinical', 'communic
 /**
  * Sections : `key` = segment d'API `/admin/settings/:key` ET suffixe des clés de traduction
  * `settings.sections.<key>`.
- * `form: false` → structure libre (listes, étapes, seuils) que le formulaire ne représente pas :
- * l'édition se fait en JSON validé, et l'écran le dit explicitement.
+ *
+ * `form` signale l'existence d'un formulaire typé. Depuis l'ajout des formulaires pilotés par
+ * spécification (`lib/settings-fields.ts` : champs par module + validation + CRUD des listes),
+ * TOUTES les sections en ont un — y compris celles qui n'étaient éditables qu'en JSON (types de
+ * GED, types de praticiens, étapes du circuit, étiquettes du calendrier, vaccination, sécurité,
+ * captcha, sauvegardes, licence). Le JSON reste disponible comme mode avancé, avec la même
+ * validation ; le drapeau est conservé pour que la page et les tests parlent le même langage.
  */
 export const SETTINGS_SECTIONS = [
   { key: 'general', icon: SlidersHorizontal, group: 'platform', form: true },
@@ -24,21 +29,21 @@ export const SETTINGS_SECTIONS = [
   { key: 'languages', icon: Languages, group: 'platform', form: true },
   { key: 'codification', icon: Hash, group: 'clinical', form: true },
   { key: 'medicalRefs', icon: HeartPulse, group: 'clinical', form: true },
-  { key: 'gedTypes', icon: FileStack, group: 'clinical', form: false },
-  { key: 'practitionerTypes', icon: Stethoscope, group: 'clinical', form: false },
-  { key: 'workflowSteps', icon: Workflow, group: 'clinical', form: false },
-  { key: 'calendarKinds', icon: CalendarClock, group: 'clinical', form: false },
-  { key: 'vaccination', icon: Syringe, group: 'clinical', form: false },
+  { key: 'gedTypes', icon: FileStack, group: 'clinical', form: true },
+  { key: 'practitionerTypes', icon: Stethoscope, group: 'clinical', form: true },
+  { key: 'workflowSteps', icon: Workflow, group: 'clinical', form: true },
+  { key: 'calendarKinds', icon: CalendarClock, group: 'clinical', form: true },
+  { key: 'vaccination', icon: Syringe, group: 'clinical', form: true },
   { key: 'smtp', icon: Mail, group: 'communication', form: true },
-  { key: 'security', icon: ShieldCheck, group: 'security', form: false },
-  { key: 'captcha', icon: KeyRound, group: 'security', form: false },
-  { key: 'backups', icon: Archive, group: 'maintenance', form: false },
-  { key: 'license', icon: KeyRound, group: 'maintenance', form: false },
+  { key: 'security', icon: ShieldCheck, group: 'security', form: true },
+  { key: 'captcha', icon: KeyRound, group: 'security', form: true },
+  { key: 'backups', icon: Archive, group: 'maintenance', form: true },
+  { key: 'license', icon: KeyRound, group: 'maintenance', form: true },
 ] as const satisfies readonly { key: string; icon: Icon; group: SectionGroup; form: boolean }[];
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]['key'];
 
-/** Sections disposant d'un formulaire typé (les autres s'éditent en JSON validé). */
+/** Sections disposant d'un formulaire typé (désormais : toutes — le JSON est un mode avancé). */
 export const FORM_SECTIONS: ReadonlySet<string> = new Set(SETTINGS_SECTIONS.filter((s) => s.form).map((s) => s.key));
 
 /** Filtre partagé entre la colonne latérale (desktop) et le bandeau de pastilles (mobile). */

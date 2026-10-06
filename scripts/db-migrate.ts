@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { dialectOf, isAlreadyAppliedError, migrationFiles } from '../apps/web/src/server/data/migrations';
 
 async function main(): Promise<void> {
   process.env.SARDPI_SCRIPT = '1';
@@ -15,9 +16,15 @@ async function main(): Promise<void> {
   const db = await getDb(); // getDb() appelle init() → ensureSchema() pour les adaptateurs SQL
 
   // Migrations SQL optionnelles (avant/après DDL généré — idempotent à la charge de l'auteur).
+  // Le dialecte est celui de l'adaptateur : « 0002-x.mysql.sql » n'est pas exécuté sur PostgreSQL,
+  // et inversement (voir data/migrations.ts). Une erreur « déjà appliqué » (colonne/table déjà
+  // présente) est ignorée : sans quoi chaque rejeu sortirait en code 1 sur une base à jour.
   const migDir = path.resolve(process.cwd(), 'migrations');
   if (fs.existsSync(migDir) && db.execRaw) {
-    const files = fs.readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
+    const dialect = db.dialect ?? 'mysql';
+    const files = migrationFiles(fs.readdirSync(migDir), dialect);
+    const skipped = fs.readdirSync(migDir).filter((f) => f.endsWith('.sql') && !files.includes(f));
+    for (const f of skipped) console.log(`[db:migrate] · migrations/${f} ignoré (dialecte ${dialectOf(f) ?? 'autre'})`);
     for (const f of files) {
       const sql = fs.readFileSync(path.join(migDir, f), 'utf8').trim();
       if (!sql) continue;
@@ -25,7 +32,12 @@ async function main(): Promise<void> {
         await db.execRaw(sql);
         console.log(`[db:migrate] ✓ migrations/${f}`);
       } catch (e) {
-        console.error(`[db:migrate] ✗ migrations/${f} : ${(e as Error).message}`);
+        const msg = (e as Error).message ?? '';
+        if (isAlreadyAppliedError(msg)) {
+          console.log(`[db:migrate] ✓ migrations/${f} (déjà appliquée)`);
+          continue;
+        }
+        console.error(`[db:migrate] ✗ migrations/${f} : ${msg}`);
         process.exitCode = 1;
       }
     }

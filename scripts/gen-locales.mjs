@@ -1471,6 +1471,153 @@ for (const [ns, keys] of Object.entries(EXTRA4)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA5 — FORMULAIRES PAR CHAMP DES MODULES DE PARAMÈTRES (validation + CRUD).
+ * Les sections qui n'étaient éditables qu'en JSON (types de GED, types de praticiens, étapes du
+ * circuit, étiquettes du calendrier, vaccination, sécurité, captcha, sauvegardes, licence) exposent
+ * désormais un formulaire par champ, avec messages de validation par champ et gestion des listes
+ * (ajouter / modifier / réordonner / supprimer). Ces clés portent les libellés de champs, les
+ * messages d'erreur et les libellés des actions CRUD.
+ */
+const EXTRA5 = {
+  settings: {
+    // --- bascule Formulaire / JSON (désormais proposée pour TOUTES les sections)
+    'settings.editMode': ['Mode d’édition', 'وضع التحرير', 'Modo de edición', 'Edit mode'],
+    'settings.save.invalid': ['{n} champ(s) à corriger', '{n} حقلًا يحتاج تصحيحًا', '{n} campo(s) por corregir', '{n} field(s) to fix'],
+    'settings.save.invalidHint': ['Corrigez les champs signalés avant d’enregistrer.', 'صحّح الحقول المعلَّمة قبل الحفظ.', 'Corrija los campos señalados antes de guardar.', 'Fix the highlighted fields before saving.'],
+    'settings.jsonAdvanced': ['JSON (avancé)', 'JSON (متقدّم)', 'JSON (avanzado)', 'JSON (advanced)'],
+    'settings.jsonAdvancedHint': ['Même validation que le formulaire, appliquée côté serveur à l’enregistrement.', 'نفس التحقق المطبَّق في النموذج، ويُطبّقه الخادم عند الحفظ.', 'La misma validación que el formulario, aplicada por el servidor al guardar.', 'Same validation as the form, enforced by the server on save.'],
+
+    // --- regroupements de champs
+    'settings.groups.sessions': ['Sessions & liens signés', 'الجلسات والروابط الموقّعة', 'Sesiones y enlaces firmados', 'Sessions & signed links'],
+    'settings.groups.passwords': ['Mots de passe & verrouillage', 'كلمات المرور والقفل', 'Contraseñas y bloqueo', 'Passwords & lockout'],
+    'settings.groups.access': ['Accès et administration', 'الوصول والإدارة', 'Acceso y administración', 'Access & administration'],
+    'settings.groups.provider': ['Fournisseur de vérification', 'مزوّد التحقق', 'Proveedor de verificación', 'Verification provider'],
+    'settings.groups.schedule': ['Planification', 'الجدولة', 'Planificación', 'Scheduling'],
+    'settings.groups.license': ['Licence', 'الترخيص', 'Licencia', 'Licence'],
+    'settings.groups.vaccination': ['Carnet vaccinal', 'دفتر التلقيح', 'Cartilla de vacunación', 'Vaccination record'],
+
+    // --- champs génériques réutilisés par plusieurs modules
+    'settings.field.label': ['Libellé multilingue', 'التسمية متعددة اللغات', 'Etiqueta multilingüe', 'Multilingual label'],
+    'settings.field.key': ['Clé technique', 'المفتاح التقني', 'Clave técnica', 'Technical key'],
+    'settings.field.key.hint': ['Minuscules et tiret bas, 2 à 30 caractères (ex. radio).', 'حروف صغيرة وشرطة سفلية، من 2 إلى 30 حرفًا (مثال: radio).', 'Minúsculas y guion bajo, de 2 a 30 caracteres (p. ej. radio).', 'Lowercase and underscore, 2–30 characters (e.g. radio).'],
+    'settings.field.prefix': ['Préfixe', 'البادئة', 'Prefijo', 'Prefix'],
+    'settings.field.prefix.hint': ['2 à 5 majuscules, utilisé dans les codes (ex. ANL).', 'من 2 إلى 5 أحرف كبيرة، تُستخدم في الأكواد (مثال: ANL).', 'De 2 a 5 mayúsculas, usado en los códigos (p. ej. ANL).', '2–5 uppercase letters, used in codes (e.g. ANL).'],
+    'settings.field.color': ['Couleur', 'اللون', 'Color', 'Colour'],
+    'settings.field.active': ['Actif', 'نشط', 'Activo', 'Active'],
+
+    // --- actions CRUD des listes
+    'settings.crud.add': ['Ajouter', 'إضافة', 'Añadir', 'Add'],
+    'settings.crud.count': ['{n} entrée(s)', '{n} عنصر', '{n} entrada(s)', '{n} item(s)'],
+    'settings.crud.empty': ['Aucune entrée pour le moment.', 'لا يوجد عنصر حاليًا.', 'Todavía no hay entradas.', 'No entries yet.'],
+    'settings.crud.invalid': ['à corriger', 'يحتاج تصحيحًا', 'por corregir', 'needs fixing'],
+    'settings.crud.untitled': ['sans libellé', 'بدون تسمية', 'sin etiqueta', 'untitled'],
+    'settings.crud.maxReached': ['Nombre maximum atteint', 'تم بلوغ الحد الأقصى', 'Se alcanzó el máximo', 'Maximum reached'],
+    'settings.crud.newTitle': ['Nouvelle entrée — {item}', 'عنصر جديد — {item}', 'Nueva entrada — {item}', 'New entry — {item}'],
+    'settings.crud.editTitle': ['Modifier — {item}', 'تعديل — {item}', 'Editar — {item}', 'Edit — {item}'],
+    'settings.crud.moveUp': ['Monter', 'تحريك لأعلى', 'Subir', 'Move up'],
+    'settings.crud.moveDown': ['Descendre', 'تحريك لأسفل', 'Bajar', 'Move down'],
+    'settings.crud.keyLocked': ['Clé verrouillée : des données existantes y font référence.', 'المفتاح مقفل: بيانات موجودة تشير إليه.', 'Clave bloqueada: hay datos que la referencian.', 'Key locked: existing data references it.'],
+
+    // --- messages de validation (mêmes bornes que les schémas partagés)
+    'settings.validation.tooSmall': ['Valeur trop petite (minimum {min}).', 'القيمة صغيرة جدًا (الحد الأدنى {min}).', 'Valor demasiado pequeño (mínimo {min}).', 'Value too small (minimum {min}).'],
+    'settings.validation.tooBig': ['Valeur trop grande (maximum {max}).', 'القيمة كبيرة جدًا (الحد الأقصى {max}).', 'Valor demasiado grande (máximo {max}).', 'Value too large (maximum {max}).'],
+    'settings.validation.required': ['Champ requis.', 'حقل مطلوب.', 'Campo obligatorio.', 'Required field.'],
+    'settings.validation.enum': ['Valeur non autorisée.', 'قيمة غير مسموح بها.', 'Valor no permitido.', 'Value not allowed.'],
+    'settings.validation.pattern': ['Format attendu non respecté.', 'الصيغة المطلوبة غير مطابقة.', 'No cumple el formato esperado.', 'Expected format not respected.'],
+    'settings.validation.invalid': ['Valeur invalide.', 'قيمة غير صحيحة.', 'Valor inválido.', 'Invalid value.'],
+    'settings.validation.jsonSyntax': ['JSON invalide (vérifiez les virgules et les guillemets).', 'JSON غير صحيح (تحقّق من الفواصل والعلامات).', 'JSON inválido (revise comas y comillas).', 'Invalid JSON (check commas and quotes).'],
+    'settings.validation.duplicateKey': ['Cette clé est déjà utilisée par une autre entrée.', 'هذا المفتاح مستخدم في عنصر آخر.', 'Esta clave ya la usa otra entrada.', 'This key is already used by another entry.'],
+    'settings.validation.gedPrefix': ['Préfixe attendu : 2 à 5 majuscules.', 'البادئة المطلوبة: من 2 إلى 5 أحرف كبيرة.', 'Prefijo esperado: de 2 a 5 mayúsculas.', 'Expected prefix: 2–5 uppercase letters.'],
+    'settings.validation.gedPath': ['Dossier attendu : minuscules, chiffres, tiret ou tiret bas.', 'المجلد المطلوب: حروف صغيرة وأرقام وشرطة أو شرطة سفلية.', 'Carpeta esperada: minúsculas, dígitos, guion o guion bajo.', 'Expected folder: lowercase, digits, dash or underscore.'],
+    'settings.validation.stepKey': ['Clé attendue : minuscules et tiret bas (ex. admission).', 'المفتاح المطلوب: حروف صغيرة وشرطة سفلية (مثال: admission).', 'Clave esperada: minúsculas y guion bajo (p. ej. admission).', 'Expected key: lowercase and underscore (e.g. admission).'],
+    'settings.validation.kindKey': ['Clé attendue : minuscules et tiret bas (ex. consultation).', 'المفتاح المطلوب: حروف صغيرة وشرطة سفلية (مثال: consultation).', 'Clave esperada: minúsculas y guion bajo (p. ej. consultation).', 'Expected key: lowercase and underscore (e.g. consultation).'],
+    'settings.validation.vaccineKey': ['Clé attendue : minuscules, chiffres et tiret bas.', 'المفتاح المطلوب: حروف صغيرة وأرقام وشرطة سفلية.', 'Clave esperada: minúsculas, dígitos y guion bajo.', 'Expected key: lowercase, digits and underscore.'],
+    'settings.validation.time': ['Horaire attendu au format HH:MM.', 'الوقت المطلوب بصيغة HH:MM.', 'Hora esperada en formato HH:MM.', 'Expected time in HH:MM format.'],
+
+    // --- sécurité & connexions
+    'settings.security.signedUrlTtlMin': ['Durée de vie des liens signés (min)', 'مدة صلاحية الروابط الموقّعة (دقائق)', 'Vigencia de enlaces firmados (min)', 'Signed link lifetime (min)'],
+    'settings.security.signedUrlTtlMin.hint': ['QR, vérification et fichiers : au-delà, le lien expire.', 'الرمز والتحقق والملفات: بعدها ينتهي الرابط.', 'QR, verificación y archivos: después, el enlace caduca.', 'QR, verification and files: beyond this the link expires.'],
+    'settings.security.encryptSensitiveFields': ['Chiffrer les champs sensibles', 'تشفير الحقول الحساسة', 'Cifrar los campos sensibles', 'Encrypt sensitive fields'],
+    'settings.security.encryptSensitiveFields.hint': ['Identifiants et données critiques chiffrés en base.', 'المعرّفات والبيانات الحساسة مشفّرة في القاعدة.', 'Identificadores y datos críticos cifrados en la base.', 'Identifiers and critical data encrypted at rest.'],
+    'settings.security.passwordMinLength': ['Longueur minimale du mot de passe', 'الحد الأدنى لطول كلمة المرور', 'Longitud mínima de la contraseña', 'Minimum password length'],
+    'settings.security.maxAttempts': ['Tentatives avant verrouillage', 'المحاولات قبل القفل', 'Intentos antes del bloqueo', 'Attempts before lockout'],
+    'settings.security.stepsMinutes': ['Paliers de verrouillage (minutes)', 'مراحل القفل (بالدقائق)', 'Escalones de bloqueo (minutos)', 'Lockout steps (minutes)'],
+    'settings.security.stepsMinutes.hint': ['Valeurs séparées par des virgules : 1, 5, 15, 60.', 'قيم مفصولة بفواصل: 1، 5، 15، 60.', 'Valores separados por comas: 1, 5, 15, 60.', 'Comma-separated values: 1, 5, 15, 60.'],
+    'settings.security.enforceTotpForAdmin': ['Double authentification obligatoire pour les administrateurs', 'التحقق بخطوتين إلزامي للمسؤولين', 'Doble factor obligatorio para administradores', 'Require two-factor for administrators'],
+    'settings.security.enforceTotpForAdmin.hint': ['Chaque compte administrateur doit activer son application TOTP.', 'يجب أن يفعّل كل حساب مسؤول تطبيق TOTP.', 'Cada cuenta de administrador debe activar su app TOTP.', 'Every administrator account must enable its TOTP app.'],
+
+    // --- captcha
+    'settings.captcha.hint': ['Protection du formulaire de connexion contre les robots.', 'حماية نموذج تسجيل الدخول من الروبوتات.', 'Protección del formulario de acceso contra robots.', 'Protects the login form against bots.'],
+    'settings.captcha.turnstile': ['Cloudflare Turnstile', 'Cloudflare Turnstile', 'Cloudflare Turnstile', 'Cloudflare Turnstile'],
+    'settings.captcha.hcaptcha': ['hCaptcha', 'hCaptcha', 'hCaptcha', 'hCaptcha'],
+    'settings.captcha.recaptcha': ['Google reCAPTCHA', 'Google reCAPTCHA', 'Google reCAPTCHA', 'Google reCAPTCHA'],
+    'settings.captcha.sitekey': ['Clé du site (sitekey)', 'مفتاح الموقع (sitekey)', 'Clave del sitio (sitekey)', 'Site key (sitekey)'],
+    'settings.captcha.sitekey.hint': ['Fournie par le service externe — laisser vide pour le mode interne.', 'يوفّرها المزود الخارجي — اتركه فارغًا للوضع الداخلي.', 'La facilita el servicio externo; déjelo vacío en modo interno.', 'Provided by the external service — leave empty for internal mode.'],
+    'settings.captcha.secret': ['Clé secrète', 'المفتاح السري', 'Clave secreta', 'Secret key'],
+    'settings.captcha.secret.hint': ['Stockée chiffrée et jamais renvoyée en clair (masquée).', 'تُخزَّن مشفّرة ولا تُعاد أبدًا بشكل صريح.', 'Se guarda cifrada y nunca se devuelve en claro.', 'Stored encrypted and never returned in clear text.'],
+
+    // --- sauvegardes
+    'settings.backups.retentionDays': ['Conservation (jours)', 'مدة الحفظ (أيام)', 'Retención (días)', 'Retention (days)'],
+    'settings.backups.auto': ['Sauvegarde automatique', 'نسخ احتياطي تلقائي', 'Copia automática', 'Automatic backup'],
+    'settings.backups.auto.hint': ['Une sauvegarde quotidienne est planifiée par la tâche de fond.', 'تُجدول نسخة يومية عبر المهمة الخلفية.', 'La tarea de fondo programa una copia diaria.', 'The background job schedules a daily backup.'],
+    'settings.backups.cronTime': ['Heure de la sauvegarde', 'وقت النسخ الاحتياطي', 'Hora de la copia', 'Backup time'],
+    'settings.backups.cronTime.hint': ['Heure locale du serveur, au format HH:MM.', 'التوقيت المحلي للخادم بصيغة HH:MM.', 'Hora local del servidor, formato HH:MM.', 'Server local time, HH:MM format.'],
+
+    // --- licence
+    'settings.license.key': ['Clé de licence', 'مفتاح الترخيص', 'Clave de licencia', 'Licence key'],
+    'settings.license.key.hint': ['Saisie enregistrée chiffrée, jamais réaffichée en clair.', 'تُحفظ مشفّرة ولا تُعرض صريحة أبدًا.', 'Se guarda cifrada y nunca se muestra en claro.', 'Stored encrypted, never displayed in clear.'],
+    'settings.license.stateLabel': ['État', 'الحالة', 'Estado', 'State'],
+    'settings.license.state.valid': ['Valide', 'صالحة', 'Válida', 'Valid'],
+    'settings.license.state.trial': ['Période d’essai', 'فترة تجريبية', 'Periodo de prueba', 'Trial'],
+    'settings.license.state.expired': ['Expirée', 'منتهية', 'Caducada', 'Expired'],
+    'settings.license.state.invalid': ['Invalide', 'غير صالحة', 'No válida', 'Invalid'],
+    'settings.license.state.none': ['Aucune', 'لا توجد', 'Ninguna', 'None'],
+    'settings.license.expiresAt': ['Date d’expiration', 'تاريخ الانتهاء', 'Fecha de caducidad', 'Expiry date'],
+    'settings.license.maxUsers': ['Nombre maximal d’utilisateurs', 'الحد الأقصى للمستخدمين', 'Número máximo de usuarios', 'Maximum users'],
+    'settings.license.org': ['Titulaire / établissement', 'الجهة المرخّص لها', 'Titular / establecimiento', 'Licence holder'],
+
+    // --- vaccination
+    'settings.vaccination.enabled': ['Activer le carnet vaccinal', 'تفعيل دفتر التلقيح', 'Activar la cartilla de vacunación', 'Enable the vaccination record'],
+    'settings.vaccination.enabled.hint': ['Affiche le suivi vaccinal dans le dossier patient.', 'يعرض متابعة التلقيح في ملف المريض.', 'Muestra el seguimiento de vacunas en la ficha del paciente.', 'Shows vaccination tracking in the patient record.'],
+    'settings.vaccination.schedule': ['Calendrier vaccinal', 'جدول التلقيح', 'Calendario de vacunación', 'Vaccination schedule'],
+    'settings.vaccination.schedule.hint': ['Une entrée = un vaccin recommandé, avec son âge et sa posologie.', 'عنصر واحد = لقاح موصى به مع العمر والجرعات.', 'Una entrada = una vacuna recomendada, con edad y dosis.', 'One entry = one recommended vaccine, with age and dosing.'],
+    'settings.vaccination.ageLabel': ['Âge recommandé', 'العمر الموصى به', 'Edad recomendada', 'Recommended age'],
+    'settings.vaccination.doses': ['Nombre de doses', 'عدد الجرعات', 'Número de dosis', 'Number of doses'],
+    'settings.vaccination.intervalDays': ['Intervalle entre doses (jours)', 'الفاصل بين الجرعات (أيام)', 'Intervalo entre dosis (días)', 'Interval between doses (days)'],
+    'settings.vaccination.intervalDays.hint': ['0 = dose unique ou intervalle libre.', '0 = جرعة واحدة أو فاصل حر.', '0 = dosis única o intervalo libre.', '0 = single dose or free interval.'],
+    'settings.vaccination.mandatory': ['Vaccin obligatoire', 'لقاح إلزامي', 'Vacuna obligatoria', 'Mandatory vaccine'],
+
+    // --- types de documents (GED)
+    'settings.gedTypes.types': ['Types de documents', 'أنواع الوثائق', 'Tipos de documentos', 'Document types'],
+    'settings.gedTypes.types.hint': ['Préfixe = code des documents, dossier = classement sur disque.', 'البادئة = كود الوثائق، والمجلد = الترتيب على القرص.', 'Prefijo = código de los documentos; carpeta = clasificación en disco.', 'Prefix = document code; folder = on-disk classification.'],
+    'settings.gedTypes.folder': ['Dossier de stockage', 'مجلد التخزين', 'Carpeta de almacenamiento', 'Storage folder'],
+    'settings.gedTypes.folder.hint': ['Minuscules, chiffres, tiret ou tiret bas (ex. analyses).', 'حروف صغيرة وأرقام وشرطة أو شرطة سفلية (مثال: analyses).', 'Minúsculas, dígitos, guion o guion bajo (p. ej. analyses).', 'Lowercase, digits, dash or underscore (e.g. analyses).'],
+
+    // --- types de praticiens
+    'settings.practitionerTypes.types': ['Types d’intervenants', 'أنواع المتدخلين', 'Tipos de profesionales', 'Practitioner types'],
+    'settings.practitionerTypes.types.hint': ['Chaque type porte un préfixe utilisé dans les codes (ex. MED).', 'لكل نوع بادئة تُستخدم في الأكواد (مثال: MED).', 'Cada tipo lleva un prefijo usado en los códigos (p. ej. MED).', 'Each type carries a prefix used in codes (e.g. MED).'],
+
+    // --- étapes du circuit de soins
+    'settings.workflow.allowSkip': ['Autoriser le saut d’étape', 'السماح بتخطي خطوة', 'Permitir saltar pasos', 'Allow skipping a step'],
+    'settings.workflow.allowSkip.hint': ['Sinon, les étapes doivent être validées dans l’ordre.', 'وإلا يجب اعتماد الخطوات بالترتيب.', 'De lo contrario, los pasos se validan en orden.', 'Otherwise steps must be completed in order.'],
+    'settings.workflow.steps': ['Étapes du circuit', 'خطوات المسار', 'Pasos del circuito', 'Care pathway steps'],
+    'settings.workflow.steps.hint': ['L’ordre d’affichage suit la position dans la liste (flèches).', 'ترتيب العرض يتبع الموضع في القائمة (الأسهم).', 'El orden de visualización sigue la posición en la lista (flechas).', 'Display order follows the list position (arrows).'],
+
+    // --- étiquettes du calendrier
+    'settings.calendarKinds.kinds': ['Types de rendez-vous', 'أنواع المواعيد', 'Tipos de cita', 'Appointment types'],
+    'settings.calendarKinds.kinds.hint': ['Ces types sont proposés à la prise de rendez-vous et colorés dans l’agenda.', 'تُقترح هذه الأنواع عند حجز الموعد وتُلوَّن في الأجندة.', 'Estos tipos se ofrecen al agendar y se colorean en la agenda.', 'These types are offered when booking and coloured in the calendar.'],
+    'settings.calendarKinds.keyHint': ['Verrouillée après création : les rendez-vous enregistrés la référencent.', 'مقفل بعد الإنشاء: المواعيد المسجّلة تشير إليه.', 'Bloqueada tras crearse: las citas guardadas la referencian.', 'Locked once created: stored appointments reference it.'],
+    'settings.calendarKinds.statuses': ['Statuts de rendez-vous', 'حالات المواعيد', 'Estados de cita', 'Appointment statuses'],
+    'settings.calendarKinds.statuses.hint': ['Statuts proposés au calendrier (confirmé, terminé, annulé…).', 'الحالات المقترحة في الأجندة (مؤكد، منتهٍ، ملغى…).', 'Estados ofrecidos en la agenda (confirmado, hecho, cancelado…).', 'Statuses offered in the calendar (confirmed, done, cancelled…).'],
+    'settings.calendarKinds.statusKeyHint': ['Verrouillée après création : les rendez-vous enregistrés la référencent.', 'مقفل بعد الإنشاء: المواعيد المسجّلة تشير إليه.', 'Bloqueada tras crearse: las citas guardadas la referencian.', 'Locked once created: stored appointments reference it.'],
+    'settings.calendarKinds.durationMin': ['Durée par défaut (minutes)', 'المدة الافتراضية (دقائق)', 'Duración por defecto (minutos)', 'Default duration (minutes)'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA5)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

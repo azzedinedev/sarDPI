@@ -606,6 +606,8 @@ const TABLE_DEFS: TableSpec[] = [
       c('start_at', 'dt!i'),
       c('end_at', 'dt!i'),
       c('case_id', 'big', 'dossier de rattachement (patient_cases)'),
+      c('kind', 'str24!i~consultation', 'type de RDV — clé de calendarKinds.kinds (réglage admin), référencée par le calendrier'),
+      c('all_day', 'bool!~0', 'rendez-vous journée entière (0/1) — l heure de début reste celle du créneau'),
       c('status', 'str16!i~pending', 'pending | confirmed | done | cancelled | no_show — cf. réglage admin calendarKinds (alias historiques normalisés : scheduled→pending, waiting→confirmed, noshow→no_show)'),
       c('reason', 'str160'),
       c('notes', 'txt'),

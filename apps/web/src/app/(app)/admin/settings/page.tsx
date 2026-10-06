@@ -27,6 +27,8 @@ import { Dialog, Drawer } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { FORM_SECTIONS, SETTINGS_SECTIONS, filterSections, groupSections, nextSection, sectionDirty, type SettingsSection as Section } from '@/lib/settings-sections';
+import { SECTION_FORMS, issuesByPath, issuesVarsByPath, sectionSchema, validateJsonText } from '@/lib/settings-fields';
+import { SettingsForm, hasFormSpec } from '@/components/settings-form';
 
 
 export default function SettingsPage(): React.ReactElement {
@@ -217,11 +219,16 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
   const { t: tc } = useT('common');
   const toast = useToast();
   const qc = useQueryClient();
-  const hasForm = FORM_SECTIONS.has(section);
+  /** Sections pilotées par spécification (champs + listes CRUD) : la majorité des modules. */
+  const hasSpec = hasFormSpec(section);
+  /** Toutes les sections disposent désormais d'un formulaire ; le JSON reste l'édition avancée. */
+  const hasForm = FORM_SECTIONS.has(section) || hasSpec;
   const q = useQuery({ queryKey: ['settings', section], queryFn: () => api.get<Record<string, unknown>>(`/admin/settings/${section}`) });
-  const [mode, setMode] = useState<'form' | 'json'>(hasForm ? 'form' : 'json');
+  const [mode, setMode] = useState<'form' | 'json'>('form');
   const [json, setJson] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  /** Erreurs renvoyées par le SERVEUR, par champ (« kinds.0.key » → message) : le serveur reste l'autorité. */
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [data, setData] = useState<Record<string, unknown>>({});
   /** dernière version connue du SERVEUR (sérialisée) : référence de l'état « à jour » */
   const [baseline, setBaseline] = useState('');
@@ -236,6 +243,7 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
       setJson(JSON.stringify(next, null, 2));
       setBaseline(JSON.stringify(next));
       setErr(null);
+      setServerErrors({});
       void qc.invalidateQueries({ queryKey: ['settings', section] });
       void qc.invalidateQueries({ queryKey: ['perm-matrix'] });
       // formats d'affichage & libellés de préfixes recalculés immédiatement (lists, infobulles)
@@ -243,8 +251,11 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
       void qc.invalidateQueries({ queryKey: ['refs', 'prefixes'] });
     },
     onError: (e: unknown) => {
-      const x = e as { details?: Record<string, string>; code?: string };
-      setErr(x.details ? JSON.stringify(x.details) : tc(`errors.${x.code ?? 'validation'}`));
+      const x = e as { details?: Record<string, string> | null; code?: string; status?: number };
+      // Le serveur revalide avec le même schéma : ses `details` portent les chemins de champ
+      // (« kinds.0.key ») → affichés SOUS le champ concerné, comme les erreurs locales.
+      if (x.details && typeof x.details === 'object') setServerErrors(x.details);
+      setErr(x.details ? null : tc(`errors.${x.code ?? 'validation'}`));
       toast.error(tc('settings.invalidJson'));
     },
   });
@@ -264,15 +275,49 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
 
   const submit = (): void => {
     if (mode === 'json') {
-      try {
-        save.mutate(JSON.parse(json) as Record<string, unknown>);
-      } catch {
-        setErr(tc('settings.invalidJson'));
+      const check = validateJsonText(section, json);
+      if (!check.ok) {
+        setErr(describeIssues(check.errors, check.vars ?? {}, t));
+        return;
       }
+      setErr(null);
+      save.mutate(check.value as Record<string, unknown>);
       return;
     }
+    // le formulaire est déjà validé en direct : on ne peut pas arriver ici avec des erreurs,
+    // mais l'appel reste gardé (double sécurité, message explicite).
+    if (invalidCount > 0) {
+      setErr(describeIssues(fieldErrors, fieldVars, t));
+      return;
+    }
+    setErr(null);
     save.mutate(data);
   };
+
+  /**
+   * Erreurs de champ calculées avec LE MÊME schéma que l'API : l'utilisateur voit ce qui bloque
+   * avant l'appel réseau, et le serveur reste l'autorité (il revalide à l'enregistrement).
+   */
+  const localErrors = useMemo(() => (mode === 'form' ? issuesByPath(section, data) : {}), [mode, section, data]);
+  /** Erreurs affichées : celles du navigateur, complétées par celles du serveur (mêmes chemins). */
+  const fieldErrors = useMemo(() => ({ ...localErrors, ...serverErrors }), [localErrors, serverErrors]);
+  const fieldVars = useMemo(() => (mode === 'form' ? issuesVarsByPath(section, data) : {}), [mode, section, data]);
+  /** Une saisie corrigée efface l'erreur serveur correspondante (sinon elle resterait affichée à vie). */
+  useEffect(() => {
+    setServerErrors((prev) => {
+      const keys = Object.keys(prev).filter((k) => k in localErrors);
+      if (!keys.length) return prev;
+      const next = { ...prev };
+      for (const k of keys) delete next[k];
+      return next;
+    });
+  }, [localErrors]);
+
+  /** JSON avancé : validé contre le même schéma, erreurs listées (chemin + message). */
+  const jsonCheck = useMemo(() => (mode === 'json' ? validateJsonText(section, json) : null), [mode, section, json]);
+  const jsonErrors = jsonCheck && !jsonCheck.ok ? jsonCheck.errors : {};
+  const jsonVars = jsonCheck && !jsonCheck.ok ? jsonCheck.vars : {};
+  const invalidCount = mode === 'form' ? Object.keys(fieldErrors).length : Object.keys(jsonErrors).length;
 
   const dirty = useMemo(() => sectionDirty(mode, data, json, baseline), [mode, data, json, baseline]);
 
@@ -299,7 +344,7 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-[15px] font-bold">{t(`settings.sections.${section}`)}</h2>
         {hasForm ? (
-          <div role="tablist" aria-label={t('settings.form')} className="ms-auto flex gap-0.5 rounded-xl border border-[rgb(var(--c-line)/0.7)] bg-[rgb(var(--c-surface)/0.6)] p-0.5">
+          <div role="tablist" aria-label={t('settings.editMode')} className="ms-auto flex gap-0.5 rounded-xl border border-[rgb(var(--c-line)/0.7)] bg-[rgb(var(--c-surface)/0.6)] p-0.5">
             {(['form', 'json'] as const).map((m) => (
               <button
                 key={m}
@@ -312,7 +357,7 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
                   mode === m ? 'bg-[rgb(var(--c-primary))] text-[rgb(var(--c-primary-ink))] shadow' : 'text-[rgb(var(--c-muted))] hover:bg-[rgb(var(--c-surface-2))]',
                 )}
               >
-                {m === 'form' ? t('settings.form') : 'JSON'}
+                {m === 'form' ? t('settings.form') : t('settings.jsonAdvanced')}
               </button>
             ))}
           </div>
@@ -323,7 +368,17 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
 
       {mode === 'json' ? (
         <div className="flex flex-col gap-2">
-          {!hasForm ? <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('settings.jsonOnlyHint')}</p> : null}
+          <p className="text-[12.5px] text-[rgb(var(--c-muted))]">{t('settings.jsonAdvancedHint')}</p>
+          {Object.keys(jsonErrors).length ? (
+            <ul className="rounded-xl bg-[rgb(var(--c-coral-soft))] px-3 py-2 font-mono text-[11.5px] font-bold text-[rgb(var(--c-coral))]">
+              {Object.entries(jsonErrors).map(([path, code]) => (
+                <li key={path}>
+                  {path === '_' ? '' : `${path} : `}
+                  {t(`settings.validation.${code}`, jsonVars[path] ?? {})}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <Textarea
             rows={Math.min(30, Math.max(16, json.split('\n').length + 1))}
             value={json}
@@ -333,11 +388,13 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
             className="min-h-[46vh] font-mono !text-[12px] leading-relaxed"
           />
         </div>
+      ) : hasSpec ? (
+        <SettingsForm section={section} data={data} onChange={setData} errors={fieldErrors} />
       ) : (
         <FormEditor section={section} data={data} onChange={setData} />
       )}
 
-      <SaveBar dirty={dirty} saving={save.isPending} onSave={submit} onReset={reset} />
+      <SaveBar dirty={dirty} saving={save.isPending} invalidCount={invalidCount} onSave={submit} onReset={reset} />
     </Card>
   );
 }
@@ -608,22 +665,30 @@ function FormEditor({ section, data, onChange }: { section: Section; data: Recor
   }
 }
 
+/** Erreurs → texte lisible et TRADUIT (« types.0.prefix : Préfixe attendu : 2 à 5 majuscules. »). */
+function describeIssues(errors: Record<string, string>, vars: Record<string, Record<string, string | number>>, t: (k: string, v?: Record<string, string | number>) => string): string {
+  return Object.entries(errors)
+    .map(([path, code]) => `${path === '_' ? '' : `${path} : `}${t(`settings.validation.${code}`, vars[path] ?? {})}`)
+    .join(' · ');
+}
+
 /**
  * Barre d'enregistrement collante : l'état du formulaire est toujours visible (« à jour » /
  * « modifications non enregistrées »), le retour à la version serveur est à un clic, et le bouton
  * Enregistrer ne s'active que s'il y a réellement quelque chose à écrire.
  */
-function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; saving: boolean; onSave: () => void; onReset: () => void }): React.ReactElement {
+function SaveBar({ dirty, saving, invalidCount = 0, onSave, onReset }: { dirty: boolean; saving: boolean; invalidCount?: number; onSave: () => void; onReset: () => void }): React.ReactElement {
   const { t } = useT('settings');
   const { t: tc } = useT('common');
   return (
     <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto flex flex-wrap items-center gap-2 rounded-b-[var(--r-card)] border-t border-[rgb(var(--c-line)/0.7)] bg-[rgb(var(--c-surface)/0.93)] px-4 py-2.5 backdrop-blur">
       <Badge tone={dirty ? 'warn' : 'ok'}>{dirty ? t('settings.save.dirty') : t('settings.save.upToDate')}</Badge>
+      {invalidCount > 0 ? <Badge tone="danger">{t('settings.save.invalid', { n: invalidCount })}</Badge> : null}
       <div className="ms-auto flex items-center gap-2">
         <Button onClick={onReset} disabled={!dirty} title={t('settings.save.discard')}>
           <RotateCcw size={14} /> {t('settings.save.discard')}
         </Button>
-        <Button variant="primary" loading={saving} disabled={!dirty} onClick={onSave}>
+        <Button variant="primary" loading={saving} disabled={!dirty || invalidCount > 0} title={invalidCount > 0 ? t('settings.save.invalidHint') : undefined} onClick={onSave}>
           <Save size={14} /> {tc('save')}
         </Button>
       </div>
