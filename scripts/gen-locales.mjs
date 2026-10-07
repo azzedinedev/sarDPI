@@ -1618,6 +1618,23 @@ for (const [ns, keys] of Object.entries(EXTRA5)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA6 — SESSION INTERROMPUE : garde de session (serveur + client) et explication à la connexion.
+ * `auth.sessionEnded` est le code renvoyé par l'API quand le jeton est valide mais que la session
+ * n'existe plus (révoquée, expirée, compte désactivé) ; `auth.sessionEndedNotice` est le message
+ * affiché sur l'écran de connexion après la redirection automatique.
+ */
+const EXTRA6 = {
+  auth: {
+    'auth.sessionEnded': ['Session interrompue — reconnectez-vous.', 'انتهت الجلسة — يرجى إعادة تسجيل الدخول.', 'Sesión interrumpida: vuelva a iniciar sesión.', 'Session ended — please sign in again.'],
+    'auth.sessionEndedNotice': ['Votre session a été interrompue ou a expiré. Reconnectez-vous pour continuer : vous reviendrez à votre page.', 'تم إنهاء جلستك أو انتهت صلاحيتها. أعد تسجيل الدخول للمتابعة وستعود إلى صفحتك.', 'Su sesión se interrumpió o caducó. Vuelva a iniciar sesión para continuar: regresará a su página.', 'Your session was interrupted or expired. Sign in again to continue — you will return to your page.'],
+    'auth.sessionRequiredNotice': ['Connexion requise pour ouvrir cette page. Identifiez-vous pour continuer.', 'يلزم تسجيل الدخول لفتح هذه الصفحة. الرجاء تسجيل الدخول للمتابعة.', 'Se requiere iniciar sesión para abrir esta página. Identifíquese para continuar.', 'Sign-in required to open this page. Please sign in to continue.'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA6)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

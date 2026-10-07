@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { clientIp, rateLimit } from '../security/ratelimit';
-import { authenticate, type AuthUser } from '../auth/guard';
+import { authenticateOutcome, type AuthUser } from '../auth/guard';
 import { ApiError, errorResponse } from './errors';
 import { getDb } from '../data';
 import type { DataAdapter } from '../data/types';
@@ -102,8 +102,12 @@ export async function handleApi(req: NextRequest, pathAfter: string): Promise<Ne
       if (!rl.ok) throw new ApiError(429, 'errors.rateLimited', `retry after ${rl.retryAfterSec}s`);
     }
 
-    const user = await authenticate(req);
-    if (def.auth !== false && !user) throw new ApiError(401, 'errors.unauthorized');
+    // L'authentification distingue « pas de jeton » (401 générique) de « session révoquée/expirée »
+    // (auth.sessionEnded) : le client redirige immédiatement vers la connexion dans les deux cas,
+    // mais l'écran peut expliquer pourquoi la session a été interrompue.
+    const auth = await authenticateOutcome(req);
+    const user = auth.ok ? auth.user : null;
+    if (def.auth !== false && !auth.ok) throw new ApiError(401, auth.code);
     if (def.perm && user) {
       const { can } = await import('@sardpi/shared');
       if (!can(user.perms, def.perm[0], def.perm[1])) throw new ApiError(403, 'errors.forbidden');

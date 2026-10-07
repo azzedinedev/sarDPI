@@ -86,6 +86,14 @@ passent par le même schéma, donc les mêmes contraintes. Points clés :
 - JWT access court + refresh rotatif httpOnly ; argon2id ; CSRF double-cookie ; anti-brute force ;
   audit **append-only chaîné par hash** (bouton « vérifier la chaîne » dans l’admin).
 - Aucune donnée personnelle dans les caches partagés : réponses privées en `no-store`.
+- **Garde de session (aucun affichage sans session valide)** : le middleware redirige toute page
+  applicative vers `/login?next=…` quand le cookie de session est absent, et le serveur revalide la
+  session à **chaque** requête authentifiée (`sid` présent, non révoqué, non expiré, compte actif) —
+  une déconnexion ailleurs, une révocation ou une réinitialisation de mot de passe coupent l’accès
+  immédiatement, sans attendre l’expiration du jeton (réponse `auth.sessionEnded`). Côté client, tout
+  `401` non récupérable vide l’état (jeton, rôle, permissions, cache de requêtes) et renvoie vers la
+  connexion ; un onglet laissé ouvert est revalidé au plus tard après 60 s (et au retour au premier
+  plan), donc une session morte ne laisse jamais l’application affichée.
 
 ## Limites assumées (v1)
 

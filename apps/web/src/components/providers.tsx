@@ -50,6 +50,17 @@ export function Providers({
   const init = useAuth((s) => s.init);
   const setU = useUi((s) => s.set);
 
+  /**
+   * Purge du cache de requêtes à la perte de session : les données de santé déjà chargées ne doivent
+   * pas rester en mémoire pour la session suivante (même navigateur, poste partagé au secrétariat).
+   * Le store redirige par ailleurs vers /login ; ceci nettoie ce qui est encore monté.
+   */
+  useEffect(() => {
+    return useAuth.subscribe((s, prev) => {
+      if (s.status === 'anonymous' && prev.status !== 'anonymous') client.clear();
+    });
+  }, [client]);
+
   useEffect(() => {
     setCountryProfile(profile);
     void init();

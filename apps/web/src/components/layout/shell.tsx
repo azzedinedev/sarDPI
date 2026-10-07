@@ -58,6 +58,10 @@ const NAV_ADMIN: NavItem[] = [
   { key: 'nav.settings', href: '/admin/settings', module: 'admin', icon: Settings },
 ];
 
+/** Revalidation de session d'un onglet ouvert : période, et délai minimal entre deux vérifications. */
+const PROBE_INTERVAL_MS = 60_000;
+const PROBE_MIN_MS = 20_000;
+
 export function Shell({ children }: { children: React.ReactNode }): React.ReactElement {
   const status = useAuth((s) => s.status);
   const has = useAuth((s) => s.has);
@@ -72,9 +76,49 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
   const [q, setQ] = useState('');
   const topbarRef = React.useRef<HTMLElement | null>(null);
 
+  /**
+   * Garde d'authentification. Le Shell ne REND JAMAIS l'application sans session vérifiée
+   * (`status !== 'authed'` → écran de vérification, voir plus bas). La redirection, elle, est
+   * centralisée dans le store (`sessionLost`) : elle vide l'état, purge les données de santé en
+   * mémoire (react-query) et construit l'URL de retour. Ici on ne fait que la déclencher si le
+   * statut est passé à « anonymous » sans être passé par ce chemin (défense en profondeur).
+   */
   useEffect(() => {
-    if (status === 'anonymous') router.replace(`/login?next=${encodeURIComponent(pathname ?? '/')}`);
-  }, [status, router, pathname]);
+    if (status === 'anonymous') useAuth.getState().sessionLost('ended');
+  }, [status]);
+
+  /**
+   * BATTEMENT DE CŒUR DE SESSION — un onglet laissé ouvert ne doit pas continuer d'afficher le
+   * dossier patient alors que sa session a été coupée (déconnexion depuis un autre appareil,
+   * révocation par l'administrateur, mot de passe réinitialisé, base réinitialisée, cookie disparu).
+   * On revalide donc périodiquement ET au retour au premier plan / à la reconnexion réseau.
+   *
+   * Pourquoi `refreshNow` : c'est le seul appel qui prouve la validité réelle de la session (le
+   * jeton d'accès en mémoire peut être encore signé alors que la session n'existe plus). En cas
+   * d'échec définitif, le store vide l'état, purge le cache et renvoie vers /login — donc l'écran
+   * se vide de lui-même sans action de l'utilisateur. Le throttle évite d'empiler des vérifications
+   * quand l'utilisateur alterne rapidement entre fenêtres.
+   */
+  const verifySession = useAuth((s) => s.refreshNow);
+  useEffect(() => {
+    if (status !== 'authed') return;
+    let last = Date.now();
+    const verify = (): void => {
+      if (document.hidden || Date.now() - last < PROBE_MIN_MS) return;
+      last = Date.now();
+      void verifySession();
+    };
+    const id = window.setInterval(verify, PROBE_INTERVAL_MS);
+    document.addEventListener('visibilitychange', verify);
+    window.addEventListener('focus', verify);
+    window.addEventListener('online', verify);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', verify);
+      window.removeEventListener('focus', verify);
+      window.removeEventListener('online', verify);
+    };
+  }, [status, verifySession]);
 
   const items = useMemo(() => {
     const vis = NAV_MAIN.filter((n) => !n.module || has(n.module, 'view'));

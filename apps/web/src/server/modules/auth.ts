@@ -9,6 +9,7 @@ import { route, type Ctx } from '../http/router';
 import { ApiError } from '../http/errors';
 import { hashPassword, verifyPassword, checkPolicy } from '../auth/password';
 import { signAccessToken } from '../auth/jwt';
+import { CSRF_COOKIE as CSRF_COOKIE_NAME, SESSION_COOKIE } from '@/lib/session-gate';
 
 import { createInternalCaptcha, resolveProvider, verifyCaptcha } from '../security/captcha';
 import { newTotpSecret, totpUri, totpVerify } from '../auth/totp';
@@ -20,8 +21,12 @@ import { audit } from '../audit';
 import { renderTemplate, sendNow } from '../mail';
 import { encryptField, decryptField } from '../security/crypto';
 
-const REFRESH_COOKIE = 'sardpi_rt';
-const CSRF_COOKIE = 'sardpi_csrf';
+/**
+ * Noms des cookies — source unique partagée avec le middleware et le client (lib/session-gate) :
+ * la porte de session de l'edge teste le MÊME cookie que celui posé ici.
+ */
+const REFRESH_COOKIE = SESSION_COOKIE;
+const CSRF_COOKIE = CSRF_COOKIE_NAME;
 
 function cookieSet(name: string, value: string, maxAgeSec: number, path = '/', httpOnly = true): string {
   const secure = env.isProd && process.env.APP_URL?.startsWith('https');
@@ -365,8 +370,10 @@ export function registerAuth(): void {
         if (me) await db.update('sessions', Number(me.id), { revoked_at: null });
         // recréer un token frais pour la session courante
         const fresh = publicToken(24);
-        await db.insert('sessions', { user_id: ctx.user!.uid, refresh_hash: sha256(fresh), user_agent: String(me?.user_agent ?? ''), ip: ctx.ip, expires_at: new Date(Date.now() + env.refreshTokenTtlDays * 86_400_000).toISOString(), created_at: new Date().toISOString() });
-        const accessToken = await signAccessToken({ uid: ctx.user!.uid, sid: null, role: ctx.user!.role, locale: ctx.user!.locale });
+        const newSess = await db.insert('sessions', { user_id: ctx.user!.uid, refresh_hash: sha256(fresh), user_agent: String(me?.user_agent ?? ''), ip: ctx.ip, expires_at: new Date(Date.now() + env.refreshTokenTtlDays * 86_400_000).toISOString(), created_at: new Date().toISOString() });
+        // Jeton rattaché à la NOUVELLE session : sans `sid`, il ne serait révocable par personne et
+        // la garde de session (guard.authenticateOutcome) le refuserait aussitôt.
+        const accessToken = await signAccessToken({ uid: ctx.user!.uid, sid: Number(newSess.id), role: ctx.user!.role, locale: ctx.user!.locale });
         return jsonCookies({ ok: true, accessToken, rotate: true }, [cookieSet(REFRESH_COOKIE, fresh, env.refreshTokenTtlDays * 86_400)]);
       }
       for (const id of input.ids) await db.updateWhere('sessions', { id, user_id: ctx.user!.uid }, { revoked_at: at });

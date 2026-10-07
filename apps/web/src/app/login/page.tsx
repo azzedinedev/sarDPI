@@ -32,6 +32,13 @@ function LoginForm(): React.ReactElement {
   const [totpCode, setTotp] = useState('');
   const [busy, setBusy] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
+  /**
+   * Motif de la redirection (lib/session-gate) : « ended » = session interrompue côté serveur
+   * (révoquée, compte fermé / désactivé), « expired » = aucune session valide (expirée, cookie
+   * effacé, navigateur rouvert). On l'explique ici pour que l'utilisateur ne soit pas devant un
+   * écran de connexion sans raison apparente.
+   */
+  const reason = sp.get('reason');
 
   const needTotp = status === 'needs-totp';
 
@@ -112,6 +119,12 @@ function LoginForm(): React.ReactElement {
               ))}
             </div>
           </div>
+
+          {reason && !error ? (
+            <div role="status" className="mb-3 rounded-xl border border-[rgb(var(--c-info)/0.4)] bg-[rgb(var(--c-info-soft))] px-3 py-2 text-[12.5px] font-semibold text-[rgb(var(--c-info))]">
+              {reason === 'expired' ? t('auth.sessionRequiredNotice') : t('auth.sessionEndedNotice')}
+            </div>
+          ) : null}
 
           {error ? (
             <div ref={errRef} role="alert" className="mb-3 rounded-xl border border-[rgb(var(--c-coral)/0.4)] bg-[rgb(var(--c-coral-soft))] px-3 py-2 text-[13px] font-semibold text-[rgb(var(--c-coral))]">

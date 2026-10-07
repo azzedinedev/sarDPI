@@ -35,35 +35,81 @@ export function invalidateRoleCache(): Promise<void> {
   return bumpTag('perms');
 }
 
-export async function authenticate(req: Request): Promise<AuthUser | null> {
+/**
+ * Résultat d'authentification DÉTAILLÉ — permet de distinguer, dans la réponse HTTP, trois
+ * situations que le client doit traiter différemment :
+ *   - 'missing'  : aucun jeton (client jamais connecté, ou nettoyé) ;
+ *   - 'invalid'  : jeton illisible/expiré (signature, TTL) ;
+ *   - 'ended'    : jeton VALIDE mais SESSION FERMÉE côté serveur (déconnexion ailleurs, session
+ *                  révoquée par l'admin, mot de passe réinitialisé, compte désactivé, ou base
+ *                  réinitialisée). C'est le cas « session interrompue » : l'écran doit se vider et
+ *                  renvoyer vers la connexion, sans laisser croire à un simple hoquet réseau.
+ */
+export type AuthOutcome = { ok: true; user: AuthUser; code?: undefined } | { ok: false; code: 'errors.unauthorized' | 'auth.sessionEnded' };
+
+/**
+ * Authentifie la requête ET vérifie que la session est TOUJOURS VIVANTE.
+ *
+ * Le jeton d'accès porte l'identifiant de session (`sid`) ; il vit quelques minutes seulement, mais
+ * il reste cryptographiquement valable jusqu'à son expiration. Sans ce contrôle, une session
+ * révoquée (déconnexion depuis un autre appareil, « révoquer les autres sessions », réinitialisation
+ * de mot de passe) continuait d'ouvrir le dossier patient jusqu'à 15 minutes : l'utilisateur voyait
+ * ses écrans se comporter normalement alors que sa session n'existait plus. On exige donc, à CHAQUE
+ * requête authentifiée, que la ligne `sessions` existe, ne soit pas révoquée et ne soit pas expirée.
+ *
+ * Coût : une lecture par clé primaire (déjà une lecture `users` par requête pour les permissions).
+ * La latence de révocation devient immédiate — c'est le prix, assumé, de la justesse ici.
+ */
+export async function authenticateOutcome(req: Request): Promise<AuthOutcome> {
   const auth = req.headers.get('authorization');
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return null;
+  if (!token) return { ok: false, code: 'errors.unauthorized' };
   const claims = await verifyAccessToken(token);
-  if (!claims) return null;
+  if (!claims) return { ok: false, code: 'errors.unauthorized' };
+
   const db = await getDb();
+  /**
+   * Session obligatoire. Un jeton sans `sid` (jeton forgé à la main, ancien client) est refusé :
+   * il n'est rattaché à aucune session révocable, il ne peut donc pas être invalidé.
+   */
+  if (claims.sid == null) return { ok: false, code: 'auth.sessionEnded' };
+  const session = await db.findOne<Record<string, unknown>>('sessions', { id: claims.sid });
+  if (!session) return { ok: false, code: 'auth.sessionEnded' };
+  if (session.revoked_at) return { ok: false, code: 'auth.sessionEnded' };
+  if (new Date(String(session.expires_at)) < new Date()) return { ok: false, code: 'auth.sessionEnded' };
+
   const user = await db.findOne<Record<string, unknown>>('users', { id: claims.uid });
-  if (!user || !Number(user.active)) return null;
+  // compte désactivé/supprimé : la session n'a plus lieu d'être — traitée comme interrompue
+  if (!user || !Number(user.active)) return { ok: false, code: 'auth.sessionEnded' };
   const roleId = Number(user.role_id);
   const { perms, roleKey } = await permissionsFor(roleId);
   return {
-    ...claims,
-    perms,
-    roleKey,
-    roleId,
-    username: String(user.username),
-    fullName: String(user.full_name ?? ''),
-    email: String(user.email ?? ''),
-    locale: String(user.locale ?? 'fr'),
-    active: true,
-    totpEnabled: Boolean(Number(user.totp_enabled)),
+    ok: true,
+    user: {
+      ...claims,
+      perms,
+      roleKey,
+      roleId,
+      username: String(user.username),
+      fullName: String(user.full_name ?? ''),
+      email: String(user.email ?? ''),
+      locale: String(user.locale ?? 'fr'),
+      active: true,
+      totpEnabled: Boolean(Number(user.totp_enabled)),
+    },
   };
 }
 
+/** Compatibilité (routes publiques facultativement authentifiées) : utilisateur ou null. */
+export async function authenticate(req: Request): Promise<AuthUser | null> {
+  const res = await authenticateOutcome(req);
+  return res.ok ? res.user : null;
+}
+
 export async function requireAuth(req: Request): Promise<AuthUser> {
-  const u = await authenticate(req);
-  if (!u) throw new ApiError(401, 'errors.unauthorized');
-  return u;
+  const res = await authenticateOutcome(req);
+  if (!res.ok) throw new ApiError(401, res.code);
+  return res.user;
 }
 
 export function requirePerm(user: AuthUser, module: string, action: ActionKey): void {

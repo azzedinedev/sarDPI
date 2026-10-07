@@ -24,10 +24,18 @@ export class ApiError extends Error {
 type TokenGetter = () => string | null;
 type Refresher = () => Promise<string | null>;
 type CsrfGetter = () => string | null;
+/**
+ * Appelé quand une requête se heurte à une session morte que le rafraîchissement n'a pas pu
+ * sauver (session révoquée, compte désactivé, cookie disparu, serveur redémarré). Le store
+ * d'authentification y réagit en vidant l'état et en renvoyant vers la connexion — y compris pour
+ * une requête déclenchée hors de tout composant (tâche de fond, export, widget).
+ */
+type SessionLostHandler = () => void;
 
 let getToken: TokenGetter = () => null;
 let refresh: Refresher = async () => null;
 let getCsrf: CsrfGetter = () => null;
+let onAuthLost: SessionLostHandler = () => {};
 /** Jeton CSRF mémorisé en mémoire (réponse login/refresh ou /auth/csrf) — fallback si le store n'a rien. */
 let csrfMemory: string | null = null;
 export function rememberCsrf(token: string | null): void { csrfMemory = token; }
@@ -38,10 +46,11 @@ export async function refreshCsrf(): Promise<void> {
   csrfMemory = j?.csrfToken ?? csrfMemory;
 }
 
-export function bindApi(hooks: { getToken: TokenGetter; refresh: Refresher; getCsrf: CsrfGetter }): void {
+export function bindApi(hooks: { getToken: TokenGetter; refresh: Refresher; getCsrf: CsrfGetter; onAuthLost?: SessionLostHandler }): void {
   getToken = hooks.getToken;
   refresh = hooks.refresh;
   getCsrf = hooks.getCsrf;
+  if (hooks.onAuthLost) onAuthLost = hooks.onAuthLost;
 }
 
 async function doFetch(path: string, init: RequestInit, retried = false): Promise<Response> {
@@ -63,9 +72,19 @@ async function doFetch(path: string, init: RequestInit, retried = false): Promis
       return doFetch(path, init, retried);
     }
   }
-  if (res.status === 401 && !retried) {
-    const fresh = await refresh();
-    if (fresh) return doFetch(path, init, true);
+  if (res.status === 401) {
+    // Un seul essai de rafraîchissement (cookie httpOnly rotatif) : c'est le cas NORMAL d'un jeton
+    // d'accès expiré pendant la session, il ne doit pas déconnecter l'utilisateur.
+    if (!retried) {
+      const fresh = await refresh();
+      if (fresh) return doFetch(path, init, true);
+      // refus définitif : la session n'existe plus côté serveur → nettoyage + retour à la connexion
+      onAuthLost();
+    } else {
+      // le jeton fraîchement obtenu est DÉJÀ refusé : la session a été interrompue pendant l'appel
+      // (révocation, mot de passe réinitialisé, base réinitialisée) — inutile d'insister.
+      onAuthLost();
+    }
   }
   return res;
 }
