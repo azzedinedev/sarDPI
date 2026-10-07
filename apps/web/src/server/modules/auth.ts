@@ -11,7 +11,7 @@ import { hashPassword, verifyPassword, checkPolicy } from '../auth/password';
 import { signAccessToken } from '../auth/jwt';
 import { CSRF_COOKIE as CSRF_COOKIE_NAME, SESSION_COOKIE } from '@/lib/session-gate';
 
-import { createInternalCaptcha, resolveProvider, verifyCaptcha } from '../security/captcha';
+import { captchaPublicInfo, resolveProvider, verifyCaptcha } from '../security/captcha';
 import { newTotpSecret, totpUri, totpVerify } from '../auth/totp';
 import { getDb } from '../data';
 import { env } from '../config';
@@ -264,17 +264,20 @@ export function registerAuth(): void {
     },
   });
 
-  /** GET /auth/captcha — captcha interne (svg) selon fournisseur configuré. */
+  /**
+   * GET /auth/captcha — défi affiché par l'écran de connexion, selon le fournisseur EFFECTIF.
+   * Renvoie soit le défi interne (id + SVG + question), soit la clé PUBLIQUE du fournisseur externe
+   * (`hcaptcha` / `turnstile` / `recaptcha`) que la page utilise pour monter son widget. En cas de
+   * clés manquantes, la résolution retombe sur l'interne (`fallback: true`) : la connexion reste
+   * possible et l'écran peut signaler la configuration incomplète.
+   */
   route({
     method: 'GET',
     path: '/auth/captcha',
     auth: false,
     licenseFree: true,
     async handler() {
-      const provider = await resolveProvider();
-      if (provider !== 'internal') return { provider, sitekey: (await import('../security/captcha')).captchaSitekeys()[provider] ?? null };
-      const { id, svg, question } = createInternalCaptcha();
-      return { provider: 'internal', id, svg, question };
+      return await captchaPublicInfo();
     },
   });
 

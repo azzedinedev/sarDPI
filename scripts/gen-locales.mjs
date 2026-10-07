@@ -1635,6 +1635,40 @@ for (const [ns, keys] of Object.entries(EXTRA6)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA7 — CAPTCHA EXTERNE : messages de l'écran de connexion (attente du widget, blocage réseau,
+ * consigne) et avertissement de repli quand le fournisseur choisi dans Paramètres n'a pas de clés
+ * (le serveur utilise alors le défi interne pour ne jamais bloquer la connexion).
+ */
+const EXTRA7 = {
+  auth: {
+    'captcha.externalHint': ['Validez le défi ci-dessus pour continuer.', 'أكمل التحقق أعلاه للمتابعة.', 'Complete el desafío de arriba para continuar.', 'Complete the challenge above to continue.'],
+    'captcha.externalWait': ['Chargement du défi…', 'جارٍ تحميل التحقق…', 'Cargando el desafío…', 'Loading the challenge…'],
+    'captcha.externalBlocked': ['Défi impossible à charger (réseau ou domaine bloqué). Rechargez la page ou contactez l’administrateur.', 'تعذّر تحميل التحقق (الشبكة أو النطاق محجوب). أعد تحميل الصفحة أو اتصل بالمسؤول.', 'No se pudo cargar el desafío (red o dominio bloqueado). Recargue la página o contacte al administrador.', 'The challenge could not load (network or blocked domain). Reload the page or contact the administrator.'],
+    'captcha.fallbackNotice': ['Le fournisseur « {provider} » est sélectionné sans clés : la vérification interne est utilisée. Renseignez la clé du site et la clé secrète dans Paramètres › Captcha.', 'المزوّد « {provider} » محدّد دون مفاتيح: يتم استخدام التحقق الداخلي. أدخل مفتاح الموقع والمفتاح السري في الإعدادات › التحقق.', 'El proveedor « {provider} » está seleccionado sin claves: se usa la verificación interna. Introduzca la clave del sitio y la clave secreta en Ajustes › Captcha.', 'Provider “{provider}” is selected without keys: the built-in challenge is used. Enter the site key and secret in Settings › Captcha.'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA7)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
+/**
+ * EXTRA8 — CAPTCHA (Paramètres) : messages de validation quand un fournisseur externe est choisi
+ * sans clés, et libellés d'aide précisant que la saisie ici OU en variable d'environnement suffit.
+ */
+const EXTRA8 = {
+  settings: {
+    'settings.captcha.provider.hint': ['« Interne » = défi auto-hébergé (aucun appel sortant). Choisir hCaptcha/Turnstile/reCAPTCHA exige la clé du site ET la clé secrète.', '«داخلي» = تحقق مستضاف محليًا (بدون اتصال خارجي). اختيار hCaptcha/Turnstile/reCAPTCHA يتطلب مفتاح الموقع والمفتاح السري.', '«Interno» = desafío autoalojado (sin llamadas salientes). Elegir hCaptcha/Turnstile/reCAPTCHA exige la clave del sitio Y la clave secreta.', '“Built-in” = self-hosted challenge (no outbound call). Choosing hCaptcha/Turnstile/reCAPTCHA requires both the site key and the secret key.'],
+    'settings.captcha.sitekey.hint': ['Fournie par le service externe. Obligatoire pour un fournisseur externe — peut aussi venir de la variable d’environnement (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).', 'يوفّرها المزوّد الخارجي. إلزامية للمزوّد الخارجي — يمكن أيضًا ضبطها عبر متغيّر البيئة (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).', 'La facilita el servicio externo. Obligatoria para un proveedor externo — también puede venir de la variable de entorno (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).', 'Provided by the external service. Required for an external provider — can also come from an environment variable (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).'],
+    'settings.captcha.secret.hint': ['Stockée chiffrée et jamais renvoyée en clair (masquée). Obligatoire pour un fournisseur externe — peut aussi venir de la variable d’environnement (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).', 'تُخزَّن مشفّرة ولا تُعاد أبدًا كنص صريح (مقنّعة). إلزامية للمزوّد الخارجي — يمكن أيضًا ضبطها عبر متغيّر البيئة (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).', 'Se almacena cifrada y nunca se devuelve en claro (enmascarada). Obligatoria para un proveedor externo — también puede venir de la variable de entorno (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).', 'Stored encrypted and never returned in clear (masked). Required for an external provider — can also come from an environment variable (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).'],
+    'settings.validation.captchaSitekey': ['Clé du site obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne).', 'مفتاح الموقع إلزامي لهذا المزوّد (أدخله هنا أو عبر متغيّر البيئة، أو ارجع إلى التحقق الداخلي).', 'Clave del sitio obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno).', 'Site key required for this provider (enter it here or via environment variable, or switch back to the built-in captcha).'],
+    'settings.validation.captchaSecret': ['Clé secrète obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne).', 'المفتاح السري إلزامي لهذا المزوّد (أدخله هنا أو عبر متغيّر البيئة، أو ارجع إلى التحقق الداخلي).', 'Clave secreta obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno).', 'Secret key required for this provider (enter it here or via environment variable, or switch back to the built-in captcha).'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA8)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

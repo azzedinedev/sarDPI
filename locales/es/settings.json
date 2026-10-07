@@ -358,9 +358,9 @@
   "settings.captcha.hcaptcha": "hCaptcha",
   "settings.captcha.recaptcha": "Google reCAPTCHA",
   "settings.captcha.sitekey": "Clave del sitio (sitekey)",
-  "settings.captcha.sitekey.hint": "La facilita el servicio externo; déjelo vacío en modo interno.",
+  "settings.captcha.sitekey.hint": "La facilita el servicio externo. Obligatoria para un proveedor externo — también puede venir de la variable de entorno (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).",
   "settings.captcha.secret": "Clave secreta",
-  "settings.captcha.secret.hint": "Se guarda cifrada y nunca se devuelve en claro.",
+  "settings.captcha.secret.hint": "Se almacena cifrada y nunca se devuelve en claro (enmascarada). Obligatoria para un proveedor externo — también puede venir de la variable de entorno (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).",
   "settings.backups.retentionDays": "Retención (días)",
   "settings.backups.auto": "Copia automática",
   "settings.backups.auto.hint": "La tarea de fondo programa una copia diaria.",
@@ -402,5 +402,8 @@
   "settings.calendarKinds.statuses": "Estados de cita",
   "settings.calendarKinds.statuses.hint": "Estados ofrecidos en la agenda (confirmado, hecho, cancelado…).",
   "settings.calendarKinds.statusKeyHint": "Bloqueada tras crearse: las citas guardadas la referencian.",
-  "settings.calendarKinds.durationMin": "Duración por defecto (minutos)"
+  "settings.calendarKinds.durationMin": "Duración por defecto (minutos)",
+  "settings.captcha.provider.hint": "«Interno» = desafío autoalojado (sin llamadas salientes). Elegir hCaptcha/Turnstile/reCAPTCHA exige la clave del sitio Y la clave secreta.",
+  "settings.validation.captchaSitekey": "Clave del sitio obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno).",
+  "settings.validation.captchaSecret": "Clave secreta obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno)."
 }

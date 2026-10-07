@@ -214,7 +214,12 @@ export async function saveSection(section: SectionName, value: Record<string, un
   const prev = (await db.findOne('settings', { key: section }))?.value_json;
   const prevObj = (typeof prev === 'string' ? JSON.parse(prev) : prev ?? {}) as Record<string, unknown>;
   const unmasked = unmask(section, value, def.secretKeys ?? []);
-  const parsed = def.zod.parse({ ...prevObj, ...unmasked });
+  // Captcha : si le fournisseur change, les clés de l'ancien ne doivent pas fuiter vers le nouveau
+  const base =
+    section === 'captcha' && unmasked.provider && prevObj.provider && unmasked.provider !== prevObj.provider
+      ? { provider: unmasked.provider }
+      : prevObj;
+  const parsed = def.zod.parse({ ...base, ...unmasked });
   const ser = JSON.stringify(parsed);
   if (prev) await db.update('settings', Number((await db.findOne('settings', { key: section }))!.id), { value_json: ser, updated_by: actorId ?? null, updated_at: new Date().toISOString() });
   else await db.insert('settings', { key: section, value_json: ser, updated_by: actorId ?? null, updated_at: new Date().toISOString() });

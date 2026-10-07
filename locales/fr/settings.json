@@ -358,9 +358,9 @@
   "settings.captcha.hcaptcha": "hCaptcha",
   "settings.captcha.recaptcha": "Google reCAPTCHA",
   "settings.captcha.sitekey": "Clé du site (sitekey)",
-  "settings.captcha.sitekey.hint": "Fournie par le service externe — laisser vide pour le mode interne.",
+  "settings.captcha.sitekey.hint": "Fournie par le service externe. Obligatoire pour un fournisseur externe — peut aussi venir de la variable d’environnement (TURNSTILE_SITEKEY / HCAPTCHA_SITEKEY / RECAPTCHA_SITEKEY).",
   "settings.captcha.secret": "Clé secrète",
-  "settings.captcha.secret.hint": "Stockée chiffrée et jamais renvoyée en clair (masquée).",
+  "settings.captcha.secret.hint": "Stockée chiffrée et jamais renvoyée en clair (masquée). Obligatoire pour un fournisseur externe — peut aussi venir de la variable d’environnement (TURNSTILE_SECRET / HCAPTCHA_SECRET / RECAPTCHA_SECRET).",
   "settings.backups.retentionDays": "Conservation (jours)",
   "settings.backups.auto": "Sauvegarde automatique",
   "settings.backups.auto.hint": "Une sauvegarde quotidienne est planifiée par la tâche de fond.",
@@ -402,5 +402,8 @@
   "settings.calendarKinds.statuses": "Statuts de rendez-vous",
   "settings.calendarKinds.statuses.hint": "Statuts proposés au calendrier (confirmé, terminé, annulé…).",
   "settings.calendarKinds.statusKeyHint": "Verrouillée après création : les rendez-vous enregistrés la référencent.",
-  "settings.calendarKinds.durationMin": "Durée par défaut (minutes)"
+  "settings.calendarKinds.durationMin": "Durée par défaut (minutes)",
+  "settings.captcha.provider.hint": "« Interne » = défi auto-hébergé (aucun appel sortant). Choisir hCaptcha/Turnstile/reCAPTCHA exige la clé du site ET la clé secrète.",
+  "settings.validation.captchaSitekey": "Clé du site obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne).",
+  "settings.validation.captchaSecret": "Clé secrète obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne)."
 }

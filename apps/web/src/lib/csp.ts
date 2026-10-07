@@ -30,13 +30,13 @@ export function buildCsp({ nonce, dev }: CspInput): string {
     `script-src ${scriptSrc}`,
     // Radix/tippy/notif. + <style> des thèmes admin → inline styles assumés (pas de données utilisateurs).
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob: https://*.hcaptcha.com https://challenges.cloudflare.com https://www.google.com`,
     "font-src 'self'",
-    // API + fetch i18n sur l'origine ; dev : websocket HMR (ws:).
-    `connect-src 'self' blob:${dev ? ' ws: wss:' : ''}`,
+    // API + fetch i18n sur l'origine ; widgets captcha externes (hCaptcha/Turnstile/reCAPTCHA) ; dev : websocket HMR (ws:).
+    `connect-src 'self' blob: ${CAPTCHA_ORIGINS}${dev ? ' ws: wss:' : ''}`,
     // Aperçu PDF via blob: worker (aperçuOrdonnance) — objectSrc reste fermé.
     "worker-src 'self' blob:",
-    "frame-src 'self' https://challenges.cloudflare.com https://newassets.hcaptcha.com https://www.google.com",
+    "frame-src 'self' https://challenges.cloudflare.com https://*.hcaptcha.com https://www.google.com https://recaptcha.net https://*.recaptcha.net",
     "frame-ancestors 'self'",
     "object-src 'none'",
     "base-uri 'self'",

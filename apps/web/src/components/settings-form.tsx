@@ -59,6 +59,8 @@ const MESSAGE_CODES = new Set([
   'kindKey',
   'vaccineKey',
   'time',
+  'captchaSitekey',
+  'captchaSecret',
 ]);
 
 /** Traduit un code d'erreur (sinon renvoie le message brut fourni par l'API). */

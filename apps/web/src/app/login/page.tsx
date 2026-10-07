@@ -1,6 +1,12 @@
 /**
- * Login — carte glass animée, blobs, captcha SVG (audio en secours), 2FA TOTP, lien mot de passe oublié.
+ * Login — carte glass animée, blobs, captcha (interne SVG ou widget hCaptcha/Turnstile/reCAPTCHA),
+ * 2FA TOTP, lien mot de passe oublié.
  * Les messages d'erreur affichent la traduction du CODE serveur (« auth.* », « errors.* »), jamais le texte brut.
+ *
+ * Le captcha n'est PAS décidé ici : `GET /auth/captcha` renvoie le fournisseur EFFECTIF (repli
+ * interne compris en cas de clés manquantes) et sa clé publique. L'écran monte donc soit le défi
+ * interne (SVG + question), soit le widget externe — dans les deux cas, le jeton envoyé à
+ * `POST /auth/login` correspond exactement à ce que le serveur va vérifier.
  */
 'use client';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
@@ -12,6 +18,8 @@ import { useAuth } from '@/stores/auth';
 import { useT, useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { Button, Field, Input } from '@/components/ui';
+import { ExternalCaptcha } from '@/components/external-captcha';
+import { captchaNeedsToken, captchaPayload, type CaptchaInfo, type CaptchaProviderName } from '@/lib/captcha-client';
 import { cn } from '@/lib/utils';
 
 function LoginForm(): React.ReactElement {
@@ -25,10 +33,14 @@ function LoginForm(): React.ReactElement {
   const [identifier, setId] = useState('');
   const [password, pw] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [captchaId, setCaptchaId] = useState<string | null>(null);
-  const [captchaSvg, setCaptchaSvg] = useState<string | null>(null);
+  /** Saisie du défi interne (calcul affiché dans le SVG). */
   const [captchaSol, setCaptchaSol] = useState('');
-  const [question, setQuestion] = useState('');
+  const [captcha, setCaptcha] = useState<CaptchaInfo | null>(null);
+  /** Jeton du widget externe (hCaptcha/Turnstile/reCAPTCHA) — vide tant que le défi n'est pas résolu. */
+  const [captchaToken, setCaptchaToken] = useState('');
+  /** Incrémenté pour remettre le défi externe à zéro (échec de connexion, changement de fournisseur). */
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const [captchaBlocked, setCaptchaBlocked] = useState(false);
   const [totpCode, setTotp] = useState('');
   const [busy, setBusy] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
@@ -44,11 +56,13 @@ function LoginForm(): React.ReactElement {
 
   const loadCaptcha = (): void => {
     void api
-      .get<{ provider: string; id?: string; svg?: string; question?: string; sitekey?: string }>('/auth/captcha')
+      .get<CaptchaInfo>('/auth/captcha')
       .then((c) => {
-        setCaptchaId(c.id ?? null);
-        setCaptchaSvg(c.svg ?? null);
-        setQuestion(c.question ?? '');
+        setCaptcha(c);
+        setCaptchaToken('');
+        setCaptchaBlocked(false);
+        // Un défi interne est à usage unique : le remonter évite de réutiliser l'ancien après un échec.
+        setCaptchaReset((n) => n + 1);
       })
       .catch(() => undefined);
   };
@@ -59,6 +73,7 @@ function LoginForm(): React.ReactElement {
    * navigateur, aucun service tiers, donc compatible on-prem / hors-ligne).
    */
   const speakQuestion = (): void => {
+    const question = captcha?.question ?? '';
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !question) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(t('captcha.speak', { question }));
@@ -78,13 +93,16 @@ function LoginForm(): React.ReactElement {
         // login porte aussi le code (étape 2) : le serveur accepte totpCode sur /auth/login après pending
         await login(identifier, password, { totp: totpCode });
       } else {
-        await login(identifier, password, captchaId ? { captchaId, captchaValue: captchaSol } : {});
+        // Le champ attendu dépend du fournisseur EFFECTIF : captchaId/Valeur (interne) ou le jeton
+        // du widget externe. Un défi non résolu n'envoie rien — le serveur refusera, l'écran explique.
+        await login(identifier, password, captchaPayload(captcha, { token: captchaToken, id: captcha?.id, value: captchaSol }));
       }
       const next = sp.get('next') ?? '/dashboard';
       router.replace(next.startsWith('/') ? next : '/dashboard');
     } catch {
-      loadCaptcha();
+      // Nouveau défi après un échec (interne comme externe) : l'ancien est soit consommé, soit expiré.
       setCaptchaSol('');
+      loadCaptcha();
     } finally {
       setBusy(false);
     }
@@ -120,6 +138,14 @@ function LoginForm(): React.ReactElement {
             </div>
           </div>
 
+          {/* Configuration captcha incomplète : le serveur a replié sur le défi interne (aucun
+              verrouillage possible) ; on le signale pour que l'administrateur corrige les clés. */}
+          {captcha?.fallback && !error ? (
+            <div role="status" className="mb-3 rounded-xl border border-[rgb(var(--c-amber)/0.45)] bg-[rgb(var(--c-amber-soft))] px-3 py-2 text-[12.5px] font-semibold text-[rgb(var(--c-amber))]">
+              {t('captcha.fallbackNotice', { provider: captcha.requested ?? '' })}
+            </div>
+          ) : null}
+
           {reason && !error ? (
             <div role="status" className="mb-3 rounded-xl border border-[rgb(var(--c-info)/0.4)] bg-[rgb(var(--c-info-soft))] px-3 py-2 text-[12.5px] font-semibold text-[rgb(var(--c-info))]">
               {reason === 'expired' ? t('auth.sessionRequiredNotice') : t('auth.sessionEndedNotice')}
@@ -147,7 +173,22 @@ function LoginForm(): React.ReactElement {
                     </button>
                   </div>
                 </Field>
-                {captchaSvg ? (
+                {captcha && captcha.provider !== 'none' && captcha.provider !== 'internal' && captcha.sitekey ? (
+                  <Field label={t('captcha.question')} hint={t('captcha.externalHint')}>
+                    <ExternalCaptcha
+                      provider={captcha.provider}
+                      sitekey={captcha.sitekey}
+                      lang={lang}
+                      resetKey={captchaReset}
+                      onToken={(tok) => {
+                        setCaptchaToken(tok);
+                        setCaptchaBlocked(false);
+                      }}
+                      onError={() => setCaptchaBlocked(true)}
+                    />
+                  </Field>
+                ) : null}
+                {captcha?.provider === 'internal' && captcha.svg ? (
                   <Field label={t('captcha.question')} hint={t('captcha.hint')}>
                     {/* Saisie, défi visuel et actions sur UNE seule ligne, tous à la hauteur d'un
                         champ (var(--row-h)) : l'ancien empilement image+boutons désalignait le tout. */}
@@ -163,7 +204,7 @@ function LoginForm(): React.ReactElement {
                       />
                       {/* Le défi est porté par le SVG : role="img" + libellé = la question elle-même,
                           sinon il serait invisible aux lecteurs d'écran (l'audio seul ne suffit pas). */}
-                      <div className="captcha-box" role="img" aria-label={question || t('captcha.question')} dangerouslySetInnerHTML={{ __html: captchaSvg }} />
+                      <div className="captcha-box" role="img" aria-label={captcha.question || t('captcha.question')} dangerouslySetInnerHTML={{ __html: captcha.svg }} />
                       <div className="captcha-actions">
                         <button type="button" className="btn btn-ghost" onClick={loadCaptcha} title={t('captcha.refresh')} aria-label={t('captcha.refresh')}>
                           <Loader2 size={14} />
@@ -185,7 +226,13 @@ function LoginForm(): React.ReactElement {
               </Field>
             )}
 
-            <Button type="submit" variant="primary" loading={busy} className="mt-1 w-full" disabled={!needTotp && (!identifier || !password)}>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={busy}
+              className="mt-1 w-full"
+              disabled={!needTotp && (!identifier || !password || (captchaNeedsToken((captcha?.provider ?? 'none') as CaptchaProviderName) && !captchaToken && !captchaBlocked))}
+            >
               <KeyRound size={16} /> {needTotp ? t('login.verify') : t('login.submit')}
             </Button>
             {/* Liens secondaires — rangée unique, centrée, style homogène (mot de passe oublié,

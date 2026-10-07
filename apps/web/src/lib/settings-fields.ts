@@ -88,9 +88,28 @@ export interface SectionFormSpec {
  * purement scalaires déjà couvertes par un formulaire maison (general, ui, smtp, codification,
  * languages, medicalRefs) n'apparaissent pas ici : elles ne passent pas par ce moteur.
  */
+/**
+ * Captcha : un fournisseur EXTERNE sans clés ne peut ni afficher de widget ni vérifier de jeton —
+ * c'est exactement la configuration qui rendait la connexion impossible (400 `auth.captcha`, sans
+ * aucun défi à l'écran). Le formulaire refuse donc l'enregistrement tant que les deux clés ne sont
+ * pas fournies ; la clé secrète peut rester masquée (inchangée) si elle était déjà enregistrée.
+ * Le SERVEUR, lui, reste tolérant à la lecture (une configuration héritée incomplète ne doit pas
+ * réinitialiser la section) et se replie à l'exécution sur le défi interne — voir `resolveCaptcha`.
+ */
+const captchaFormZ = captchaSectionZ.superRefine((v, ctx) => {
+  if (v.provider !== 'turnstile' && v.provider !== 'hcaptcha' && v.provider !== 'recaptcha') return;
+  const missing = (field: 'sitekey' | 'secret', message: string): void => {
+    const value = v[field];
+    // '••••' = clé déjà enregistrée et renvoyée masquée par l'API : elle n'est pas vide, donc acceptée.
+    if (!value || value.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [field] });
+  };
+  missing('sitekey', 'captchaSitekey');
+  missing('secret', 'captchaSecret');
+});
+
 const SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   security: securitySettingsZ,
-  captcha: captchaSectionZ,
+  captcha: captchaFormZ,
   backups: backupZ,
   license: licenseSectionZ,
   vaccination: vaccinationSectionZ,
@@ -164,7 +183,7 @@ export const SECTION_FORMS: Record<string, SectionFormSpec> = {
         hintKey: 'settings.captcha.hint',
         fields: [
           { path: 'provider', kind: 'select', labelKey: 'settings.captcha.provider', options: PROVIDER_OPTIONS },
-          { path: 'sitekey', kind: 'text', labelKey: 'settings.captcha.sitekey', hintKey: 'settings.captcha.sitekey.hint' },
+          { path: 'sitekey', kind: 'text', labelKey: 'settings.captcha.sitekey', hintKey: 'settings.captcha.sitekey.hint', placeholder: '10000000-ffff-ffff-ffff-000000000001' },
           { path: 'secret', kind: 'password', labelKey: 'settings.captcha.secret', hintKey: 'settings.captcha.secret.hint' },
         ],
       },
@@ -347,7 +366,7 @@ export function setPath<T extends Record<string, unknown>>(obj: T, path: string,
 /* ------------------------------------------------------------------ validation par champ */
 
 /** Codes de message portés par les schémas partagés (regex/temps personnalisés). */
-const CUSTOM_CODES = new Set(['gedPrefix', 'gedPath', 'stepKey', 'kindKey', 'vaccineKey', 'time', 'duplicateKey']);
+const CUSTOM_CODES = new Set(['gedPrefix', 'gedPath', 'stepKey', 'kindKey', 'vaccineKey', 'time', 'duplicateKey', 'captchaSitekey', 'captchaSecret']);
 
 /** Traduit un problème Zod en code de message i18n (`settings.validation.<code>`). */
 export function issueCode(issue: z.ZodIssue): string {
