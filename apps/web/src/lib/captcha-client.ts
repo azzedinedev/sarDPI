@@ -8,10 +8,13 @@
  */
 
 export type CaptchaProviderName = 'none' | 'internal' | 'turnstile' | 'hcaptcha' | 'recaptcha';
+export type CaptchaModeName = 'math' | 'image';
 
 /** Réponse de `GET /api/v1/auth/captcha` (voir `captchaPublicInfo` côté serveur). */
 export interface CaptchaInfo {
   provider: CaptchaProviderName;
+  /** Mode interne ('math' = calcul arithmétique, 'image' = caractères déformés). */
+  mode?: CaptchaModeName;
   /** Fournisseur choisi dans Paramètres › Captcha (peut différer : voir `fallback`). */
   requested?: CaptchaProviderName;
   /** Le fournisseur demandé est-il utilisable tel quel ? */

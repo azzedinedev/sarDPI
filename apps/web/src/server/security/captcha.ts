@@ -21,15 +21,65 @@ import { rng } from '../util';
 import { env } from '../config';
 
 export type CaptchaProvider = 'none' | 'internal' | 'turnstile' | 'hcaptcha' | 'recaptcha';
+export type InternalCaptchaMode = 'math' | 'image';
 
-const store = new LRUCache<string, { answer: number; exp: number }>({ max: 10_000, ttl: 5 * 60_000 });
+/** Jeu de caractères lisibles sans ambiguïté (exclut 0/O/o, 1/I/l/L). */
+const IMAGE_CHARSET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
-export function createInternalCaptcha(): { id: string; svg: string; question: string } {
+const store = new LRUCache<string, { answer: number | string; mode: InternalCaptchaMode; exp: number }>({ max: 10_000, ttl: 5 * 60_000 });
+
+/**
+ * Génère le défi captcha interne en SVG (100 % local, aucun appel sortant, conforme loi 18-07).
+ * Deux modes au choix dans Paramètres › Captcha :
+ *  - 'math'  : calcul arithmétique simple (ex. 7 + 4 = 11)
+ *  - 'image' : image de 5 caractères déformés avec lignes de bruit et rotations aléatoires.
+ */
+export function createInternalCaptcha(mode: InternalCaptchaMode = 'math'): { id: string; svg: string; question: string; mode: InternalCaptchaMode } {
+  const id = rng(9);
+  const jitter = (n: number) => n + Math.random() * 6 - 3;
+
+  if (mode === 'image') {
+    let code = '';
+    for (let i = 0; i < 5; i++) {
+      code += IMAGE_CHARSET[Math.floor(Math.random() * IMAGE_CHARSET.length)];
+    }
+    store.set(id, { answer: code.toUpperCase(), mode: 'image', exp: Date.now() + 5 * 60_000 });
+
+    const charsSvg = code
+      .split('')
+      .map((ch, i) => {
+        const x = Math.round(14 + i * 26 + (Math.random() * 4 - 2));
+        const y = Math.round(31 + (Math.random() * 5 - 2.5));
+        const rot = Math.round(Math.random() * 24 - 12);
+        const font = i % 2 === 0 ? 'monospace' : "'IBM Plex Sans', sans-serif";
+        const color = ['#0c3a45', '#085866', '#0ea5b7', '#155e75'][i % 4];
+        return `<text x="${x}" y="${y}" font-family="${font}" font-weight="700" font-size="22" fill="${color}" transform="rotate(${rot} ${x} ${y})">${ch}</text>`;
+      })
+      .join('');
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="48" role="img" aria-label="captcha">
+      <defs>
+        <linearGradient id="cbg_${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#f0f9fa"/>
+          <stop offset="100%" stop-color="#e1f1f5"/>
+        </linearGradient>
+      </defs>
+      <rect width="150" height="48" rx="8" fill="url(#cbg_${id})"/>
+      <path d="M4 ${22 + Math.random() * 8} Q 50 ${12 + Math.random() * 24} 146 ${20 + Math.random() * 12}" stroke="#0ea5b7" stroke-width="1.4" fill="none" opacity="0.45"/>
+      <path d="M6 ${30 + Math.random() * 10} Q 80 ${28 + Math.random() * 14} 144 ${14 + Math.random() * 16}" stroke="#34c77b" stroke-width="1.2" fill="none" opacity="0.4"/>
+      ${charsSvg}
+      <circle cx="${18 + Math.random() * 30}" cy="${12 + Math.random() * 24}" r="1.8" fill="#f05c4e" opacity=".55"/>
+      <circle cx="${70 + Math.random() * 40}" cy="${12 + Math.random() * 24}" r="1.6" fill="#0ea5b7" opacity=".55"/>
+      <circle cx="${125 + Math.random() * 18}" cy="${12 + Math.random() * 24}" r="1.8" fill="#34c77b" opacity=".55"/>
+    </svg>`;
+    // Question = les lettres séparées par un espace (pour la synthèse vocale)
+    return { id, svg, question: code.split('').join(' '), mode: 'image' };
+  }
+
+  // Mode mathématique
   const a = 2 + Math.floor(Math.random() * 8);
   const b = 1 + Math.floor(Math.random() * 8);
-  const id = rng(9);
-  store.set(id, { answer: a + b, exp: Date.now() + 5 * 60_000 });
-  const jitter = (n: number) => n + Math.random() * 6 - 3;
+  store.set(id, { answer: a + b, mode: 'math', exp: Date.now() + 5 * 60_000 });
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="48" role="img" aria-label="captcha">
     <rect width="150" height="48" rx="8" fill="#eef7f9"/>
     <path d="M4 ${20 + Math.random() * 8} Q 60 ${Math.random() * 40} 146 ${10 + Math.random() * 28}" stroke="#0ea5b7" fill="none" opacity="0.5"/>
@@ -37,7 +87,7 @@ export function createInternalCaptcha(): { id: string; svg: string; question: st
     <circle cx="118" cy="${12 + Math.random() * 24}" r="1.6" fill="#f05c4e" opacity=".6"/>
     <circle cx="132" cy="${12 + Math.random() * 24}" r="1.6" fill="#34c77b" opacity=".6"/>
   </svg>`;
-  return { id, svg, question: `${a} + ${b}` };
+  return { id, svg, question: `${a} + ${b}`, mode: 'math' };
 }
 
 export function verifyInternalCaptcha(id: string | undefined, value: string | undefined): boolean {
@@ -45,7 +95,11 @@ export function verifyInternalCaptcha(id: string | undefined, value: string | un
   const rec = store.get(id);
   if (!rec) return false;
   store.delete(id); // à usage unique
-  return Number(value.trim()) === rec.answer;
+  const clean = value.trim();
+  if (typeof rec.answer === 'string') {
+    return clean.toUpperCase() === rec.answer.toUpperCase();
+  }
+  return Number(clean) === rec.answer;
 }
 
 export interface CaptchaResolution {
@@ -53,6 +107,8 @@ export interface CaptchaResolution {
   requested: CaptchaProvider;
   /** Fournisseur EFFECTIF : identique à `requested`, ou « internal » en cas de repli. */
   provider: CaptchaProvider;
+  /** Mode du captcha interne ('math' = addition simple, 'image' = caractères déformés). */
+  mode: InternalCaptchaMode;
   /** Clé publique du fournisseur effectif (utile au rendu du widget) — jamais un secret. */
   sitekey: string;
   /** Clé secrète du fournisseur effectif (vérification serveur) — ne sort JAMAIS de l'API. */
@@ -93,26 +149,35 @@ const isExternal = (p: CaptchaProvider): boolean => p === 'turnstile' || p === '
  * Priorité des clés : Paramètres › Captcha, puis variables d'environnement (déploiement out-of-the-box).
  */
 export async function resolveCaptcha(): Promise<CaptchaResolution> {
+  // Contournement d'urgence : la variable d'environnement CAPTCHA_OVERRIDE (none | internal)
+  // permet à l'administrateur système de débloquer immédiatement l'accès en cas d'erreur de config.
+  const override = (process.env.CAPTCHA_OVERRIDE ?? '').trim().toLowerCase() as CaptchaProvider;
   const { getSection } = await import('../settings');
-  const cap = (await getSection('captcha')) as { provider?: CaptchaProvider; sitekey?: string; secret?: string };
-  const requested = (cap.provider ?? env.captchaProvider) as CaptchaProvider;
+  const cap = (await getSection('captcha', { fresh: true })) as { provider?: CaptchaProvider; mode?: InternalCaptchaMode; sitekey?: string; secret?: string };
+  const requested =
+    override && (['none', 'internal', 'turnstile', 'hcaptcha', 'recaptcha'] as string[]).includes(override)
+      ? override
+      : ((cap.provider ?? env.captchaProvider) as CaptchaProvider);
+  const mode: InternalCaptchaMode = cap.mode === 'image' ? 'image' : 'math';
+
   if (!isExternal(requested)) {
-    return { requested, provider: requested, sitekey: '', secret: '', configured: true, fallback: false };
+    return { requested, provider: requested, mode, sitekey: '', secret: '', configured: true, fallback: false };
   }
   const fromEnv = envKeys(requested);
   const sitekey = (cap.sitekey ?? '').trim() || fromEnv.sitekey.trim();
   const secret = (cap.secret ?? '').trim() || fromEnv.secret.trim();
   // Clé manquante ⇒ le fournisseur ne peut ni afficher de widget ni vérifier de jeton : repli interne.
   if (!sitekey || !secret) {
-    return { requested, provider: 'internal', sitekey: '', secret: '', configured: false, fallback: true };
+    return { requested, provider: 'internal', mode, sitekey: '', secret: '', configured: false, fallback: true };
   }
-  return { requested, provider: requested, sitekey, secret, configured: true, fallback: false };
+  return { requested, provider: requested, mode, sitekey, secret, configured: true, fallback: false };
 }
 
 /** Charge utile PUBLIQUE du captcha — exactement ce dont l'écran de connexion a besoin, rien d'autre. */
 export interface CaptchaPublicInfo {
   provider: CaptchaProvider;
   requested: CaptchaProvider;
+  mode?: InternalCaptchaMode;
   configured: boolean;
   fallback: boolean;
   sitekey: string | null;
@@ -129,13 +194,13 @@ export interface CaptchaPublicInfo {
 export async function captchaPublicInfo(): Promise<CaptchaPublicInfo> {
   const res = await resolveCaptcha();
   if (res.provider === 'internal') {
-    const c = createInternalCaptcha();
+    const c = createInternalCaptcha(res.mode);
     return { provider: 'internal', requested: res.requested, configured: res.configured, fallback: res.fallback, sitekey: null, ...c };
   }
   if (res.provider === 'none') {
-    return { provider: 'none', requested: res.requested, configured: true, fallback: false, sitekey: null };
+    return { provider: 'none', requested: res.requested, mode: res.mode, configured: true, fallback: false, sitekey: null };
   }
-  return { provider: res.provider, requested: res.requested, configured: res.configured, fallback: false, sitekey: res.sitekey };
+  return { provider: res.provider, requested: res.requested, mode: res.mode, configured: res.configured, fallback: false, sitekey: res.sitekey };
 }
 
 async function verifyExternal(endpoint: string, secret: string, token: string, remoteIp: string): Promise<boolean> {

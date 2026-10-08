@@ -133,6 +133,7 @@ export class JsonAdapter implements DataAdapter {
   readonly inMemory: boolean;
   private tables = new Map<string, TableState>();
   private dirty = new Set<string>();
+  private mtimes = new Map<string, number>();
   /** file FIFO des transactions au niveau racine (sérialisation équivalente au FOR UPDATE SQL) */
   private txChain: Promise<unknown> = Promise.resolve();
   /** true pendant transaction() : les flush sont différés jusqu'au commit/rollback */
@@ -163,7 +164,10 @@ export class JsonAdapter implements DataAdapter {
   private load(table: string): TableState {
     if (this.inMemory) return { rows: [], auto: 0 };
     try {
-      const raw = fs.readFileSync(this.file(table), 'utf8');
+      const fp = this.file(table);
+      const stat = fs.statSync(fp);
+      this.mtimes.set(table, stat.mtimeMs);
+      const raw = fs.readFileSync(fp, 'utf8');
       const parsed = JSON.parse(raw) as { auto?: number; rows?: Row[] };
       const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
       const maxId = rows.reduce((m, r) => Math.max(m, Number(r.id ?? 0)), 0);
@@ -176,7 +180,23 @@ export class JsonAdapter implements DataAdapter {
   private state(table: string): TableState {
     assertTable(table);
     let st = this.tables.get(table);
-    if (!st) {
+    // Rechargement à chaud si le fichier a été modifié sur disque (outils CLI, seed, reset)
+    // uniquement si la table n'a pas de modifications en attente de commit.
+    if (!this.inMemory && !this.dirty.has(table) && !this.locked) {
+      try {
+        const stat = fs.statSync(this.file(table));
+        const last = this.mtimes.get(table) ?? 0;
+        if (stat.mtimeMs > last || !st) {
+          st = this.load(table);
+          this.tables.set(table, st);
+        }
+      } catch {
+        if (!st) {
+          st = { rows: [], auto: 0 };
+          this.tables.set(table, st);
+        }
+      }
+    } else if (!st) {
       st = this.load(table);
       this.tables.set(table, st);
     }
@@ -192,6 +212,9 @@ export class JsonAdapter implements DataAdapter {
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(tmp, JSON.stringify({ auto: st.auto, rows: st.rows }));
     fs.renameSync(tmp, this.file(table)); // swap quasi atomique : jamais de fichier à demi écrit
+    try {
+      this.mtimes.set(table, fs.statSync(this.file(table)).mtimeMs);
+    } catch {}
   }
 
   private afterWrite(table: string): void {

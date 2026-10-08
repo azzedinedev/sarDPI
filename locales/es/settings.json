@@ -405,5 +405,9 @@
   "settings.calendarKinds.durationMin": "Duración por defecto (minutos)",
   "settings.captcha.provider.hint": "«Interno» = desafío autoalojado (sin llamadas salientes). Elegir hCaptcha/Turnstile/reCAPTCHA exige la clave del sitio Y la clave secreta.",
   "settings.validation.captchaSitekey": "Clave del sitio obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno).",
-  "settings.validation.captchaSecret": "Clave secreta obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno)."
+  "settings.validation.captchaSecret": "Clave secreta obligatoria para este proveedor (introdúzcala aquí o vía variable de entorno, o vuelva al captcha interno).",
+  "settings.captcha.mode": "Tipo de desafío interno",
+  "settings.captcha.mode.hint": "Se aplica al captcha interno autoalojado: suma simple o imagen de caracteres.",
+  "settings.captcha.mode.math": "Cálculo matemático (suma: 7 + 4 = ?)",
+  "settings.captcha.mode.image": "Imagen de código visual (letras y números distorsionados)"
 }

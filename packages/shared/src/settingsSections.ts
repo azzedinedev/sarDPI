@@ -116,8 +116,12 @@ export const vaccinationSectionZ = z.object({
  * continuer de primer tant que l'administrateur n'a rien choisi (voir `resolveProvider`). Un défaut
  * ici figerait « internal » et rendrait la variable d'environnement inopérante.
  */
+export const captchaModes = ['math', 'image'] as const;
+export type CaptchaMode = (typeof captchaModes)[number];
+
 export const captchaSectionZ = z.object({
   provider: z.enum(captchaProviders), // constante déjà exportée par entities.ts
+  mode: z.enum(captchaModes).default('math'),
   sitekey: z.string().max(120).optional(),
   secret: z.string().max(200).optional(),
 });

@@ -405,5 +405,9 @@
   "settings.calendarKinds.durationMin": "Default duration (minutes)",
   "settings.captcha.provider.hint": "“Built-in” = self-hosted challenge (no outbound call). Choosing hCaptcha/Turnstile/reCAPTCHA requires both the site key and the secret key.",
   "settings.validation.captchaSitekey": "Site key required for this provider (enter it here or via environment variable, or switch back to the built-in captcha).",
-  "settings.validation.captchaSecret": "Secret key required for this provider (enter it here or via environment variable, or switch back to the built-in captcha)."
+  "settings.validation.captchaSecret": "Secret key required for this provider (enter it here or via environment variable, or switch back to the built-in captcha).",
+  "settings.captcha.mode": "Built-in challenge type",
+  "settings.captcha.mode.hint": "Applies to the built-in self-hosted captcha: simple addition or character image.",
+  "settings.captcha.mode.math": "Math calculation (addition: 7 + 4 = ?)",
+  "settings.captcha.mode.image": "Visual code image (distorted letters and numbers)"
 }

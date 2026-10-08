@@ -405,5 +405,9 @@
   "settings.calendarKinds.durationMin": "Durée par défaut (minutes)",
   "settings.captcha.provider.hint": "« Interne » = défi auto-hébergé (aucun appel sortant). Choisir hCaptcha/Turnstile/reCAPTCHA exige la clé du site ET la clé secrète.",
   "settings.validation.captchaSitekey": "Clé du site obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne).",
-  "settings.validation.captchaSecret": "Clé secrète obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne)."
+  "settings.validation.captchaSecret": "Clé secrète obligatoire pour ce fournisseur (saisissez-la ici ou via la variable d’environnement, sinon revenez au captcha interne).",
+  "settings.captcha.mode": "Type de défi interne",
+  "settings.captcha.mode.hint": "S’applique au captcha interne auto-hébergé : addition simple ou image de caractères.",
+  "settings.captcha.mode.math": "Calcul mathématique (addition : 7 + 4 = ?)",
+  "settings.captcha.mode.image": "Image de code visuel (lettres et chiffres déformés)"
 }

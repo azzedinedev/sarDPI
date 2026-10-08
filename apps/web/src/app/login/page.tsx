@@ -76,7 +76,11 @@ function LoginForm(): React.ReactElement {
     const question = captcha?.question ?? '';
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !question) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(t('captcha.speak', { question }));
+    const text =
+      captcha?.mode === 'image'
+        ? t('captcha.speakLetters', { letters: question })
+        : t('captcha.speak', { question });
+    const u = new SpeechSynthesisUtterance(text);
     u.lang = lang === 'ar' ? 'ar-SA' : lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR';
     window.speechSynthesis.speak(u);
   };
@@ -189,18 +193,28 @@ function LoginForm(): React.ReactElement {
                   </Field>
                 ) : null}
                 {captcha?.provider === 'internal' && captcha.svg ? (
-                  <Field label={t('captcha.question')} hint={t('captcha.hint')}>
+                  <Field
+                    label={captcha.mode === 'image' ? t('captcha.imageQuestion') : t('captcha.question')}
+                    hint={captcha.mode === 'image' ? t('captcha.imageHint') : t('captcha.hint')}
+                  >
                     {/* Saisie, défi visuel et actions sur UNE seule ligne, tous à la hauteur d'un
                         champ (var(--row-h)) : l'ancien empilement image+boutons désalignait le tout. */}
                     <div className="flex items-center gap-2">
                       <Input
-                        className="min-w-0 flex-1"
+                        className="min-w-0 flex-1 font-mono tracking-wider uppercase"
                         value={captchaSol}
-                        onChange={(e) => setCaptchaSol(e.target.value.replace(/[^\d-]/g, ''))}
-                        inputMode="numeric"
+                        onChange={(e) =>
+                          setCaptchaSol(
+                            captcha.mode === 'image'
+                              ? e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                              : e.target.value.replace(/[^\d-]/g, '')
+                          )
+                        }
+                        inputMode={captcha.mode === 'image' ? 'text' : 'numeric'}
                         autoComplete="off"
                         dir="ltr"
-                        placeholder="6824"
+                        placeholder={captcha.mode === 'image' ? '4K9R2' : '6824'}
+                        maxLength={captcha.mode === 'image' ? 6 : 10}
                       />
                       {/* Le défi est porté par le SVG : role="img" + libellé = la question elle-même,
                           sinon il serait invisible aux lecteurs d'écran (l'audio seul ne suffit pas). */}

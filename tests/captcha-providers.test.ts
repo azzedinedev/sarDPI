@@ -219,3 +219,68 @@ describe('le serveur reste tolérant à la LECTURE d’une section héritée inc
 async function resolveProviderSafe(): Promise<string> {
   return (await resolveCaptcha()).provider;
 }
+
+describe('mode du captcha interne : calcul mathématique OU image de caractères', () => {
+  beforeEach(async () => {
+    const db = await getDb();
+    await db.removeWhere('settings', { key: 'captcha' });
+    cacheDel('settings', 'settings:captcha');
+    delete process.env.CAPTCHA_OVERRIDE;
+  });
+
+  it('mode math (par défaut) : génère une addition et vérifie la somme arithmétique', async () => {
+    await setCaptcha({ provider: 'internal', mode: 'math' });
+    const info = await captchaPublicInfo();
+    expect(info.provider).toBe('internal');
+    expect(info.mode).toBe('math');
+    expect(info.question).toMatch(/^\d+ \+ \d+$/);
+    const [a, b] = info.question!.split('+').map((x) => Number(x.trim()));
+    await expect(verifyCaptcha({ captchaId: info.id, captchaValue: String((a ?? 0) + (b ?? 0)) }, '127.0.0.1')).resolves.toBe(true);
+  });
+
+  it('mode image : génère 5 caractères déformés en SVG et vérifie le code insensible à la casse', async () => {
+    await setCaptcha({ provider: 'internal', mode: 'image' });
+    const info = await captchaPublicInfo();
+    expect(info.provider).toBe('internal');
+    expect(info.mode).toBe('image');
+    // SVG bien formé avec dégradé et lettres en <text>
+    expect(info.svg).toContain('<svg');
+    expect(info.svg).toContain('<text');
+    // Question = 5 lettres séparées par un espace (utilisable par le synthétiseur vocal)
+    const code = info.question!.replace(/\s+/g, '');
+    expect(code).toHaveLength(5);
+    // Tolérance casse : la saisie en minuscules doit être acceptée
+    await expect(verifyCaptcha({ captchaId: info.id, captchaValue: code.toLowerCase() }, '127.0.0.1')).resolves.toBe(true);
+  });
+
+  it('mode image : un mauvais code est refusé', async () => {
+    await setCaptcha({ provider: 'internal', mode: 'image' });
+    const info = await captchaPublicInfo();
+    await expect(verifyCaptcha({ captchaId: info.id, captchaValue: 'FAUX1' }, '127.0.0.1')).resolves.toBe(false);
+  });
+});
+
+describe('contournement d’urgence (urgence admin bloqué)', () => {
+  beforeEach(async () => {
+    const db = await getDb();
+    await db.removeWhere('settings', { key: 'captcha' });
+    cacheDel('settings', 'settings:captcha');
+    delete process.env.CAPTCHA_OVERRIDE;
+  });
+
+  it('CAPTCHA_OVERRIDE=none en variable d’environnement court-circuite tout réglage en base', async () => {
+    await setCaptcha({ provider: 'hcaptcha', sitekey: 'k', secret: 's' });
+    process.env.CAPTCHA_OVERRIDE = 'none';
+    const res = await resolveCaptcha();
+    expect(res.provider).toBe('none');
+    delete process.env.CAPTCHA_OVERRIDE;
+  });
+
+  it('CAPTCHA_OVERRIDE=internal force le mode interne même si hCaptcha était actif', async () => {
+    await setCaptcha({ provider: 'hcaptcha', sitekey: 'k', secret: 's' });
+    process.env.CAPTCHA_OVERRIDE = 'internal';
+    const res = await resolveCaptcha();
+    expect(res.provider).toBe('internal');
+    delete process.env.CAPTCHA_OVERRIDE;
+  });
+});

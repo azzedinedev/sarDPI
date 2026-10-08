@@ -1669,6 +1669,27 @@ for (const [ns, keys] of Object.entries(EXTRA8)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA9 — CAPTCHA IMAGE VISUELLE : libellés pour le mode 'image' (lettres et chiffres déformés en SVG)
+ * et le sélecteur de mode dans Paramètres › Captcha.
+ */
+const EXTRA9 = {
+  settings: {
+    'settings.captcha.mode': ['Type de défi interne', 'نوع التحقق الداخلي', 'Tipo de desafío interno', 'Built-in challenge type'],
+    'settings.captcha.mode.hint': ['S’applique au captcha interne auto-hébergé : addition simple ou image de caractères.', 'ينطبق على التحقق الداخلي المستضاف محليًا: جمع بسيط أو صورة أحرف.', 'Se aplica al captcha interno autoalojado: suma simple o imagen de caracteres.', 'Applies to the built-in self-hosted captcha: simple addition or character image.'],
+    'settings.captcha.mode.math': ['Calcul mathématique (addition : 7 + 4 = ?)', 'حساب رياضي (جمع: 7 + 4 = ؟)', 'Cálculo matemático (suma: 7 + 4 = ?)', 'Math calculation (addition: 7 + 4 = ?)'],
+    'settings.captcha.mode.image': ['Image de code visuel (lettres et chiffres déformés)', 'صورة رمز بصري (أحرف وأرقام مشوّهة)', 'Imagen de código visual (letras y números distorsionados)', 'Visual code image (distorted letters and numbers)'],
+  },
+  auth: {
+    'captcha.imageQuestion': ['Code de sécurité', 'رمز الأمان', 'Código de seguridad', 'Security code'],
+    'captcha.imageHint': ['Recopiez les lettres et chiffres affichés dans l’image.', 'أعد كتابة الأحرف والأرقام الظاهرة في الصورة.', 'Copie las letras y números que aparecen en la imagen.', 'Type the letters and numbers shown in the image.'],
+    'captcha.speakLetters': ['Code de sécurité : {letters}. Répétez le code.', 'رمز الأمان: {letters}. أعد إدخال الرمز.', 'Código de seguridad: {letters}. Repita el código.', 'Security code: {letters}. Type the code.'],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA9)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

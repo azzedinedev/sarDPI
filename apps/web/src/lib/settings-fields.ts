@@ -137,6 +137,11 @@ const PROVIDER_OPTIONS = [
   { value: 'recaptcha', labelKey: 'settings.captcha.recaptcha' },
 ];
 
+const CAPTCHA_MODES = [
+  { value: 'math', labelKey: 'settings.captcha.mode.math' },
+  { value: 'image', labelKey: 'settings.captcha.mode.image' },
+];
+
 const LICENSE_STATES = [
   { value: 'valid', labelKey: 'settings.license.state.valid' },
   { value: 'trial', labelKey: 'settings.license.state.trial' },
@@ -183,6 +188,7 @@ export const SECTION_FORMS: Record<string, SectionFormSpec> = {
         hintKey: 'settings.captcha.hint',
         fields: [
           { path: 'provider', kind: 'select', labelKey: 'settings.captcha.provider', options: PROVIDER_OPTIONS },
+          { path: 'mode', kind: 'select', labelKey: 'settings.captcha.mode', hintKey: 'settings.captcha.mode.hint', options: CAPTCHA_MODES },
           { path: 'sitekey', kind: 'text', labelKey: 'settings.captcha.sitekey', hintKey: 'settings.captcha.sitekey.hint', placeholder: '10000000-ffff-ffff-ffff-000000000001' },
           { path: 'secret', kind: 'password', labelKey: 'settings.captcha.secret', hintKey: 'settings.captcha.secret.hint' },
         ],

@@ -405,5 +405,9 @@
   "settings.calendarKinds.durationMin": "المدة الافتراضية (دقائق)",
   "settings.captcha.provider.hint": "«داخلي» = تحقق مستضاف محليًا (بدون اتصال خارجي). اختيار hCaptcha/Turnstile/reCAPTCHA يتطلب مفتاح الموقع والمفتاح السري.",
   "settings.validation.captchaSitekey": "مفتاح الموقع إلزامي لهذا المزوّد (أدخله هنا أو عبر متغيّر البيئة، أو ارجع إلى التحقق الداخلي).",
-  "settings.validation.captchaSecret": "المفتاح السري إلزامي لهذا المزوّد (أدخله هنا أو عبر متغيّر البيئة، أو ارجع إلى التحقق الداخلي)."
+  "settings.validation.captchaSecret": "المفتاح السري إلزامي لهذا المزوّد (أدخله هنا أو عبر متغيّر البيئة، أو ارجع إلى التحقق الداخلي).",
+  "settings.captcha.mode": "نوع التحقق الداخلي",
+  "settings.captcha.mode.hint": "ينطبق على التحقق الداخلي المستضاف محليًا: جمع بسيط أو صورة أحرف.",
+  "settings.captcha.mode.math": "حساب رياضي (جمع: 7 + 4 = ؟)",
+  "settings.captcha.mode.image": "صورة رمز بصري (أحرف وأرقام مشوّهة)"
 }
