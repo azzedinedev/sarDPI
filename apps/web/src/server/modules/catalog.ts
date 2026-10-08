@@ -149,7 +149,75 @@ export function registerCatalog(): void {
     async handler(ctx) {
       const db = ctx.db;
       const cats = await db.find<Record<string, unknown>>('intervention_categories', { where: { active: 1 }, orderBy: [['id', 'asc']] });
-      const types = await db.find<Record<string, unknown>>('intervention_types', { where: { active: 1 }, orderBy: [['id', 'asc']] });
+      let types = await db.find<Record<string, unknown>>('intervention_types', { where: { active: 1 }, orderBy: [['id', 'asc']] });
+
+      // Auto-amorçage des types de laboratoire si aucun type n'a été créé pour LAB
+      const hasLab = types.some((t) => String(t.category_prefix) === 'LAB');
+      if (!hasLab) {
+        const DEFAULT_LAB_TYPES = [
+          {
+            code: 'LAB_bio', category_prefix: 'LAB', type_code: 'bio',
+            name_json: { fr: 'Bilan biologique courant', ar: 'الكيمياء الحيوية العامة', es: 'Bioquímica clínica', en: 'Routine biochemistry' },
+            fields_json: [
+              { key: 'prelevement_at', kind: 'datetime', label: { fr: 'Date & heure de prélèvement', ar: 'تاريخ ووقت أخذ العينة' }, required: true },
+              { key: 'sample_type', kind: 'select', label: { fr: 'Nature de l’échantillon', ar: 'نوع العيّنة' }, options: ['Sang veineux', 'Sang artériel', 'Urines', 'Autre'] },
+              { key: 'indication', kind: 'text', label: { fr: 'Indication clinique', ar: 'دواعي الفحص' } },
+              { key: 'conclusion', kind: 'textarea', label: { fr: 'Interprétation / Conclusion', ar: 'الخلاصة والتفسير' }, required: true },
+            ],
+            statuses_json: ['draft', 'in_progress', 'validated', 'cancelled'], default_status: 'draft',
+            pdf_template: 'report', active: 1, require_verify_token: 1, views_json: { formColumns: 2, listColumns: [] },
+          },
+          {
+            code: 'LAB_nfs', category_prefix: 'LAB', type_code: 'nfs',
+            name_json: { fr: 'Hémogramme complet (NFS)', ar: 'تحليل الدم الشامل (NFS)', es: 'Hemograma completo', en: 'Complete blood count (CBC)' },
+            fields_json: [
+              { key: 'prelevement_at', kind: 'datetime', label: { fr: 'Date & heure de prélèvement', ar: 'تاريخ ووقت أخذ العينة' }, required: true },
+              { key: 'tube', kind: 'select', label: { fr: 'Tube de prélèvement', ar: 'أنبوب العينة' }, options: ['EDTA (violet)', 'Citrate (bleu)', 'Héparine (vert)', 'Sec (rouge)'] },
+              { key: 'indication', kind: 'text', label: { fr: 'Indication clinique', ar: 'دواعي الفحص' } },
+              { key: 'conclusion', kind: 'textarea', label: { fr: 'Interprétation / Conclusion', ar: 'الخلاصة والتفسير' }, required: true },
+            ],
+            statuses_json: ['draft', 'in_progress', 'validated', 'cancelled'], default_status: 'draft',
+            pdf_template: 'report', active: 1, require_verify_token: 1, views_json: { formColumns: 2, listColumns: [] },
+          },
+          {
+            code: 'LAB_urines', category_prefix: 'LAB', type_code: 'urines',
+            name_json: { fr: 'Analyse d’urines & ECBU', ar: 'تحليل البول والمزرعة الجرثومية', es: 'Urocultivo y sedimento', en: 'Urinalysis & culture' },
+            fields_json: [
+              { key: 'mode_recueil', kind: 'select', label: { fr: 'Mode de recueil', ar: 'طريقة الجمع' }, options: ['Milieu de jet', 'Sondage vésical', 'Poche pédiatrique'] },
+              { key: 'aspect', kind: 'text', label: { fr: 'Aspect macroscopique', ar: 'المظهر العياني' } },
+              { key: 'conclusion', kind: 'textarea', label: { fr: 'Conclusion', ar: 'الخلاصة' }, required: true },
+            ],
+            statuses_json: ['draft', 'in_progress', 'validated', 'cancelled'], default_status: 'draft',
+            pdf_template: 'report', active: 1, require_verify_token: 1, views_json: { formColumns: 2, listColumns: [] },
+          },
+          {
+            code: 'LAB_serologie', category_prefix: 'LAB', type_code: 'serologie',
+            name_json: { fr: 'Sérologie & Immunologie', ar: 'علم الأمصال والمناعة', es: 'Serología e inmunología', en: 'Serology & immunology' },
+            fields_json: [
+              { key: 'technique', kind: 'text', label: { fr: 'Technique / Automate', ar: 'التقنية المستخدمة' } },
+              { key: 'indication', kind: 'text', label: { fr: 'Indication', ar: 'دواعي الفحص' } },
+              { key: 'conclusion', kind: 'textarea', label: { fr: 'Résultats & Conclusion', ar: 'النتائج والخلاصة' }, required: true },
+            ],
+            statuses_json: ['draft', 'in_progress', 'validated', 'cancelled'], default_status: 'draft',
+            pdf_template: 'report', active: 1, require_verify_token: 1, views_json: { formColumns: 2, listColumns: [] },
+          },
+          {
+            code: 'LAB_coag', category_prefix: 'LAB', type_code: 'coag',
+            name_json: { fr: 'Hémostase & Coagulation (TP / INR / TCA)', ar: 'تخثر الدم والسيولة', es: 'Coagulación y hemostasia', en: 'Hemostasis & coagulation' },
+            fields_json: [
+              { key: 'traitement', kind: 'text', label: { fr: 'Traitement anticoagulant', ar: 'العلاج بمضادات التخثر' } },
+              { key: 'conclusion', kind: 'textarea', label: { fr: 'Interprétation', ar: 'التفسير' }, required: true },
+            ],
+            statuses_json: ['draft', 'in_progress', 'validated', 'cancelled'], default_status: 'draft',
+            pdf_template: 'report', active: 1, require_verify_token: 1, views_json: { formColumns: 2, listColumns: [] },
+          },
+        ];
+        for (const lt of DEFAULT_LAB_TYPES) {
+          const inserted = await db.insert('intervention_types', lt);
+          types.push(inserted);
+        }
+      }
+
       return { categories: cats, types };
     },
   });

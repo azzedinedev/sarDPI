@@ -4,7 +4,17 @@ import type React from 'react';
 import type { z } from 'zod';
 import type { FilterGroup } from '@sardpi/shared';
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'time' | 'select' | 'multiselect' | 'autocomplete' | 'stringlist' | 'checkbox' | 'tel' | 'email' | 'password' | 'code' | 'json' | 'richtext';
+export type FieldKind = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'time' | 'select' | 'multiselect' | 'autocomplete' | 'stringlist' | 'checkbox' | 'tel' | 'email' | 'password' | 'code' | 'json' | 'richtext' | 'custom';
+
+export interface RenderInputCtx {
+  value: unknown;
+  setValue: (val: unknown) => void;
+  setFieldValue: (field: string, val: unknown) => void;
+  register: any; // ReturnType<typeof useForm>['register']
+  row: RowData | null;
+  formState: any;
+  watch: (key: string) => unknown;
+}
 
 export interface FieldDef {
   key: string; // nom du champ côté API (camelCase)
@@ -22,6 +32,7 @@ export interface FieldDef {
   disabled?: boolean;
   placeholder?: string;
   render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode; // vue lecture
+  renderInput?: (ctx: RenderInputCtx) => React.ReactNode;
 }
 
 export interface ColDef {

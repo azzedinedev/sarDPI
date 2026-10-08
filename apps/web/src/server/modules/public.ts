@@ -22,6 +22,7 @@ import { t } from '../i18n/server';
 import { qrSvg, verifyUrl } from '../qr';
 import { getActiveProfile } from '../country';
 import { sanitizeRow } from '../http/crud';
+import { hydrateRow } from '../data/cast';
 
 /* ------------------------------------------------------------------ i18n */
 route({
@@ -199,30 +200,125 @@ async function buildSpecFor(code: string, lang: string, ctx: Ctx): Promise<DocSp
   const rec = await db.findOne<Record<string, unknown>>('medical_records', { code });
   if (rec) {
     const type = await db.findOne<Record<string, unknown>>('intervention_types', { id: Number(rec.type_id) });
-    const patient = await db.findOne<Record<string, unknown>>('patients', { id: Number(rec.patient_id) });
+    const patientRaw = await db.findOne<Record<string, unknown>>('patients', { id: Number(rec.patient_id) });
+    const patient = patientRaw ? (hydrateRow('patients', patientRaw) as Record<string, unknown>) : null;
     const lab = await db.find<Record<string, unknown>>('lab_results', { where: { record_id: Number(rec.id) } });
+    const location = rec.location_id ? await db.findOne<Record<string, unknown>>('locations', { id: Number(rec.location_id) }) : null;
+    const team = await db.find<Record<string, unknown>>('record_practitioners', { where: { record_id: Number(rec.id) } });
+    const practs = team.length ? await Promise.all(team.map((tp) => db.findOne<Record<string, unknown>>('practitioners', { id: Number(tp.practitioner_id) }))) : [];
+    const practNames = practs.filter(Boolean).map((p) => `${String(p?.last_name ?? '').toUpperCase()} ${p?.first_name ?? ''}`.trim()).filter(Boolean).join(', ');
+
+    // 1. Données du patient (bloc standard configurable)
+    const patientRows: [string, string][] = [];
+    if (patient) {
+      patientRows.push([
+        lang === 'ar' ? 'الاسم واللقب' : 'Nom & Prénom',
+        `${String(patient.last_name ?? '').toUpperCase()} ${patient.first_name ?? ''}${patient.last_name_ar || patient.first_name_ar ? ` (${patient.last_name_ar ?? ''} ${patient.first_name_ar ?? ''})` : ''}`.trim(),
+      ]);
+      patientRows.push([lang === 'ar' ? 'رمز المريض' : 'Code patient', String(patient.code ?? '')]);
+      if (patient.birth_date) {
+        const b = String(patient.birth_date).slice(0, 10);
+        const age = Math.floor((Date.now() - new Date(b).getTime()) / (365.25 * 24 * 3600 * 1000));
+        patientRows.push([
+          lang === 'ar' ? 'تاريخ الميلاد / السن' : 'Date de naissance / Âge',
+          `${b}${age > 0 ? ` (${age} ${lang === 'ar' ? 'سنة' : 'ans'})` : ''}`,
+        ]);
+      }
+      if (patient.sex) {
+        patientRows.push([
+          lang === 'ar' ? 'الجنس' : 'Sexe',
+          patient.sex === 'M' ? (lang === 'ar' ? 'ذكر' : 'Masculin (M)') : patient.sex === 'F' ? (lang === 'ar' ? 'أنثى' : 'Féminin (F)') : String(patient.sex),
+        ]);
+      }
+      const isEnc = (v: unknown) => typeof v === 'string' && v.startsWith('ENCv1.');
+      if (patient.phone && !isEnc(patient.phone)) {
+        patientRows.push([lang === 'ar' ? 'الهاتف' : 'Téléphone', String(patient.phone)]);
+      }
+      const ss = patient.chifa_number ?? patient.ss_number;
+      if (ss && !isEnc(ss)) {
+        patientRows.push([
+          lang === 'ar' ? 'الضمان الاجتماعي / الشفاء' : 'N° Sécurité sociale / Chifa',
+          String(ss),
+        ]);
+      }
+      if (patient.blood_group && !isEnc(patient.blood_group)) {
+        patientRows.push([lang === 'ar' ? 'فصيلة الدم' : 'Groupe sanguin', String(patient.blood_group)]);
+      }
+      const addrParts = [patient.address && !isEnc(patient.address) ? patient.address : null, patient.commune, patient.wilaya].filter(Boolean);
+      if (addrParts.length) {
+        patientRows.push([
+          lang === 'ar' ? 'العنوان' : 'Adresse',
+          addrParts.join(', '),
+        ]);
+      }
+    }
+    if (location) {
+      const locLabel = pickLabel((location.name_json ?? {}) as never, lang) || location.name || location.building || location.code;
+      patientRows.push([lang === 'ar' ? 'مكان الفحص' : 'Lieu d’intervention', String(locLabel)]);
+    }
+    if (practNames) {
+      patientRows.push([lang === 'ar' ? 'الممارس / الفريق' : 'Praticien / Équipe', practNames]);
+    }
+
+    // 2. Détails & données de l'acte / examen
     const fields = (typeof rec.fields_json === 'string' ? JSON.parse(String(rec.fields_json)) : rec.fields_json ?? {}) as Record<string, unknown>;
     const defs = (typeof type?.fields_json === 'string' ? JSON.parse(String(type.fields_json)) : (type?.fields_json ?? [])) as { key: string; label?: Record<string, string>; kind?: string }[];
-    const rows: [string, string][] = defs
+    const examRows: [string, string][] = defs
       .filter((d) => fields[d.key] !== undefined && fields[d.key] !== null && fields[d.key] !== '')
-      .map((d) => [pickLabel(d.label ?? {}, lang), String(Array.isArray(fields[d.key]) ? (fields[d.key] as unknown[]).join(', ') : fields[d.key])]);
+      .map((d) => [pickLabel(d.label ?? {}, lang) || d.key, String(Array.isArray(fields[d.key]) ? (fields[d.key] as unknown[]).join(', ') : fields[d.key])]);
+
+    // 3. Tableau des contrôles et résultats de laboratoire
     const blocks: DocSpec['blocks'] = [];
-    if (rows.length) blocks.push({ heading: t(lang, 'pdf', 'pdf.patient'), rows });
-    if (lab.length) {
+    if (patientRows.length) {
+      blocks.push({ heading: t(lang, 'pdf', 'pdf.patient'), rows: patientRows });
+    }
+    if (examRows.length) {
+      blocks.push({ heading: lang === 'ar' ? 'بيانات وتفاصيل الفحص' : 'Détails & données de l’examen', rows: examRows });
+    }
+
+    // Résultats depuis lab_results ou values_json
+    let labItems = lab;
+    if (!labItems.length && rec.values_json) {
+      try {
+        const vj = typeof rec.values_json === 'string' ? JSON.parse(String(rec.values_json)) : rec.values_json;
+        if (Array.isArray(vj)) {
+          labItems = vj.map((x: Record<string, unknown>) => ({
+            param_key: x.parameterKey ?? x.param_key ?? x.key,
+            value_num: typeof x.value === 'number' ? x.value : null,
+            value_txt: typeof x.value === 'number' ? null : String(x.value ?? ''),
+            unit: x.unit ?? '',
+            ref_min: x.refLow ?? x.ref_min ?? null,
+            ref_max: x.refHigh ?? x.ref_max ?? null,
+            flag: x.flag ?? 'normal',
+          }));
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (labItems.length) {
       blocks.push({
         heading: t(lang, 'lab', 'lab.values'),
         table: {
-          head: [t(lang, 'lab', 'lab.parameter'), t(lang, 'lab', 'lab.result'), t(lang, 'lab', 'lab.unit'), t(lang, 'lab', 'lab.refRange'), t(lang, 'lab', 'lab.flag')],
-          rows: lab.map((l) => [
+          head: [
+            t(lang, 'lab', 'lab.parameter'),
+            t(lang, 'lab', 'lab.result'),
+            t(lang, 'lab', 'lab.unit'),
+            t(lang, 'lab', 'lab.refRange'),
+            t(lang, 'lab', 'lab.flag'),
+          ],
+          rows: labItems.map((l) => [
             escHtml(String(l.param_key).toUpperCase()),
             `<c><b class="num">${l.value_num != null ? Number(l.value_num) : escHtml(String(l.value_txt ?? ''))}</b></c>`,
             escHtml(String(l.unit ?? '')),
-            l.ref_min != null || l.ref_max != null ? `${l.ref_min ?? ''} – ${l.ref_max ?? ''}` : '',
-            `<c><span class="flag-${l.flag}">${escHtml(t(lang, 'lab', `lab.${l.flag === 'normal' ? 'normal' : l.flag}`))}</span></c>`,
+            l.ref_min != null || l.ref_max != null ? `${l.ref_min ?? ''} – ${l.ref_max ?? ''}` : '—',
+            `<c><span class="flag-${l.flag}">${escHtml(t(lang, 'lab', `lab.${l.flag === 'normal' ? 'normal' : l.flag}`)) || escHtml(String(l.flag))}</span></c>`,
           ]),
         },
       });
     }
+
     const summary = rec.summary_json ? pickLabel(rec.summary_json as never, lang) : String(rec.code);
     return {
       kind: String(rec.category_prefix) === 'LAB' ? 'lab' : 'report',
@@ -236,6 +332,7 @@ async function buildSpecFor(code: string, lang: string, ctx: Ctx): Promise<DocSp
         code: String(rec.code),
         date: fmtDate(rec.act_date),
         patientLine: patient ? `${String(patient.last_name).toUpperCase()} ${patient.first_name} — ${patient.code}` : undefined,
+        practitioner: practNames || undefined,
       },
       blocks,
       qr: rec.verify_token ? { svg: await qrSvg(verifyUrl(env.appUrl, String(rec.verify_token)), { size: 92 }), caption: t(lang, 'pdf', 'pdf.verify') } : undefined,
@@ -245,7 +342,8 @@ async function buildSpecFor(code: string, lang: string, ctx: Ctx): Promise<DocSp
   }
   const rx = await db.findOne<Record<string, unknown>>('prescriptions', { code });
   if (rx) {
-    const patient = await db.findOne<Record<string, unknown>>('patients', { id: Number(rx.patient_id) });
+    const patientRaw = await db.findOne<Record<string, unknown>>('patients', { id: Number(rx.patient_id) });
+    const patient = patientRaw ? (hydrateRow('patients', patientRaw) as Record<string, unknown>) : null;
     const pract = await db.findOne<Record<string, unknown>>('practitioners', { id: Number(rx.practitioner_id) });
     const lines = await db.find<Record<string, unknown>>('prescription_lines', { where: { prescription_id: Number(rx.id) }, orderBy: [['seq', 'asc']] });
     let stampSvg: string | undefined;

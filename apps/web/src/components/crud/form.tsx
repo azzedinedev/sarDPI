@@ -16,6 +16,7 @@ const snake = (k: string): string => k.replace(/[A-Z]/g, (m) => `_${m.toLowerCas
 function lookup(row: RowData, key: string): unknown {
   if (row[key] !== undefined) return row[key];
   if (row[snake(key)] !== undefined) return row[snake(key)];
+  if (key === 'apptId' && row['appointment_id'] !== undefined) return row['appointment_id'];
   if (key.includes('.')) {
     const [head, ...rest] = key.split('.');
     let cur: unknown = row[head!] ?? row[snake(head!)];
@@ -123,19 +124,19 @@ export function CrudForm({
             grp.label == null ? (
               <React.Fragment key={`g${gi}`}>
                 {grp.items.map((f) => (
-                  <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, register)}</FieldShell>
+                  <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, methods, row)}</FieldShell>
                 ))}
               </React.Fragment>
             ) : (
               <fieldset key={`g${gi}`} className="col-span-2 mt-1 border-t border-[rgb(var(--c-line)/0.7)] pt-3 first:border-t-0 first:pt-0">
                 {grp.items.length < 2 ? grp.items.map((f) => (
-                  <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, register)}</FieldShell>
+                  <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, methods, row)}</FieldShell>
                 )) : (
                   <>
                     <legend className="pe-2 text-[13px] font-bold uppercase tracking-wide text-[rgb(var(--c-primary))]">{grp.label}</legend>
                     <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3.5">
                       {grp.items.map((f) => (
-                        <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, register)}</FieldShell>
+                        <FieldShell key={f.key} f={f} error={formState.errors[f.key]?.message as string | undefined}>{renderInput(f, methods, row)}</FieldShell>
                       ))}
                     </div>
                   </>
@@ -175,7 +176,25 @@ function FieldShell({ f, error, children }: { f: FieldDef; error?: string; child
   );
 }
 
-function renderInput(f: FieldDef, register: ReturnType<typeof useForm>['register']): React.ReactElement {
+function renderInput(
+  f: FieldDef,
+  methods: ReturnType<typeof useForm<Record<string, unknown>>>,
+  row: RowData | null,
+): React.ReactElement {
+  if (f.renderInput) {
+    return (
+      <>{f.renderInput({
+        value: methods.watch(f.key),
+        setValue: (val: unknown) => methods.setValue(f.key, val, { shouldValidate: true, shouldDirty: true }),
+        setFieldValue: (k: string, val: unknown) => methods.setValue(k, val, { shouldValidate: true, shouldDirty: true }),
+        register: methods.register,
+        row,
+        formState: methods.formState,
+        watch: methods.watch,
+      })}</>
+    );
+  }
+  const register = methods.register;
   switch (f.kind) {
     case 'textarea':
     case 'json':

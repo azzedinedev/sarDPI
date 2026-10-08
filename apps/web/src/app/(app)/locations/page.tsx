@@ -20,9 +20,9 @@ export default function LocationsPage(): React.ReactElement {
       scopeSelect
       defaultSort={{ id: 'id', desc: false }}
       schema={locationBaseZ}
-      canCreate={has('locations', 'create')}
-      canUpdate={has('locations', 'update')}
-      canArchive={has('locations', 'archive')}
+      canCreate={has('location', 'create')}
+      canUpdate={has('location', 'update')}
+      canArchive={has('location', 'archive')}
       createLabel={t('loc.new')}
       cardTitle={(r) => fmtVal(r.name_fr ?? r.name)}
       cardSubtitle={(r) => <BizCode code={r.code as string} />}

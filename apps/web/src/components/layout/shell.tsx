@@ -14,6 +14,7 @@ import {
   FlaskConical,
   FolderOpen,
   LayoutDashboard,
+  MapPin,
   Menu,
   MessageSquare,
   Moon,
@@ -51,6 +52,7 @@ const NAV_MAIN: NavItem[] = [
   { key: 'nav.pharmacy', href: '/pharmacy', module: 'pharmacy', icon: Pill },
   { key: 'nav.prescriptions', href: '/prescriptions', module: 'prescriptions', icon: NotebookText },
   { key: 'nav.ged', href: '/documents', module: 'ged', icon: FolderOpen },
+  { key: 'nav.locations', href: '/locations', module: 'location', icon: MapPin },
   { key: 'nav.messages', href: '/messages', module: 'notifications', icon: MessageSquare },
 ];
 const NAV_ADMIN: NavItem[] = [

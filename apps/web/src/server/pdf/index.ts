@@ -107,11 +107,18 @@ code,.code{font-family:'IBM Plex Mono',monospace;font-size:11px;unicode-bidi:iso
 table{width:100%;border-collapse:collapse;margin:4px 0 8px}
 table.kv th{text-align:start;color:#4b6472;font-weight:600;width:38%;padding:3px 8px 3px 0;vertical-align:top}
 table.kv td{padding:3px 0;vertical-align:top}
-table.grid th,table.grid td{border:1px solid #d5e3ea;padding:5px 8px;text-align:start;font-size:11px}
-table.grid thead th{background:${primary}14;color:#234654}
-table.grid tr:nth-child(even) td{background:#f7fbfc}
-table.grid td.num{font-family:'IBM Plex Mono',monospace;text-align:end;direction:ltr;unicode-bidi:isolate}
-.flag-high{color:#c2410c;font-weight:700}.flag-low{color:#0369a1;font-weight:700}.flag-critical{color:#b91c1c;font-weight:800;background:#fee2e2;padding:0 5px;border-radius:5px}
+table.grid{width:100%;border-collapse:collapse;margin:8px 0 14px;page-break-inside:auto}
+table.grid thead{display:table-header-group}
+table.grid tfoot{display:table-footer-group}
+table.grid tr{page-break-inside:avoid;page-break-after:auto}
+table.grid th,table.grid td{border:1px solid #d5e3ea;padding:6.5px 9px;text-align:start;font-size:11px;vertical-align:middle}
+table.grid thead th{background:${primary}18;color:#1a3a48;font-weight:700;border-bottom:2px solid ${primary}40}
+table.grid tr:nth-child(even) td{background:#f8fafc}
+table.grid td.num{font-family:'IBM Plex Mono',monospace;text-align:end;direction:ltr;unicode-bidi:isolate;font-weight:600}
+.flag-high,.flag-H{color:#c2410c;font-weight:700;background:#ffedd5;padding:2px 6px;border-radius:4px;display:inline-block;font-size:10px}
+.flag-low,.flag-L{color:#0369a1;font-weight:700;background:#e0f2fe;padding:2px 6px;border-radius:4px;display:inline-block;font-size:10px}
+.flag-critical{color:#b91c1c;font-weight:800;background:#fee2e2;padding:2px 6px;border-radius:4px;display:inline-block;font-size:10px}
+.flag-normal,.flag-N{color:#15803d;font-weight:600;background:#dcfce7;padding:2px 6px;border-radius:4px;display:inline-block;font-size:10px}
 p.note{white-space:pre-wrap;background:#f4f8fa;border-radius:8px;padding:8px 10px;margin:6px 0}
 ul.rx{list-style:none;padding:0;margin:0}
 ul.rx li{padding:6px 0;border-bottom:1px dashed #dbe7ec}
@@ -125,7 +132,7 @@ footer.ftr{display:flex;justify-content:space-between;align-items:flex-end;gap:1
 .stampbox img{max-height:22mm;max-width:44mm;display:block;margin:0 auto 3px}
 .stampbox .sign{border-top:1px solid #94a9b4;width:42mm;margin:26mm auto 3px;text-align:center;color:#607d8b;font-size:9.5px;padding-top:2px}
 .conf{font-size:8.6px;color:#7c93a0;text-align:center;margin-top:10px}
-@media print{body{padding:6mm 4mm}.doc{max-width:none}@page{size:A4;margin:12mm}}
+@media print{body{padding:6mm 4mm}.doc{max-width:none}@page{size:A4;margin:12mm 10mm}table.grid{page-break-inside:auto}table.grid thead{display:table-header-group}table.grid tr{page-break-inside:avoid}}
 </style>
 </head>
 <body>

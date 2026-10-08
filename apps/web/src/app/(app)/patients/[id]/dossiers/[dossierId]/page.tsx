@@ -176,7 +176,7 @@ export default function DossierPage(): React.ReactElement {
               <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{r.type_label || pickAny(r.summary, lang) || tc('untitled')}</span>
               <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{r.act_date ? fmt(r.act_date, true) : ''}</span>
               <BizCode code={r.code} />
-              <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : 'text-[rgb(var(--c-muted))]'}`}>{fmtVal(r.status)}</span>
+              <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : r.status === 'cancelled' ? 'text-[rgb(var(--c-danger))]' : 'text-[rgb(var(--c-muted))]'}`}>{r.status === 'draft' ? t('records.st.draft') : r.status === 'validated' ? t('records.st.validated') : r.status === 'cancelled' ? t('records.st.cancelled') : r.status === 'in_progress' ? t('records.st.in_progress') : r.status === 'awaiting_results' ? t('records.st.awaiting') : fmtVal(r.status)}</span>
             </motion.button>
           ))}
         </Card>

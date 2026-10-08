@@ -126,11 +126,12 @@ export function RecordDialog({
 
   const statusTone = (s: unknown): 'ok' | 'danger' | 'warn' => (s === 'validated' ? 'ok' : s === 'cancelled' ? 'danger' : 'warn');
   const statusLabel = (s: unknown): string => {
-    const k = String(s);
+    const k = String(s ?? '');
     if (k === 'draft') return t('records.st.draft');
     if (k === 'validated') return t('records.st.validated');
     if (k === 'cancelled') return t('records.st.cancelled');
-    if (k === 'in_progress' || k === 'awaiting_results') return t('records.st.awaiting');
+    if (k === 'in_progress') return t('records.st.in_progress');
+    if (k === 'awaiting_results' || k === 'awaiting') return t('records.st.awaiting');
     return k;
   };
 
@@ -187,7 +188,7 @@ export function RecordDialog({
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                   options={[
                     { value: 'draft', label: t('records.st.draft') },
-                    { value: 'in_progress', label: t('records.st.awaiting') },
+                    { value: 'in_progress', label: t('records.st.in_progress') },
                     { value: 'validated', label: t('records.st.validated') },
                     { value: 'cancelled', label: t('records.st.cancelled') },
                   ]}
@@ -196,12 +197,15 @@ export function RecordDialog({
             </div>
           ) : (
             <>
-              {summary.fr || summary.ar ? (
-                <div className="rounded-xl bg-[rgb(var(--c-surface-2))] p-3 text-[13px]">
-                  {summary.fr ? <div dir="ltr" className="font-semibold">{String(summary.fr)}</div> : null}
-                  {summary.ar ? <div dir="rtl" className="mt-0.5 text-[rgb(var(--c-muted))]">{String(summary.ar)}</div> : null}
-                </div>
-              ) : null}
+              {(() => {
+                const s = (rec?.summary_json && typeof rec.summary_json === 'object' ? (rec.summary_json as Record<string, string>)[lang] : null) || (typeof rec?.summary === 'string' ? rec.summary : null) || summary[lang] || summary.fr;
+                if (!s) return null;
+                return (
+                  <div className="rounded-xl bg-[rgb(var(--c-surface-2))] p-3 text-[13px]" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                    <div className="font-semibold">{String(s)}</div>
+                  </div>
+                );
+              })()}
             </>
           )}
 

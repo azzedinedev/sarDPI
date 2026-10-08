@@ -674,7 +674,7 @@ function PatientRecords({ pid }: { pid: number }): React.ReactElement {
             className="flex items-center gap-3 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-2.5 text-start transition-colors hover:bg-[rgb(var(--c-primary-soft)/0.4)]"
           >
             <Badge tone="info">{fmtVal(r.category_prefix)}</Badge>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{fmtVal(r.title ?? r.summary) || tc('untitled')}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{(r.summary && typeof r.summary === 'object' ? pickAny(r.summary as never, lang) : null) || fmtVal(r.title ?? r.summary) || tc('untitled')}</span>
             {linked ? (
               <span className="badge hidden shrink-0 items-center gap-1 sm:inline-flex" title={t('dossier.linked')}>
                 <FolderOpen size={11} /> {pickAny({ fr: linked.category_label } as Record<string, string>, lang) || linked.category_label}
@@ -682,7 +682,7 @@ function PatientRecords({ pid }: { pid: number }): React.ReactElement {
             ) : null}
             <span dir="ltr" className="tabular-nums text-[11.5px] text-[rgb(var(--c-muted))]">{fmt(r.act_date, true)}</span>
             <BizCode code={r.code as string} />
-            <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : 'text-[rgb(var(--c-muted))]'}`}>{fmtVal(r.status)}</span>
+            <span className={`badge ${r.status === 'validated' ? 'text-[rgb(var(--c-ok))]' : r.status === 'cancelled' ? 'text-[rgb(var(--c-danger))]' : 'text-[rgb(var(--c-muted))]'}`}>{r.status === 'draft' ? t('records.st.draft') : r.status === 'validated' ? t('records.st.validated') : r.status === 'cancelled' ? t('records.st.cancelled') : r.status === 'in_progress' ? t('records.st.in_progress') : r.status === 'awaiting_results' ? t('records.st.awaiting') : fmtVal(r.status)}</span>
           </motion.button>
         );
       })}
