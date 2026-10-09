@@ -104,6 +104,7 @@ export default function CalendarPage(): React.ReactElement {
   const toast = useToast();
   const sp = useSearchParams();
   const qc = useQueryClient();
+  const perms = useAuth((s) => s.perms);
   const has = useAuth((s) => s.has);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [dialog, setDialog] = useState<{ mode: 'create' | 'edit' | 'detail'; start?: string; end?: string; appt?: Appt } | null>(null);
@@ -508,6 +509,7 @@ function ApptDialog({
   const { t: tc } = useT('common');
   const toast = useToast();
   const qc = useQueryClient();
+  const perms = useAuth((s) => s.perms);
   const has = useAuth((s) => s.has);
   const open = Boolean(state);
 

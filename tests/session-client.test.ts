@@ -145,4 +145,32 @@ describe('stores/auth — sessionLost() vide l’état et renvoie vers la connex
     useAuth.getState().sessionLost('ended');
     expect(replaceSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('refreshNow() met à jour perms et la référence has pour déclencher la réactivité des composants et menus', async () => {
+    const initialHas = useAuth.getState().has;
+    expect(initialHas('patient', 'view')).toBe(false);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { accessToken: 'fresh-acc', csrfToken: 'fresh-csrf' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          user: { id: 1, username: 'admin', fullName: 'Administrateur', locale: 'fr' },
+          role: { id: 1, key: 'admin', name: { fr: 'Administrateur' } },
+          perms: ['*'],
+          license: { state: 'valid' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useAuth.getState().refreshNow();
+
+    expect(useAuth.getState().perms).toEqual(['*']);
+    const updatedHas = useAuth.getState().has;
+    expect(updatedHas).not.toBe(initialHas);
+    expect(updatedHas('patient', 'view')).toBe(true);
+    expect(updatedHas('appointment', 'view')).toBe(true);
+    expect(updatedHas('record.lab', 'view')).toBe(true);
+    expect(updatedHas('admin', 'view')).toBe(true);
+  });
 });

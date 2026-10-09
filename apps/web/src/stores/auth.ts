@@ -71,8 +71,10 @@ const BOOT_RETRIES = 2;
 const BOOT_RETRY_DELAY_MS = 1200;
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+const makeHas = (perms: string[]) => (module: string, action: ActionKey = 'view') => can(perms, module, action);
+
 /** État « aucune session » : tout ce qui vient d'une session précédente est effacé. */
-const ANON = { accessToken: null, csrf: null, user: null, role: null, perms: [] as string[], license: null, totpPending: false, status: 'anonymous' as const };
+const ANON = { accessToken: null, csrf: null, user: null, role: null, perms: [] as string[], license: null, totpPending: false, status: 'anonymous' as const, has: makeHas([]) };
 
 export const useAuth = create<AuthState>((set, get) => ({
   accessToken: null,
@@ -80,6 +82,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   role: null,
   perms: [],
+  has: makeHas([]),
   license: null,
   status: 'checking',
   error: null,
@@ -150,7 +153,7 @@ export const useAuth = create<AuthState>((set, get) => ({
           perms: string[];
           license: { state: string };
         };
-        set({ user: me.user, role: me.role, perms: me.perms, license: me.license, status: 'authed', error: null });
+        set({ user: me.user, role: me.role, perms: me.perms, license: me.license, status: 'authed', error: null, has: makeHas(me.perms) });
         if (typeof document !== 'undefined') {
           document.documentElement.lang = me.user?.locale ?? 'fr';
           document.documentElement.dir = me.user?.locale === 'ar' ? 'rtl' : 'ltr';
@@ -224,8 +227,6 @@ export const useAuth = create<AuthState>((set, get) => ({
       window.location.replace(loginUrl());
     }
   },
-
-  has: (module, action) => can(get().perms, module, action),
 
   setPrefs: async (p) => {
     set((s) => (s.user ? { user: { ...s.user, ...p } } : {}));

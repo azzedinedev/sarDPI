@@ -30,7 +30,7 @@ import {
 import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { useI18n, useT } from '@/lib/i18n';
-import { pickLabel } from '@sardpi/shared';
+import { can, pickLabel } from '@sardpi/shared';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui';
 
@@ -47,6 +47,7 @@ export function ProfileMenu(): React.ReactElement {
   const { t: tAuth } = useT('auth');
   const user = useAuth((s) => s.user);
   const role = useAuth((s) => s.role);
+  const perms = useAuth((s) => s.perms);
   const license = useAuth((s) => s.license);
   const has = useAuth((s) => s.has);
   const logout = useAuth((s) => s.logout);
@@ -114,7 +115,7 @@ export function ProfileMenu(): React.ReactElement {
   }, [open, items]);
 
   const roleLabel = role ? pickLabel(role.name ?? {}, lang, 'fr') || role.key : '';
-  const canSettings = has('setting', 'view') || has('admin', 'view');
+  const canSettings = can(perms, 'setting', 'view') || can(perms, 'admin', 'view');
 
   const nextTheme = (m: 'light' | 'dark' | 'system'): 'light' | 'dark' | 'system' => (m === 'light' ? 'dark' : m === 'dark' ? 'system' : 'light');
   const ThemeIcon = ui.themeMode === 'dark' ? Moon : ui.themeMode === 'system' ? Monitor : Sun;

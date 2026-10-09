@@ -81,4 +81,69 @@ describe('Restauration serveur, expiration de session et RBAC navigation', () =>
     expect(can(admin.perms, 'admin', 'view')).toBe(true);
     expect(can(admin.perms, 'any_future_module', 'view')).toBe(true);
   });
+
+  it('5. Le menu de navigation principal et admin réagit à l’arrivée asynchrone des permissions', () => {
+    const NAV_MAIN = [
+      { key: 'nav.dashboard', href: '/dashboard', module: null },
+      { key: 'nav.patients', href: '/patients', module: 'patient' },
+      { key: 'nav.calendar', href: '/calendar', module: 'appointment' },
+      { key: 'nav.records', href: '/records/CON', module: 'record.consultation' },
+      { key: 'nav.lab', href: '/records/LAB', module: 'record.lab' },
+      { key: 'nav.pharmacy', href: '/pharmacy', module: 'record.pharmacy' },
+      { key: 'nav.prescriptions', href: '/prescriptions', module: 'prescription' },
+      { key: 'nav.ged', href: '/documents', module: 'ged' },
+      { key: 'nav.locations', href: '/locations', module: 'location' },
+      { key: 'nav.messages', href: '/messages', module: 'message' },
+    ];
+    const NAV_ADMIN = [
+      { key: 'nav.admin', href: '/admin', module: 'admin' },
+      { key: 'nav.settings', href: '/admin/settings', module: 'admin' },
+    ];
+
+    // Au premier rendu (avant que /auth/me ne se résolve) : perms = []
+    const emptyPerms: string[] = [];
+    const visInitial = NAV_MAIN.filter((n) => !n.module || can(emptyPerms, n.module, 'view'));
+    const admInitial = NAV_ADMIN.filter((n) => !n.module || can(emptyPerms, n.module, 'view'));
+    expect(visInitial.map((n) => n.key)).toEqual(['nav.dashboard']);
+    expect(admInitial).toEqual([]);
+
+    // Dès que /auth/me résout pour admin : toutes les rubriques doivent s'afficher
+    const adminPerms = ['*'];
+    const visAdmin = NAV_MAIN.filter((n) => !n.module || can(adminPerms, n.module, 'view'));
+    const admAdmin = NAV_ADMIN.filter((n) => !n.module || can(adminPerms, n.module, 'view'));
+    expect(visAdmin).toHaveLength(10);
+    expect(admAdmin).toHaveLength(2);
+    expect(visAdmin.map((n) => n.key)).toContain('nav.patients');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.calendar');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.records');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.lab');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.pharmacy');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.prescriptions');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.ged');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.locations');
+    expect(visAdmin.map((n) => n.key)).toContain('nav.messages');
+    expect(admAdmin.map((n) => n.key)).toContain('nav.admin');
+    expect(admAdmin.map((n) => n.key)).toContain('nav.settings');
+
+    // Dès que /auth/me résout pour médecin : toutes les rubriques cliniques doivent s'afficher
+    const physicianPerms = SEED_ROLES.find((r) => r.key === 'physician')!.perms;
+    const visPhysician = NAV_MAIN.filter((n) => !n.module || can(physicianPerms, n.module, 'view'));
+    const admPhysician = NAV_ADMIN.filter((n) => !n.module || can(physicianPerms, n.module, 'view'));
+    expect(visPhysician).toHaveLength(10);
+    expect(admPhysician).toHaveLength(0);
+
+    // Pour secrétaire : patients, agenda, records, ged, lieux, messagerie
+    const secretaryPerms = SEED_ROLES.find((r) => r.key === 'secretary')!.perms;
+    const visSecretary = NAV_MAIN.filter((n) => !n.module || can(secretaryPerms, n.module, 'view'));
+    expect(visSecretary.map((n) => n.key)).toEqual([
+      'nav.dashboard',
+      'nav.patients',
+      'nav.calendar',
+      'nav.records',
+      'nav.prescriptions',
+      'nav.ged',
+      'nav.locations',
+      'nav.messages',
+    ]);
+  });
 });

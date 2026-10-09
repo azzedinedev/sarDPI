@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Blocks, CalendarClock, Database, FolderCog, KeyRound, Languages, Mail, Palette, Plug, Settings2, ShieldCheck, Users } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/stores/auth';
+import { can } from '@sardpi/shared';
 
 const SECTIONS = [
   { href: '/admin/users', icon: Users, perm: 'user', key: 'admin.users' },
@@ -21,8 +22,8 @@ const SECTIONS = [
 
 export default function AdminHome(): React.ReactElement {
   const { t } = useT('settings');
-  const has = useAuth((s) => s.has);
-  const items = SECTIONS.filter((x) => has(x.perm, 'view'));
+  const perms = useAuth((s) => s.perms);
+  const items = SECTIONS.filter((x) => can(perms, x.perm, 'view'));
   return (
     <div className="flex flex-col gap-4">
       <div>

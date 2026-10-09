@@ -32,6 +32,7 @@ import {
 import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { useT, useI18n } from '@/lib/i18n';
+import { can } from '@sardpi/shared';
 import { cn } from '@/lib/utils';
 import { SessionLoader } from '@/components/loaders';
 import { Breadcrumb } from '@/components/breadcrumb';
@@ -66,6 +67,7 @@ const PROBE_MIN_MS = 20_000;
 
 export function Shell({ children }: { children: React.ReactNode }): React.ReactElement {
   const status = useAuth((s) => s.status);
+  const perms = useAuth((s) => s.perms);
   const has = useAuth((s) => s.has);
   const license = useAuth((s) => s.license);
   const router = useRouter();
@@ -123,10 +125,39 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
   }, [status, verifySession]);
 
   const items = useMemo(() => {
-    const vis = NAV_MAIN.filter((n) => !n.module || has(n.module, 'view'));
-    const adm = NAV_ADMIN.filter((n) => !n.module || has(n.module, 'view'));
+    const vis = NAV_MAIN.filter((n) => !n.module || can(perms, n.module, 'view'));
+    const adm = NAV_ADMIN.filter((n) => !n.module || can(perms, n.module, 'view'));
     return { vis, adm };
-  }, [has]);
+  }, [perms]);
+
+  /**
+   * Publie la hauteur RÉELLE de la chrome collante (bandeau licence + topbar + fil d'Ariane) dans
+   * « --app-sticky-top » : la sous-navigation des Paramètres s'y colle sans marge codée en dur
+   * (voir .sticky-under-topbar). Recalculé au redimensionnement, au zoom, au changement de
+   * densité (data-density), de mode de navigation, et à l'apparition du bandeau licence.
+   */
+  useEffect(() => {
+    const el = topbarRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let raf = 0;
+    const apply = (): void => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = Math.round(el.getBoundingClientRect().bottom) + 12;
+        document.documentElement.style.setProperty('--app-sticky-top', `${Math.max(48, h)}px`);
+      });
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    ro.observe(document.body); // bandeau licence, polices, libellés longs
+    window.addEventListener('resize', apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, [license?.state, items.vis.length, items.adm.length, ui.density, ui.nav]);
 
   /**
    * Publie la hauteur RÉELLE de la chrome collante (bandeau licence + topbar + fil d'Ariane) dans
