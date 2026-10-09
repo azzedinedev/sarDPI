@@ -48,12 +48,13 @@ export function PopMenu({
       const a = anchor.current?.getBoundingClientRect();
       if (!a) return;
       const m = menuRef.current?.getBoundingClientRect();
-      const w = m?.width || 260;
+      const w = matchWidth ? a.width : (m?.width || 260);
       const h = m?.height || 240;
-      let top = a.bottom + 6;
-      if (top + h > window.innerHeight - 8) top = Math.max(8, a.top - h - 6);
-      let left = a.right - w; // alignement fin (logique « end »), cohérent RTL car basé sur des coordonnées physiques
-      left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+      let top = a.bottom + 4;
+      if (top + h > window.innerHeight - 8) top = Math.max(8, a.top - h - 4);
+      const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+      let left = isRtl ? a.right - w : a.left;
+      left = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - w - 8));
       setPos({ top, left, w: matchWidth ? a.width : undefined });
     };
     place();
@@ -67,8 +68,13 @@ export function PopMenu({
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[190]" onClick={onClose} aria-hidden />
-      <div ref={menuRef} className={cn('glass-card fixed z-[200] p-2 shadow-[var(--shadow-lift)]', className)} style={pos ? { top: pos.top, left: pos.left, width: pos.w } : { top: -9999, left: -9999 }} data-open={open}>
+      <div className="fixed inset-0 z-[290]" onClick={onClose} aria-hidden />
+      <div
+        ref={menuRef}
+        className={cn('glass-card fixed z-[300] p-1.5 shadow-[var(--shadow-lift)]', className)}
+        style={pos ? { top: pos.top, left: pos.left, width: pos.w } : { top: -9999, left: -9999, visibility: 'hidden' }}
+        data-open={open}
+      >
         {children}
       </div>
     </>,

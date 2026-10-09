@@ -54,4 +54,11 @@ describe('Améliorations du calendrier & Sécurité des modales', () => {
     expect(apptServerSrc).toContain('practitioner_name:');
     expect(apptServerSrc).toContain('location_name:');
   });
+
+  it('PopMenu (autocomplete) a un z-index supérieur aux modales pour s’afficher au premier plan', () => {
+    const popoverSrc = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/components/popover.tsx'), 'utf-8');
+    // PopMenu z-index z-[300] supérieur à Dialog z-[210]
+    expect(popoverSrc).toContain('z-[300]');
+    expect(popoverSrc).toContain('z-[290]');
+  });
 });
