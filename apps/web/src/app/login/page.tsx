@@ -102,7 +102,8 @@ function LoginForm(): React.ReactElement {
         await login(identifier, password, captchaPayload(captcha, { token: captchaToken, id: captcha?.id, value: captchaSol }));
       }
       const next = sp.get('next') ?? '/dashboard';
-      router.replace(next.startsWith('/') ? next : '/dashboard');
+      const target = next.startsWith('/') && !next.startsWith('/login') ? next : '/dashboard';
+      window.location.replace(target);
     } catch {
       // Nouveau défi après un échec (interne comme externe) : l'ancien est soit consommé, soit expiré.
       setCaptchaSol('');

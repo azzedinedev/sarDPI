@@ -48,9 +48,9 @@ function OptionList({
   emptyLabel: string;
 }): React.ReactElement {
   return (
-    <div role="listbox" className="max-h-64 w-full min-w-56 overflow-y-auto" dir="auto">
+    <div role="listbox" className="max-h-64 w-full min-w-[260px] overflow-y-auto overflow-x-hidden" dir="auto">
       {items.length === 0 ? (
-        <p className="px-2 py-3 text-center text-[12.5px] text-[rgb(var(--c-muted))]">{emptyLabel}</p>
+        <p className="px-3 py-3 text-center text-[12.5px] text-[rgb(var(--c-muted))]">{emptyLabel}</p>
       ) : (
         items.map((o, i) => (
           <button
@@ -61,7 +61,7 @@ function OptionList({
             onMouseDown={(e) => e.preventDefault() /* ne pas voler le focus avant le clic */}
             onClick={() => onPick(o)}
             className={cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-[13px] hover:bg-[rgb(var(--c-primary-soft))]',
+              'flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-start text-[13px] hover:bg-[rgb(var(--c-primary-soft))] transition-colors',
               i === active && 'bg-[rgb(var(--c-primary-soft))] ring-1 ring-[rgb(var(--c-primary)/0.35)]',
               selected(o) && 'font-semibold text-[rgb(var(--c-primary))]',
             )}
@@ -69,8 +69,8 @@ function OptionList({
             {multiple ? (
               <span className={cn('grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px]', selected(o) ? 'border-[rgb(var(--c-primary))] bg-[rgb(var(--c-primary))] text-white' : 'border-[rgb(var(--c-line))]')}>{selected(o) ? '✓' : ''}</span>
             ) : null}
-            <span dir="auto" className="min-w-0 flex-1 truncate">{o.label}</span>
-            {o.sublabel ? <span dir="ltr" className="font-mono text-[10.5px] text-[rgb(var(--c-muted))]">{o.sublabel}</span> : null}
+            <span dir="auto" className="min-w-0 flex-1 truncate font-medium">{o.label}</span>
+            {o.sublabel ? <span dir="ltr" className="shrink-0 ms-2 font-mono text-[10.5px] text-[rgb(var(--c-muted))]">{o.sublabel}</span> : null}
           </button>
         ))
       )}

@@ -61,4 +61,44 @@ describe('Améliorations du calendrier & Sécurité des modales', () => {
     expect(popoverSrc).toContain('z-[300]');
     expect(popoverSrc).toContain('z-[290]');
   });
+
+  it('Les blocs du calendrier disposent d’une icône d’édition, d’un double-clic et d’un clic sans disparition', () => {
+    const calSrc = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/app/(app)/calendar/page.tsx'), 'utf-8');
+    // dayMinToDate ne doit pas additionner HOUR0 deux fois
+    expect(calSrc).toContain('dayMinToDate(day, startMin)');
+    expect(calSrc).toContain('dayMinToDate(day, endMin)');
+    expect(calSrc).not.toContain('dayMinToDate(day, startMin + HOUR0 * 60)');
+    expect(calSrc).not.toContain('dayMinToDate(day, endMin + HOUR0 * 60)');
+
+    // Seuil de déplacement (moved) pour éviter de déclencher un déplacement lors d’un simple clic
+    expect(calSrc).toContain('dragStartRef');
+    expect(calSrc).toContain('wasMoved');
+
+    // Icône d’édition présente sur le bloc
+    expect(calSrc).toContain('<Edit3 size={11}');
+    // Déclencheurs de clic et double-clic
+    expect(calSrc).toContain("onDoubleClick={(e) => {");
+    expect(calSrc).toContain("setDialog({ mode: 'edit', appt: a })");
+    expect(calSrc).toContain("setDialog({ mode: 'detail', appt: a })");
+  });
+
+  it('PopMenu adapte sa largeur aux résultats de liste et applique un arrière-plan opaque complet', () => {
+    const popoverSrc = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/components/popover.tsx'), 'utf-8');
+    // Arrière-plan opaque et non transparent
+    expect(popoverSrc).toContain('!bg-[rgb(var(--c-surface))]');
+    // Mesure de la largeur réelle pour adapter la liste aux résultats
+    expect(popoverSrc).toContain('measuredW');
+    expect(popoverSrc).toContain('minW');
+    expect(popoverSrc).toContain('maxW');
+
+    // OptionList dans combo.tsx a une largeur adaptée
+    const comboSrc = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/components/combo.tsx'), 'utf-8');
+    expect(comboSrc).toContain('min-w-[260px]');
+  });
+
+  it('La redirection après connexion utilise window.location.replace pour recharger proprement la session sur /calendar', () => {
+    const loginSrc = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/app/login/page.tsx'), 'utf-8');
+    expect(loginSrc).toContain('window.location.replace(target)');
+    expect(loginSrc).not.toContain('router.replace(next.startsWith');
+  });
 });

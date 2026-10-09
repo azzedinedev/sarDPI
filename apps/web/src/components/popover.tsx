@@ -40,7 +40,7 @@ export function PopMenu({
   matchWidth?: boolean;
 }): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; w?: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; w: number; minW: number; maxW: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) { setPos(null); return; }
@@ -48,14 +48,17 @@ export function PopMenu({
       const a = anchor.current?.getBoundingClientRect();
       if (!a) return;
       const m = menuRef.current?.getBoundingClientRect();
-      const w = matchWidth ? a.width : (m?.width || 260);
+      const minW = matchWidth ? Math.max(a.width, 280) : 260;
+      const maxW = Math.min(window.innerWidth - 16, 560);
+      const measuredW = m ? Math.max(m.width || 0, menuRef.current?.scrollWidth || 0, menuRef.current?.offsetWidth || 0) : minW;
+      const w = Math.min(maxW, Math.max(minW, measuredW));
       const h = m?.height || 240;
       let top = a.bottom + 4;
       if (top + h > window.innerHeight - 8) top = Math.max(8, a.top - h - 4);
       const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
       let left = isRtl ? a.right - w : a.left;
       left = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - w - 8));
-      setPos({ top, left, w: matchWidth ? a.width : undefined });
+      setPos({ top, left, w, minW, maxW });
     };
     place();
     const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose(); };
@@ -71,8 +74,8 @@ export function PopMenu({
       <div className="fixed inset-0 z-[290]" onClick={onClose} aria-hidden />
       <div
         ref={menuRef}
-        className={cn('glass-card fixed z-[300] p-1.5 shadow-[var(--shadow-lift)]', className)}
-        style={pos ? { top: pos.top, left: pos.left, width: pos.w } : { top: -9999, left: -9999, visibility: 'hidden' }}
+        className={cn('glass-card !bg-[rgb(var(--c-surface))] border border-[rgb(var(--c-line))] fixed z-[300] p-1.5 shadow-2xl rounded-xl', className)}
+        style={pos ? { top: pos.top, left: pos.left, width: pos.w, minWidth: pos.minW, maxWidth: pos.maxW } : { top: -9999, left: -9999, visibility: 'hidden', width: 'max-content', minWidth: 280, maxWidth: 560 }}
         data-open={open}
       >
         {children}

@@ -85,10 +85,10 @@ function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-/** minute-du-jour + datetime-local → Date locale */
-function dayMinToDate(day: Date, min: number): Date {
+/** minute-du-jour (relative au début de grille HOUR0) → Date locale */
+function dayMinToDate(day: Date, minFromHour0: number): Date {
   const d = new Date(day);
-  d.setHours(HOUR0 + Math.floor(min / 60), min % 60, 0, 0);
+  d.setHours(HOUR0 + Math.floor(minFromHour0 / 60), minFromHour0 % 60, 0, 0);
   return d;
 }
 
@@ -116,6 +116,7 @@ export default function CalendarPage(): React.ReactElement {
   const canEditLabels = has('setting', 'update');
   const colRefs = useRef<(HTMLDivElement | null)[]>([]);
   const draggedRef = useRef(false); // supprime le « clic » qui suit un glisser (sinon la fiche s'ouvrirait)
+  const dragStartRef = useRef<{ clientY: number; moved: boolean }>({ clientY: 0, moved: false });
 
   const from = weekStart.toISOString();
   const to = new Date(weekStart.getTime() + 7 * 86_400_000).toISOString();
@@ -180,13 +181,25 @@ export default function CalendarPage(): React.ReactElement {
   useEffect(() => {
     if (!drag || drag.type === 'select') return;
     const onMove = (e: PointerEvent): void => {
-      if (drag.type === 'move') setDrag({ ...drag, cur: minuteFromEvent(e, drag.day) - drag.grabOffset });
-      else if (drag.type === 'resize') setDrag({ ...drag, curEnd: minuteFromEvent(e, drag.day) });
+      if (Math.abs(e.clientY - dragStartRef.current.clientY) >= 4) {
+        dragStartRef.current.moved = true;
+      }
+      if (drag.type === 'move') {
+        if (!dragStartRef.current.moved) return;
+        setDrag((prev) => (prev && prev.type === 'move' ? { ...prev, cur: minuteFromEvent(e, prev.day) - prev.grabOffset } : prev));
+      } else if (drag.type === 'resize') {
+        setDrag((prev) => (prev && prev.type === 'resize' ? { ...prev, curEnd: minuteFromEvent(e, prev.day) } : prev));
+      }
     };
     const onUp = (): void => {
       const d = drag;
+      const wasMoved = dragStartRef.current.moved;
       setDrag(null);
       if (!d) return;
+      if (!wasMoved && d.type === 'move') {
+        // Clic stationnaire sans glisser : ne pas muter, laisser le clic / double-clic ouvrir la modale
+        return;
+      }
       const target = rows.find((r) => r.id === d.id);
       if (!target) return;
       const day = days[d.day]!;
@@ -200,8 +213,8 @@ export default function CalendarPage(): React.ReactElement {
         endMin = clampMin(snap(d.curEnd));
         if (endMin <= startMin) endMin = startMin + SNAP_MIN;
       }
-      const startAt = dayMinToDate(day, startMin + HOUR0 * 60).toISOString();
-      const endAt = dayMinToDate(day, endMin + HOUR0 * 60).toISOString();
+      const startAt = dayMinToDate(day, startMin).toISOString();
+      const endAt = dayMinToDate(day, endMin).toISOString();
       if (startAt !== target.start_at || endAt !== target.end_at) {
         draggedRef.current = true;
         moveMut.mutate({ id: d.id, startAt, endAt });
@@ -238,7 +251,7 @@ export default function CalendarPage(): React.ReactElement {
       const startMin = a;
       const endMin = b <= a ? a + SLOT_MIN : b; // simple clic → créneau de 30 min
       const day = days[dayIndex]!;
-      setDialog({ mode: 'create', start: toLocalInput(dayMinToDate(day, startMin + HOUR0 * 60)), end: toLocalInput(dayMinToDate(day, endMin + HOUR0 * 60)) });
+      setDialog({ mode: 'create', start: toLocalInput(dayMinToDate(day, startMin)), end: toLocalInput(dayMinToDate(day, endMin)) });
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -247,14 +260,15 @@ export default function CalendarPage(): React.ReactElement {
   const startBlockDrag = (e: React.PointerEvent, a: Appt, dayIndex: number, mode: 'move' | 'resize'): void => {
     if (!canUpdate || e.button !== 0) return;
     e.stopPropagation();
-    e.preventDefault();
     const startMin = minsOf(a.start_at) - HOUR0 * 60;
     const endMin = (a.end_at ? minsOf(a.end_at) : startMin + 30) - HOUR0 * 60;
     const dur = Math.max(SNAP_MIN, endMin - startMin);
+    dragStartRef.current = { clientY: e.clientY, moved: false };
     if (mode === 'move') {
       const grabOffset = minuteFromEvent(e, dayIndex) - startMin;
       setDrag({ type: 'move', id: a.id, day: dayIndex, grabOffset, origStart: startMin, dur, cur: startMin });
     } else {
+      dragStartRef.current.moved = true;
       setDrag({ type: 'resize', id: a.id, day: dayIndex, origStart: startMin, curEnd: endMin });
     }
   };
@@ -388,12 +402,37 @@ export default function CalendarPage(): React.ReactElement {
                       }
                       setDialog({ mode: 'detail', appt: a });
                     }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setDialog({ mode: 'edit', appt: a });
+                    }}
                   >
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-[9.5px] opacity-80">{fmtMin(startMin + HOUR0 * 60)}</span>
-                      <button className="min-w-0 flex-1 truncate text-start font-bold" onClick={(e) => { e.stopPropagation(); setDialog({ mode: 'detail', appt: a }); }}>
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 truncate text-start font-bold hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDialog({ mode: 'detail', appt: a });
+                        }}
+                      >
                         {a.patient_name ?? t('appt.orphan')}
                       </button>
+                      {canUpdate ? (
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-0.5 text-[rgb(var(--c-ink))] opacity-70 hover:opacity-100 hover:bg-[rgb(var(--c-surface)/0.6)]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDialog({ mode: 'edit', appt: a });
+                          }}
+                          title={tc('edit')}
+                          aria-label={tc('edit')}
+                        >
+                          <Edit3 size={11} />
+                        </button>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-1 text-[9px] opacity-80">
                       <span className="truncate">{ck.kindLabel(a.kind)}</span>
