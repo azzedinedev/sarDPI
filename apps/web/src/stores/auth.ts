@@ -119,6 +119,7 @@ export const useAuth = create<AuthState>((set, get) => ({
      * redirection (`reason`) et `next` ramène l'utilisateur à sa page après reconnexion.
      */
     leaving = true;
+    setTimeout(() => { leaving = false; }, 2000);
     const url = new URL(target, window.location.origin);
     if (reason === 'expired' && !url.searchParams.has('reason')) url.searchParams.set('reason', 'expired');
     window.location.replace(url.toString());

@@ -45,15 +45,15 @@ interface NavItem {
 }
 const NAV_MAIN: NavItem[] = [
   { key: 'nav.dashboard', href: '/dashboard', module: null, icon: LayoutDashboard },
-  { key: 'nav.patients', href: '/patients', module: 'patients', icon: Users },
-  { key: 'nav.calendar', href: '/calendar', module: 'calendar', icon: CalendarRange },
-  { key: 'nav.records', href: '/records/CON', module: 'records', icon: Stethoscope },
-  { key: 'nav.lab', href: '/records/LAB', module: 'lab', icon: FlaskConical },
-  { key: 'nav.pharmacy', href: '/pharmacy', module: 'pharmacy', icon: Pill },
-  { key: 'nav.prescriptions', href: '/prescriptions', module: 'prescriptions', icon: NotebookText },
+  { key: 'nav.patients', href: '/patients', module: 'patient', icon: Users },
+  { key: 'nav.calendar', href: '/calendar', module: 'appointment', icon: CalendarRange },
+  { key: 'nav.records', href: '/records/CON', module: 'record.consultation', icon: Stethoscope },
+  { key: 'nav.lab', href: '/records/LAB', module: 'record.lab', icon: FlaskConical },
+  { key: 'nav.pharmacy', href: '/pharmacy', module: 'record.pharmacy', icon: Pill },
+  { key: 'nav.prescriptions', href: '/prescriptions', module: 'prescription', icon: NotebookText },
   { key: 'nav.ged', href: '/documents', module: 'ged', icon: FolderOpen },
   { key: 'nav.locations', href: '/locations', module: 'location', icon: MapPin },
-  { key: 'nav.messages', href: '/messages', module: 'notifications', icon: MessageSquare },
+  { key: 'nav.messages', href: '/messages', module: 'message', icon: MessageSquare },
 ];
 const NAV_ADMIN: NavItem[] = [
   { key: 'nav.admin', href: '/admin', module: 'admin', icon: Shield },

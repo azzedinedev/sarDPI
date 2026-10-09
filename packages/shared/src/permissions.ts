@@ -18,11 +18,43 @@ export type ModuleKey = (typeof MODULES)[number];
 export type ActionKey = (typeof ACTIONS)[number];
 export type Permission = string; // 'module.action'
 
-/** Vérifie une permission contre une liste (avec jokers). */
+/** Alias et équivalences de modules pour l'UI et l'API. */
+const MODULE_ALIASES: Record<string, string[]> = {
+  patients: ['patient'],
+  patient: ['patients'],
+  calendar: ['appointment'],
+  appointment: ['calendar'],
+  records: ['record', 'record.consultation'],
+  'record.consultation': ['records', 'record'],
+  lab: ['record.lab', 'labref'],
+  'record.lab': ['lab', 'labref'],
+  pharmacy: ['record.pharmacy', 'drug'],
+  'record.pharmacy': ['pharmacy', 'drug'],
+  prescriptions: ['prescription'],
+  prescription: ['prescriptions'],
+  notifications: ['message'],
+  message: ['notifications'],
+  locations: ['location'],
+  location: ['locations'],
+  admin: ['user', 'role', 'setting', 'audit', 'licence', 'backup', 'theme'],
+};
+
+/** Vérifie une permission contre une liste (avec jokers et alias de modules). */
 export function can(perms: string[] | undefined, module: string, action: ActionKey): boolean {
-  if (!perms) return false;
+  if (!perms || !perms.length) return false;
   if (perms.includes('*')) return true;
-  return perms.includes(`${module}.${action}`) || perms.includes(`${module}.*`) || perms.includes(`*.${action}`);
+
+  const testModule = (m: string): boolean =>
+    perms.includes(`${m}.${action}`) || perms.includes(`${m}.*`) || perms.includes(`*.${action}`) || perms.includes('*');
+
+  if (testModule(module)) return true;
+
+  const aliases = MODULE_ALIASES[module] ?? [];
+  for (const alias of aliases) {
+    if (testModule(alias)) return true;
+  }
+
+  return false;
 }
 
 /** Rôles seed avec matrice de permissions par module. */

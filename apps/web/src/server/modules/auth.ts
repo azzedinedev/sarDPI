@@ -154,7 +154,10 @@ export function registerAuth(): void {
     async handler(ctx: Ctx) {
       const db = await getDb();
       const token = ctx.req.cookies.get(REFRESH_COOKIE)?.value;
-      if (!token) throw new ApiError(401, 'errors.unauthorized');
+      const clearCookies = [cookieSet(REFRESH_COOKIE, '', 0), cookieSet(CSRF_COOKIE, '', 0, '/', false)];
+      if (!token) {
+        return jsonCookies({ error: { code: 'errors.unauthorized', message: 'errors.unauthorized' } }, clearCookies, 401);
+      }
       const hash = sha256(token);
       const sess = await db.findOne<Record<string, unknown>>('sessions', { refresh_hash: hash });
       if (!sess) {
@@ -163,11 +166,15 @@ export function registerAuth(): void {
         if (old) {
           await db.updateWhere('sessions', { user_id: Number(old.user_id) }, { revoked_at: new Date().toISOString() });
         }
-        throw new ApiError(401, 'errors.unauthorized');
+        return jsonCookies({ error: { code: 'auth.sessionEnded', message: 'Session introuvable ou restaurée' } }, clearCookies, 401);
       }
-      if (sess.revoked_at || new Date(String(sess.expires_at)) < new Date()) throw new ApiError(401, 'errors.unauthorized');
+      if (sess.revoked_at || new Date(String(sess.expires_at)) < new Date()) {
+        return jsonCookies({ error: { code: 'auth.sessionEnded', message: 'Session expirée ou révoquée' } }, clearCookies, 401);
+      }
       const user = await db.findOne<Record<string, unknown>>('users', { id: Number(sess.user_id) });
-      if (!user || !Number(user.active)) throw new ApiError(401, 'errors.unauthorized');
+      if (!user || !Number(user.active)) {
+        return jsonCookies({ error: { code: 'auth.sessionEnded', message: 'Compte utilisateur inactif' } }, clearCookies, 401);
+      }
 
       const fresh = publicToken(24);
       const newSess = await db.insert('sessions', {
