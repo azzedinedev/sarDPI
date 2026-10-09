@@ -121,7 +121,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     leaving = true;
     setTimeout(() => { leaving = false; }, 2000);
     const url = new URL(target, window.location.origin);
-    if (reason === 'expired' && !url.searchParams.has('reason')) url.searchParams.set('reason', 'expired');
+    if (reason) url.searchParams.set('reason', reason);
     window.location.replace(url.toString());
   },
 

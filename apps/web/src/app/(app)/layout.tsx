@@ -13,8 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Récupère l'URL demandée pour le paramètre ?next=
   const h = await headers();
-  const rawPath = h.get('x-matched-path') || h.get('x-invoke-path') || '/dashboard';
-  const path = rawPath.startsWith('/') ? rawPath : '/dashboard';
+  const rawPath = h.get('x-pathname') || h.get('x-matched-path') || h.get('x-invoke-path') || '/dashboard';
+  const rawSearch = h.get('x-search') || '';
+  const path = rawPath.startsWith('/') ? `${rawPath}${rawSearch}` : '/dashboard';
 
   if (!token) {
     redirect(loginUrl(path, 'expired'));

@@ -38,11 +38,16 @@ export function middleware(req: NextRequest): NextResponse {
   if (isNavigation && needsSession(pathname) && !req.cookies.get(SESSION_COOKIE)?.value) {
     const url = req.nextUrl.clone();
     const target = new URL(loginUrl(`${pathname}${search}`, 'expired'), url.origin);
-    return withSecurityHeaders(NextResponse.redirect(target), req, nonce);
+    const redirectRes = NextResponse.redirect(target);
+    redirectRes.cookies.delete(SESSION_COOKIE);
+    redirectRes.cookies.delete('sardpi_csrf');
+    return withSecurityHeaders(redirectRes, req, nonce);
   }
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nextjs-csp-nonce', nonce);
+  requestHeaders.set('x-pathname', pathname);
+  requestHeaders.set('x-search', search);
 
   const res = NextResponse.next({ request: { headers: requestHeaders } });
   return withSecurityHeaders(res, req, nonce);
