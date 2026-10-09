@@ -4,21 +4,39 @@
  * RTL complet (axes inversés). Interactions souris :
  *  - sélection par glisser sur la grille → création d'un RDV pré-rempli (plage début→fin) ;
  *  - glisser un bloc → déplacement horaire ; poignée basse → redimensionnement de la durée ;
- *  - clic sur un bloc → fiche d'édition (patient, praticien, lieu, statut, notes).
- * Patient = Autocomplete distant (/patients/search) ; praticien = Autocomplete local.
+ *  - clic sur un bloc → fiche de détail & édition complète (patient, praticien, lieu, statut, notes).
+ * Patient, Lieu, Praticien = Autocomplete avec possibilité d'ajout rapide (modales intégrées).
  * Conflits vérifiés serveur (/appointments/conflicts, ignoreId en édition).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Tags } from 'lucide-react';
+import {
+  AlertTriangle,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit3,
+  ExternalLink,
+  FileText,
+  MapPin,
+  Plus,
+  Stethoscope,
+  Tags,
+  Trash2,
+  User,
+} from 'lucide-react';
 import { api, crudFilters } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Field, Select, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { AsyncAutocomplete, type ComboOption } from '@/components/combo';
 import { CalendarKindsDialog } from '@/components/calendar-kinds-editor';
+import { LocationQuickDialog } from '@/components/location-quick-dialog';
+import { PatientQuickDialog } from '@/components/patient-quick-dialog';
+import { PractitionerQuickDialog } from '@/components/practitioner-quick-dialog';
 import { useCalendarKinds } from '@/lib/display';
 import { useToast } from '@/components/toast';
 import { cn, withAlpha } from '@/lib/utils';
@@ -88,11 +106,11 @@ export default function CalendarPage(): React.ReactElement {
   const qc = useQueryClient();
   const has = useAuth((s) => s.has);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [dialog, setDialog] = useState<{ mode: 'create' | 'edit'; start?: string; end?: string; appt?: Appt } | null>(null);
+  const [dialog, setDialog] = useState<{ mode: 'create' | 'edit' | 'detail'; start?: string; end?: string; appt?: Appt } | null>(null);
   const [drag, setDrag] = useState<Drag>(null);
   const [labelsOpen, setLabelsOpen] = useState(false);
-  const canWrite = has('calendar', 'create');
-  const canUpdate = has('calendar', 'update');
+  const canWrite = has('calendar', 'create') || has('appointment', 'create');
+  const canUpdate = has('calendar', 'update') || has('appointment', 'update');
   // Étiquettes (types + statuts de RDV) configurables en base — réglage « calendarKinds ».
   const ck = useCalendarKinds();
   const canEditLabels = has('setting', 'update');
@@ -368,19 +386,18 @@ export default function CalendarPage(): React.ReactElement {
                         draggedRef.current = false;
                         return;
                       }
-                      if (canUpdate) setDialog({ mode: 'edit', appt: a });
-                      else window.location.href = `/patients/${a.patient_id}`;
+                      setDialog({ mode: 'detail', appt: a });
                     }}
                   >
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-[9.5px] opacity-80">{fmtMin(startMin + HOUR0 * 60)}</span>
-                      <button className="min-w-0 flex-1 truncate text-start" onClick={(e) => { e.stopPropagation(); window.location.href = `/patients/${a.patient_id}`; }}>
+                      <button className="min-w-0 flex-1 truncate text-start font-bold" onClick={(e) => { e.stopPropagation(); setDialog({ mode: 'detail', appt: a }); }}>
                         {a.patient_name ?? t('appt.orphan')}
                       </button>
                     </div>
                     <div className="flex items-center gap-1 text-[9px] opacity-80">
                       <span className="truncate">{ck.kindLabel(a.kind)}</span>
-                      {has('calendar', 'update') ? (
+                      {has('calendar', 'update') || has('appointment', 'update') ? (
                         <select
                           className="ms-auto w-16 rounded border-0 bg-transparent text-[9px] font-bold outline-none"
                           value={a.status}
@@ -436,18 +453,31 @@ function fmtMin(m: number): string {
   return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-/* statusColor() a disparu : les couleurs des blocs viennent désormais du réglage
-   « calendarKinds » (voir useCalendarKinds() + withAlpha()), donc configurables en base. */
-
-/** Fiche RDV — création (plage pré-remplie) ou édition (bloc existant). */
-function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: 'create' | 'edit'; start?: string; end?: string; appt?: Appt } | null; onClose: () => void; onSaved: () => void; patientHint?: number }): React.ReactElement {
+/** Fiche RDV — affichage détaillé, création ou édition avec sélection & ajout rapide patient/lieu/praticien. */
+function ApptDialog({
+  state,
+  onClose,
+  onSaved,
+  patientHint,
+}: {
+  state: { mode: 'create' | 'edit' | 'detail'; start?: string; end?: string; appt?: Appt } | null;
+  onClose: () => void;
+  onSaved: () => void;
+  patientHint?: number;
+}): React.ReactElement {
   const { t } = useT('patient');
   const { t: tc } = useT('common');
+  const toast = useToast();
+  const qc = useQueryClient();
+  const has = useAuth((s) => s.has);
   const open = Boolean(state);
-  const editing = state?.mode === 'edit' ? state.appt! : null;
+
+  const [curMode, setCurMode] = useState<'create' | 'edit' | 'detail'>('create');
+  const [currentAppt, setCurrentAppt] = useState<Appt | null>(null);
 
   const [patient, setPatient] = useState<ComboOption | null>(null);
   const [practitioner, setPractitioner] = useState<ComboOption | null>(null);
+  const [locationOption, setLocationOption] = useState<ComboOption | null>(null);
   const [locationId, setLoc] = useState<number | null>(null);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -455,31 +485,122 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
   const [status, setStatus] = useState('pending');
   const [notes, setNotes] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
-  // Types/statuts configurables ; le premier de chaque liste sert de valeur par défaut.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Modales d'ajout rapide
+  const [quickPatientOpen, setQuickPatientOpen] = useState(false);
+  const [quickPractOpen, setQuickPractOpen] = useState(false);
+  const [quickLocOpen, setQuickLocOpen] = useState(false);
+
   const ck = useCalendarKinds();
   const defaultKind = ck.kinds[0]?.key ?? 'consultation';
   const defaultStatus = ck.statuses[0]?.key ?? 'pending';
 
-  const practs = useQuery({ queryKey: ['pract-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
-  const locs = useQuery({ queryKey: ['loc-lite', 'active'], queryFn: () => api.get<{ rows: { id: number; code: string; kind: string }[] }>('/locations', { pageSize: 100, filters: crudFilters([{ field: 'active', value: 1 }]) }), enabled: open });
+  const canUpdate = has('calendar', 'update') || has('appointment', 'update');
+  const canDelete = has('calendar', 'delete') || has('appointment', 'delete') || canUpdate;
+
+  const practs = useQuery({
+    queryKey: ['pract-lite', 'active'],
+    queryFn: () =>
+      api.get<{ rows: { id: number; code: string; last_name: string; first_name: string }[] }>('/practitioners', {
+        pageSize: 100,
+        filters: crudFilters([{ field: 'active', value: 1 }]),
+      }),
+    enabled: open,
+  });
+
+  const locs = useQuery({
+    queryKey: ['loc-lite', 'active'],
+    queryFn: () =>
+      api.get<{ rows: { id: number; code: string; name?: string; building?: string; kind: string }[] }>('/locations', {
+        pageSize: 100,
+        filters: crudFilters([{ field: 'active', value: 1 }]),
+      }),
+    enabled: open,
+  });
+
+  const practOptions: ComboOption[] = useMemo(
+    () =>
+      (practs.data?.rows ?? []).map((x) => ({
+        value: String(x.id),
+        label: `Dr ${x.last_name} ${x.first_name}`.trim(),
+        sublabel: x.code,
+      })),
+    [practs.data],
+  );
+
+  const locOptions: ComboOption[] = useMemo(
+    () =>
+      (locs.data?.rows ?? []).map((x) => ({
+        value: String(x.id),
+        label: `${x.name || x.code} (${x.code})`,
+        sublabel: [x.kind, x.building].filter(Boolean).join(' · '),
+      })),
+    [locs.data],
+  );
+
+  const fetchPatients = useCallback(
+    (qTerm: string) =>
+      api
+        .get<{ rows: { id: number; code: string; full_name?: string; last_name?: string; first_name?: string }[] }>(
+          `/patients/search?q=${encodeURIComponent(qTerm)}`,
+        )
+        .then((r) =>
+          r.rows.map((p) => ({
+            value: String(p.id),
+            label: p.full_name ?? `${(p.last_name ?? '').toUpperCase()} ${p.first_name ?? ''}`.trim(),
+            sublabel: p.code,
+          })),
+        ),
+    [],
+  );
 
   // (ré)initialisation à chaque ouverture
   useEffect(() => {
     if (!state) return;
     setConflict(null);
-    if (editing) {
-      setPatient(editing.patient_id ? { value: String(editing.patient_id), label: editing.patient_name ?? `#${editing.patient_id}`, sublabel: editing.patient_code ?? undefined } : null);
-      setPractitioner(editing.practitioner_id ? { value: String(editing.practitioner_id), label: editing.practitioner_name ?? `#${editing.practitioner_id}` } : null);
-      setLoc(editing.location_id ? Number(editing.location_id) : null);
-      setStart(toLocalInput(new Date(editing.start_at)));
-      setEnd(toLocalInput(new Date(editing.end_at)));
-      setKind(editing.kind ?? defaultKind);
-      setStatus(editing.status ?? defaultStatus);
-      setNotes(editing.notes ?? '');
+    setConfirmDelete(false);
+    setCurMode(state.mode);
+    const appt = state.appt ?? null;
+    setCurrentAppt(appt);
+
+    if (appt) {
+      setPatient(
+        appt.patient_id
+          ? {
+              value: String(appt.patient_id),
+              label: appt.patient_name ?? `#${appt.patient_id}`,
+              sublabel: appt.patient_code ?? undefined,
+            }
+          : null,
+      );
+      setPractitioner(
+        appt.practitioner_id
+          ? {
+              value: String(appt.practitioner_id),
+              label: appt.practitioner_name ? `Dr ${appt.practitioner_name}` : `#${appt.practitioner_id}`,
+            }
+          : null,
+      );
+      setLoc(appt.location_id ? Number(appt.location_id) : null);
+      if (appt.location_id) {
+        const found = locOptions.find((o) => o.value === String(appt.location_id));
+        setLocationOption(
+          found ?? (appt.location_name ? { value: String(appt.location_id), label: appt.location_name } : null),
+        );
+      } else {
+        setLocationOption(null);
+      }
+      setStart(toLocalInput(new Date(appt.start_at)));
+      setEnd(toLocalInput(new Date(appt.end_at)));
+      setKind(appt.kind ?? defaultKind);
+      setStatus(appt.status ?? defaultStatus);
+      setNotes(appt.notes ?? '');
     } else {
       setPatient(patientHint ? { value: String(patientHint), label: `#${patientHint}` } : null);
       setPractitioner(null);
       setLoc(null);
+      setLocationOption(null);
       setStart(state.start ?? '');
       setEnd(state.end ?? '');
       setKind(defaultKind);
@@ -487,12 +608,7 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
       setNotes('');
       if (patientHint) void resolvePatient(patientHint).then(setPatient);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
-  const practOptions: ComboOption[] = useMemo(() => (practs.data?.rows ?? []).map((x) => ({ value: String(x.id), label: `${x.last_name} ${x.first_name}`, sublabel: x.code })), [practs.data]);
-
-  const fetchPatients = useCallback((qTerm: string) => api.get<{ rows: { id: number; code: string; full_name: string }[] }>(`/patients/search?q=${encodeURIComponent(qTerm)}`).then((r) => r.rows.map((p) => ({ value: String(p.id), label: p.full_name, sublabel: p.code }))), []);
+  }, [state, locOptions, defaultKind, defaultStatus, patientHint]);
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -510,81 +626,416 @@ function ApptDialog({ state, onClose, onSaved, patientHint }: { state: { mode: '
         notes: notes || null,
       };
       if (practitioner || locationId) {
-        const c = await api.post<{ conflicts: { code: string }[] }>('/appointments/conflicts', { practitionerId: body.practitionerId, locationId, startAt: body.startAt, endAt: body.endAt, ignoreId: editing?.id });
+        const c = await api.post<{ conflicts: { code: string }[] }>('/appointments/conflicts', {
+          practitionerId: body.practitionerId,
+          locationId,
+          startAt: body.startAt,
+          endAt: body.endAt,
+          ignoreId: currentAppt?.id,
+        });
         if (c.conflicts.length) throw new Error(`conflict:${c.conflicts[0]!.code}`);
       }
-      if (editing) return api.put(`/appointments/${editing.id}`, body);
+      if (curMode === 'edit' && currentAppt) return api.put(`/appointments/${currentAppt.id}`, body);
       return api.post('/appointments', body);
     },
     onSuccess: onSaved,
     onError: (e: Error) => (e.message.startsWith('conflict:') ? setConflict(e.message.slice(9)) : setConflict('!')),
   });
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={editing ? t('appt.edit') : t('appt.new')}
-      footer={
-        <>
-          <Button onClick={onClose}>{tc('cancel')}</Button>
-          <Button variant="primary" disabled={!patient || !start} loading={mut.isPending} onClick={() => mut.mutate()}>
-            {tc('save')}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <Field label={t('appt.patient')} required>
-          <AsyncAutocomplete value={patient} fetchOptions={fetchPatients} minChars={2} onChange={setPatient} placeholder={t('list.searchPlaceholder')} />
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={t('appt.start')}>
-            <input type="datetime-local" className="field" value={start} onChange={(e) => setStart(e.target.value)} />
-          </Field>
-          <Field label={t('appt.end')}>
-            <input type="datetime-local" className="field" value={end} onChange={(e) => setEnd(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={t('appt.practitioner')}>
-            <AsyncAutocomplete value={practitioner} options={practOptions} onChange={setPractitioner} placeholder="—" />
-          </Field>
-          <Field label={t('appt.location')}>
-            <Select value={locationId ?? ''} onChange={(e) => setLoc(e.target.value ? Number(e.target.value) : null)} options={[{ value: '', label: '—' }, ...(locs.data?.rows ?? []).map((x) => ({ value: String(x.id), label: x.code }))]} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={t('appt.kind')}>
-            <Select value={kind} onChange={(e) => setKind(e.target.value)} options={ck.kindOptions} />
-          </Field>
-          {editing ? (
-            <Field label={t('appt.statusField')}>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} options={ck.statusOptions} />
-            </Field>
-          ) : null}
-        </div>
-        <Field label={tc('notes')}>
-          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-        {editing ? (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" onClick={() => (window.location.href = `/patients/${editing.patient_id}`)}>
-              {t('appt.openPatient')}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => (window.location.href = `/records/CON?new=1&patient=${editing.patient_id}&appt=${editing.id}`)}>
-              <Plus size={13} /> {t('appt.createRecord')}
-            </Button>
+  const delMut = useMutation({
+    mutationFn: async () => {
+      if (!currentAppt) return;
+      return api.del(`/appointments/${currentAppt.id}`);
+    },
+    onSuccess: () => {
+      toast.success(tc('deleted'));
+      onSaved();
+    },
+    onError: () => toast.error(tc('common.error')),
+  });
+
+  const changeStatusMut = useMutation({
+    mutationFn: async (newSt: string) => {
+      if (!currentAppt) return;
+      return api.post(`/appointments/${currentAppt.id}/status`, { status: newSt });
+    },
+    onSuccess: (_, newSt) => {
+      toast.success(tc('saved'));
+      setStatus(newSt);
+      if (currentAppt) currentAppt.status = newSt;
+      void qc.invalidateQueries({ queryKey: ['agenda'] });
+    },
+    onError: () => toast.error(tc('common.error')),
+  });
+
+  // Vue DÉTAIL d'un rendez-vous
+  if (curMode === 'detail' && currentAppt) {
+    const stDate = new Date(currentAppt.start_at);
+    const enDate = new Date(currentAppt.end_at);
+    const diffMinutes = Math.max(1, Math.round((enDate.getTime() - stDate.getTime()) / 60000));
+    const langCode = tc('lang.code') === 'ar' ? 'ar-DZ' : 'fr-FR';
+    const dateFormatted = stDate.toLocaleDateString(langCode, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const startTimeFormatted = stDate.toLocaleTimeString(langCode, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const endTimeFormatted = enDate.toLocaleTimeString(langCode, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        title={
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{t('cal.title')} · {currentAppt.code ?? `RDV-${currentAppt.id}`}</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+              style={{
+                background: withAlpha(ck.statusColor(currentAppt.status), 0.15),
+                color: ck.statusColor(currentAppt.status),
+                borderColor: withAlpha(ck.statusColor(currentAppt.status), 0.4),
+              }}
+            >
+              {ck.statusLabel(currentAppt.status)}
+            </span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+              style={{
+                borderInlineStartColor: ck.kindColor(currentAppt.kind),
+                borderInlineStartWidth: 3,
+                background: withAlpha(ck.kindColor(currentAppt.kind), 0.12),
+              }}
+            >
+              {ck.kindLabel(currentAppt.kind)}
+            </span>
           </div>
-        ) : null}
-        {conflict ? (
-          <p className="flex items-center gap-1.5 rounded-xl bg-[rgb(var(--c-coral-soft))] px-3 py-2 text-[12.5px] font-semibold text-[rgb(var(--c-coral))]">
-            <AlertTriangle size={14} /> {t('appt.conflict')} <span dir="ltr" className="font-mono">{conflict}</span>
-          </p>
-        ) : null}
-        <Badge tone="neutral">DZ : vendredi/samedi = weekend</Badge>
-      </div>
-    </Dialog>
+        }
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div>
+              {canDelete ? (
+                confirmDelete ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-semibold text-[rgb(var(--c-coral))]">{tc('common.confirmDelete')}</span>
+                    <Button size="sm" variant="danger" loading={delMut.isPending} onClick={() => delMut.mutate()}>
+                      {tc('actions.confirm')}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+                      {tc('cancel')}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="ghost" className="text-[rgb(var(--c-coral))] hover:bg-[rgb(var(--c-coral)/0.1)]" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 size={14} /> {tc('delete')}
+                  </Button>
+                )
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={onClose}>
+                {tc('actions.close')}
+              </Button>
+              {currentAppt.patient_id ? (
+                <Button size="sm" variant="ghost" onClick={() => (window.location.href = `/records/CON?new=1&patient=${currentAppt.patient_id}&appt=${currentAppt.id}`)}>
+                  <Plus size={13} /> {t('appt.createRecord')}
+                </Button>
+              ) : null}
+              {canUpdate ? (
+                <Button size="sm" variant="primary" onClick={() => setCurMode('edit')}>
+                  <Edit3 size={14} /> {tc('edit')}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3.5">
+          {/* Patient Card */}
+          <div className="rounded-xl border border-[rgb(var(--c-line)/0.8)] bg-[rgb(var(--c-surface-2)/0.4)] p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[rgb(var(--c-primary)/0.15)] text-[14px] font-bold text-[rgb(var(--c-primary))]">
+                  <User size={18} />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[14.5px] font-bold text-[rgb(var(--c-ink))]">
+                    {currentAppt.patient_name ?? t('appt.orphan')}
+                  </div>
+                  {currentAppt.patient_code ? (
+                    <div className="font-mono text-[11px] text-[rgb(var(--c-muted))]">
+                      {currentAppt.patient_code}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {currentAppt.patient_id ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => (window.location.href = `/patients/${currentAppt.patient_id}`)}
+                >
+                  <ExternalLink size={13} /> {t('appt.openPatient')}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Date & Time info */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="flex items-start gap-2.5 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+              <span className="mt-0.5 text-[rgb(var(--c-primary))]">
+                <Calendar size={17} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--c-muted))]">
+                  {tc('date')}
+                </div>
+                <div className="text-[13.5px] font-medium capitalize text-[rgb(var(--c-ink))]">
+                  {dateFormatted}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+              <span className="mt-0.5 text-[rgb(var(--c-primary))]">
+                <Clock size={17} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--c-muted))]">
+                  {t('appt.duration')}
+                </div>
+                <div className="font-mono text-[13.5px] font-bold text-[rgb(var(--c-ink))]">
+                  {startTimeFormatted} → {endTimeFormatted}
+                  <span className="ms-2 text-[11.5px] font-normal text-[rgb(var(--c-muted))]">
+                    ({diffMinutes} min)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Practitioner & Location info */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="flex items-start gap-2.5 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+              <span className="mt-0.5 text-[rgb(var(--c-primary))]">
+                <Stethoscope size={17} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--c-muted))]">
+                  {t('appt.practitioner')}
+                </div>
+                <div className="truncate text-[13px] font-medium text-[rgb(var(--c-ink))]">
+                  {currentAppt.practitioner_name ? (currentAppt.practitioner_name.startsWith('Dr') ? currentAppt.practitioner_name : `Dr ${currentAppt.practitioner_name}`) : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+              <span className="mt-0.5 text-[rgb(var(--c-primary))]">
+                <MapPin size={17} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--c-muted))]">
+                  {t('appt.location')}
+                </div>
+                <div className="truncate text-[13px] font-medium text-[rgb(var(--c-ink))]">
+                  {currentAppt.location_name || '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick status changer */}
+          {canUpdate ? (
+            <div className="rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+              <Field label={t('appt.statusField')}>
+                <Select
+                  value={currentAppt.status}
+                  onChange={(e) => changeStatusMut.mutate(e.target.value)}
+                  options={ck.statusOptions}
+                />
+              </Field>
+            </div>
+          ) : null}
+
+          {/* Notes / observations */}
+          <div className="rounded-xl border border-[rgb(var(--c-line)/0.6)] p-3">
+            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--c-muted))]">
+              <FileText size={14} /> {tc('notes')}
+            </div>
+            <div className="text-[13px] whitespace-pre-wrap text-[rgb(var(--c-ink))]">
+              {currentAppt.notes || <span className="text-[rgb(var(--c-muted))] italic">Aucun motif ou observation spécifié.</span>}
+            </div>
+          </div>
+        </div>
+      </Dialog>
+    );
+  }
+
+  // Vue CRÉATION ou MODIFICATION
+  return (
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        title={curMode === 'edit' ? `${t('appt.edit')} — ${currentAppt?.code ?? ''}` : t('appt.new')}
+        footer={
+          <>
+            {curMode === 'edit' ? (
+              <Button onClick={() => setCurMode('detail')}>{tc('back')}</Button>
+            ) : (
+              <Button onClick={onClose}>{tc('cancel')}</Button>
+            )}
+            <Button variant="primary" disabled={!patient || !start} loading={mut.isPending} onClick={() => mut.mutate()}>
+              {tc('save')}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          {/* Patient Autocomplete + Quick-add */}
+          <Field label={t('appt.patient')} required>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <AsyncAutocomplete
+                  value={patient}
+                  fetchOptions={fetchPatients}
+                  minChars={2}
+                  onChange={setPatient}
+                  placeholder={t('list.searchPlaceholder')}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setQuickPatientOpen(true)}
+                title={t('list.new')}
+                className="shrink-0"
+              >
+                <Plus size={15} /> <span className="hidden sm:inline">{tc('actions.add')}</span>
+              </Button>
+            </div>
+          </Field>
+
+          {/* Horaires début / fin */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Field label={t('appt.start')} required>
+              <input type="datetime-local" className="field" value={start} onChange={(e) => setStart(e.target.value)} />
+            </Field>
+            <Field label={t('appt.end')}>
+              <input type="datetime-local" className="field" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </Field>
+          </div>
+
+          {/* Praticien & Lieu Autocomplete + Quick-add */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Field label={t('appt.practitioner')}>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <AsyncAutocomplete
+                    value={practitioner}
+                    options={practOptions}
+                    onChange={setPractitioner}
+                    placeholder="Rechercher un praticien…"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setQuickPractOpen(true)}
+                  title="Nouveau praticien"
+                  className="shrink-0"
+                >
+                  <Plus size={15} />
+                </Button>
+              </div>
+            </Field>
+
+            <Field label={t('appt.location')}>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <AsyncAutocomplete
+                    value={locationOption}
+                    options={locOptions}
+                    onChange={(opt) => {
+                      setLocationOption(opt);
+                      setLoc(opt ? Number(opt.value) : null);
+                    }}
+                    placeholder="Rechercher un lieu…"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setQuickLocOpen(true)}
+                  title="Nouveau lieu"
+                  className="shrink-0"
+                >
+                  <Plus size={15} />
+                </Button>
+              </div>
+            </Field>
+          </div>
+
+          {/* Type & Statut */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Field label={t('appt.kind')}>
+              <Select value={kind} onChange={(e) => setKind(e.target.value)} options={ck.kindOptions} />
+            </Field>
+            {curMode === 'edit' ? (
+              <Field label={t('appt.statusField')}>
+                <Select value={status} onChange={(e) => setStatus(e.target.value)} options={ck.statusOptions} />
+              </Field>
+            ) : null}
+          </div>
+
+          {/* Observations */}
+          <Field label={tc('notes')}>
+            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Motif, observations…" />
+          </Field>
+
+          {/* Conflits */}
+          {conflict ? (
+            <p className="flex items-center gap-1.5 rounded-xl bg-[rgb(var(--c-coral-soft))] px-3 py-2 text-[12.5px] font-semibold text-[rgb(var(--c-coral))]">
+              <AlertTriangle size={14} /> {t('appt.conflict')} <span dir="ltr" className="font-mono">{conflict}</span>
+            </p>
+          ) : null}
+          <Badge tone="neutral">DZ : vendredi/samedi = weekend</Badge>
+        </div>
+      </Dialog>
+
+      {/* Modales d'ajout rapide connectées */}
+      <PatientQuickDialog
+        open={quickPatientOpen}
+        onClose={() => setQuickPatientOpen(false)}
+        onSaved={(p) => setPatient({ value: String(p.id), label: p.name, sublabel: p.code })}
+      />
+      <PractitionerQuickDialog
+        open={quickPractOpen}
+        onClose={() => setQuickPractOpen(false)}
+        onSaved={(pr) => setPractitioner({ value: String(pr.id), label: pr.name, sublabel: pr.code })}
+      />
+      <LocationQuickDialog
+        open={quickLocOpen}
+        onClose={() => setQuickLocOpen(false)}
+        onSaved={(l) => {
+          const opt = { value: String(l.id), label: `${l.name} (${l.code})`, sublabel: l.code };
+          setLocationOption(opt);
+          setLoc(l.id);
+        }}
+      />
+    </>
   );
 }
 

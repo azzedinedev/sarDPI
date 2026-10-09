@@ -21,7 +21,25 @@ export function useEscOpen(onClose: () => void, open: boolean): void {
   }, [open, onClose]);
 }
 
-export function Dialog({ open, onClose, title, children, wide, xwide, footer }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; wide?: boolean; xwide?: boolean; footer?: React.ReactNode }): React.ReactElement | null {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+  wide,
+  xwide,
+  footer,
+  closeOnClickOutside = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  children: React.ReactNode;
+  wide?: boolean;
+  xwide?: boolean;
+  footer?: React.ReactNode;
+  closeOnClickOutside?: boolean;
+}): React.ReactElement | null {
   useEscOpen(onClose, open);
   const reduce = useReducedMotion();
   // portail sur <body> : un parent avec transform (framer-motion) ou overflow (carte de liste)
@@ -31,7 +49,10 @@ export function Dialog({ open, onClose, title, children, wide, xwide, footer }: 
     <AnimatePresence>
       {open ? (
         <motion.div className="fixed inset-0 z-[210] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0 : 0.15 }}>
-          <div className="absolute inset-0 bg-[rgb(9_40_56/0.45)] backdrop-blur-[3px]" onClick={onClose} />
+          <div
+            className="absolute inset-0 bg-[rgb(9_40_56/0.45)] backdrop-blur-[3px]"
+            onClick={closeOnClickOutside ? onClose : undefined}
+          />
           <motion.div
             role="dialog"
             aria-modal="true"
@@ -57,7 +78,25 @@ export function Dialog({ open, onClose, title, children, wide, xwide, footer }: 
   );
 }
 
-export function Drawer({ open, onClose, title, subtitle, children, footer, width = 'max-w-2xl' }: { open: boolean; onClose: () => void; title?: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; width?: string }): React.ReactElement | null {
+export function Drawer({
+  open,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+  width = 'max-w-2xl',
+  closeOnClickOutside = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  width?: string;
+  closeOnClickOutside?: boolean;
+}): React.ReactElement | null {
   useEscOpen(onClose, open);
   const reduce = useReducedMotion();
   if (typeof document === 'undefined') return null;
@@ -65,7 +104,13 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, width
     <AnimatePresence>
       {open ? (
         <div className="fixed inset-0 z-[210]">
-          <motion.div className="absolute inset-0 bg-[rgb(9_40_56/0.4)] backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
+          <motion.div
+            className="absolute inset-0 bg-[rgb(9_40_56/0.4)] backdrop-blur-[2px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeOnClickOutside ? onClose : undefined}
+          />
           <motion.aside
             role="dialog"
             aria-modal="true"

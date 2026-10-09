@@ -3,7 +3,7 @@
  * ressources par lieu/intervenant, week-end vendredi-samedi + option hégirienne gérés via profil pays (UI).
  */
 import { z } from 'zod';
-import { appointmentBaseZ, appointmentStatusZ } from '@sardpi/shared';
+import { appointmentBaseZ, appointmentStatusZ, pickLabel } from '@sardpi/shared';
 import { registerCrud } from '../http/crud';
 import { route, type Ctx } from '../http/router';
 import { allocateSuffixed } from '../codes/service';
@@ -76,6 +76,33 @@ export function appointmentPatch(i: Record<string, unknown>, mode: 'create' | 'u
   return patch;
 }
 
+async function decorateAppointments(rows: Record<string, unknown>[], ctx: Ctx): Promise<Record<string, unknown>[]> {
+  const db = ctx.db;
+  const pIds = [...new Set(rows.map((r) => r.patient_id).filter(Boolean).map(Number))];
+  const pats = pIds.length ? await db.find<Record<string, unknown>>('patients', { where: { id: pIds } }) : [];
+  const pBy = new Map(pats.map((p) => [Number(p.id), p]));
+  const prIds = [...new Set(rows.map((r) => r.practitioner_id).filter(Boolean).map(Number))];
+  const prs = prIds.length ? await db.find<Record<string, unknown>>('practitioners', { where: { id: prIds } }) : [];
+  const prBy = new Map(prs.map((p) => [Number(p.id), p]));
+  const locIds = [...new Set(rows.map((r) => r.location_id).filter(Boolean).map(Number))];
+  const locs = locIds.length ? await db.find<Record<string, unknown>>('locations', { where: { id: locIds } }) : [];
+  const locBy = new Map(locs.map((l) => [Number(l.id), l]));
+  const lang = ctx.user?.locale ?? 'fr';
+  return rows.map((r) => {
+    const p = pBy.get(Number(r.patient_id));
+    const pr = prBy.get(Number(r.practitioner_id));
+    const loc = locBy.get(Number(r.location_id));
+    const locName = loc ? (pickLabel(loc.name_json as never, lang) || loc.building || loc.code) : null;
+    return normalizeAppointment({
+      ...r,
+      patient_name: p ? `${String(p.last_name).toUpperCase()} ${p.first_name}` : null,
+      patient_code: p?.code ?? null,
+      practitioner_name: pr ? `${pr.last_name} ${pr.first_name}`.trim() : null,
+      location_name: locName,
+    });
+  });
+}
+
 export function registerAppointments(): void {
   registerCrud({
     resource: 'appointments',
@@ -94,26 +121,7 @@ export function registerAppointments(): void {
       }
       if (row.patient_id) await pushHistory(ctx.user!.uid, { patientId: Number(row.patient_id), kind: 'appointment', refId: id, refCode: String(row.code), summary: { fr: 'Rendez-vous programmé', ar: 'موعد مجدول', en: 'Appointment scheduled' }, detail: { at: row.start_at } });
     },
-    decorate: async (rows, ctx) => {
-      const db = ctx.db;
-      const pats = await db.find<Record<string, unknown>>('patients', { where: { id: [...new Set(rows.map((r) => Number(r.patient_id)))] } });
-      const pBy = new Map(pats.map((p) => [Number(p.id), p]));
-      const prIds = [...new Set(rows.map((r) => r.practitioner_id).filter(Boolean).map(Number))];
-      const prs = prIds.length ? await db.find<Record<string, unknown>>('practitioners', { where: { id: prIds } }) : [];
-      const prBy = new Map(prs.map((p) => [Number(p.id), p]));
-      const locIds = [...new Set(rows.map((r) => r.location_id).filter(Boolean).map(Number))];
-      const locs = locIds.length ? await db.find<Record<string, unknown>>('locations', { where: { id: locIds } }) : [];
-      const locBy = new Map(locs.map((l) => [Number(l.id), l]));
-      return rows.map((r) =>
-        normalizeAppointment({
-          ...r,
-          patient_name: pBy.get(Number(r.patient_id)) ? `${String(pBy.get(Number(r.patient_id))!.last_name).toUpperCase()} ${pBy.get(Number(r.patient_id))!.first_name}` : null,
-          patient_code: pBy.get(Number(r.patient_id))?.code ?? null,
-          practitioner_name: r.practitioner_id ? `${prBy.get(Number(r.practitioner_id))?.last_name ?? ''} ${prBy.get(Number(r.practitioner_id))?.first_name ?? ''}`.trim() : null,
-          location_name: r.location_id ? locBy.get(Number(r.location_id))?.building ?? null : null,
-        }),
-      );
-    },
+    decorate: (rows, ctx) => decorateAppointments(rows, ctx),
     bump: ['calendar'],
   });
 
@@ -136,8 +144,9 @@ export function registerAppointments(): void {
       if (locationId) where.push({ field: 'location_id', op: 'eq', value: Number(locationId) });
       if (patientId) where.push({ field: 'patient_id', op: 'eq', value: Number(patientId) });
       const rows = await ctx.db.find<Record<string, unknown>>('appointments', { where: where as never, orderBy: [['start_at', 'asc']], limit: 800 });
-      // la vue alimente DIRECTEMENT le calendrier : kind/all_day doivent y être garantis aussi
-      return { rows: rows.map(normalizeAppointment) };
+      // la vue alimente DIRECTEMENT le calendrier : kind/all_day et décorations patient/praticien/lieu inclus
+      const decorated = await decorateAppointments(rows, ctx);
+      return { rows: decorated };
     },
   });
 
