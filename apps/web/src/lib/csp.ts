@@ -37,7 +37,9 @@ export function buildCsp({ nonce, dev }: CspInput): string {
     // Aperçu PDF via blob: worker (aperçuOrdonnance) — objectSrc reste fermé.
     "worker-src 'self' blob:",
     "frame-src 'self' https://challenges.cloudflare.com https://*.hcaptcha.com https://www.google.com https://recaptcha.net https://*.recaptcha.net",
-    "frame-ancestors 'self'",
+    // DEV : l'app peut être affichée dans l'aperçu intégré d'un IDE/agent (origine différente) —
+    // en production, le cadrage reste strictement limité à la même origine.
+    dev ? "frame-ancestors 'self' https: http://localhost:*" : "frame-ancestors 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

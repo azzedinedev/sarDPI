@@ -13,6 +13,8 @@ const repoRoot = path.resolve(here, '../..');
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Aperçu hébergé (dev) : autorise les requêtes d'assets/HMR depuis le domaine du proxy d'aperçu.
+  allowedDevOrigins: ['*.e2b.app', '*.e2b.dev', 'localhost'],
   transpilePackages: ['@sardpi/shared'],
   serverExternalPackages: [
     'mysql2',
@@ -41,7 +43,9 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // En développement, autoriser l'aperçu intégré (iframe de l'IDE/agent, origine différente) ;
+          // la production conserve SAMEORIGIN.
+          ...(process.env.NODE_ENV === 'production' ? [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }] : []),
           { key: 'Referrer-Policy', value: 'same-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), geolocation=(), microphone=(), payment=()' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
