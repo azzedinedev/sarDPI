@@ -29,6 +29,19 @@ Le mot de passe d’admin peut être imposé via `SARDPI_ADMIN_PASSWORD` avant `
 > **Le seed refuse toute base non vide sans `--force`** ; `--force` n’efface des données que sur les
 > adaptateurs démo (JSON/memory). Ne jamais seed en production.
 
+### Mot de passe perdu / compte verrouillé (CLI, sans e-mail)
+
+```bash
+npm run reset:password -- --list                    # comptes, rôle, état, verrou
+npm run reset:password -- admin                     # mot de passe aléatoire affiché une seule fois
+npm run reset:password -- admin 'Nouveau!Mdp2026'   # mot de passe imposé (politique vérifiée)
+npm run reset:password -- admin --unlock            # déverrouille sans changer le mot de passe
+```
+
+Par défaut la commande révoque les sessions actives du compte (`--keep-sessions` pour les garder) et
+arme le changement forcé à la prochaine connexion (`--no-force` pour l’éviter). Chaque opération est
+inscrite dans le journal d’audit chaîné (`users.reset_password_cli`, acteur `NULL` = hors session).
+
 ## Lancement via VS Code
 
 1. Ouvrir le dossier racine du monorepo dans VS Code (et non `apps/web`).
@@ -54,6 +67,8 @@ Le mot de passe d’admin peut être imposé via `SARDPI_ADMIN_PASSWORD` avant `
 | `npm run db:export` | export JSON portatif → `backups/` (importable via Admin » Base de données) |
 | `npm run locales` | régénère `/locales/{lang}/{ns}.json` depuis `scripts/gen-locales.mjs` (source unique) |
 | `npm run fonts` | extrait & sous-ensemble les WOFF2 IBM Plex (latin/arabe/mono) dans `public/fonts` |
+| `npm run reset:password -- <user>` | réinitialise (ou déverrouille) un mot de passe en CLI, sans e-mail ni session admin — voir ci-dessous |
+| `npm run reset:captcha` | remet le captcha à `internal` (ou `none`) directement en base, sans être connecté |
 | `npm test` | Vitest — critères codification, RBAC, crypto, chaîne d’audit, i18n, adaptateurs, gabarit PDF |
 | `npm run typecheck` | `tsc --noEmit` sur tout le monorepo |
 | `npm run install:pdf` | installe Puppeteer (Chromium local) pour le rendu PDF arabe fidèle |
