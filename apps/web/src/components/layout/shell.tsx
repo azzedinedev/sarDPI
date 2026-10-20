@@ -26,6 +26,7 @@ import {
   Shield,
   Stethoscope,
   Sun,
+  Syringe,
   Users,
   X,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ import { useT, useI18n } from '@/lib/i18n';
 import { can } from '@sardpi/shared';
 import { cn } from '@/lib/utils';
 import { SessionLoader } from '@/components/loaders';
+import { AppLogo } from '@/components/app-logo';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { ProfileMenu } from '@/components/profile-menu';
 
@@ -59,6 +61,8 @@ const NAV_MAIN: NavItem[] = [
 const NAV_ADMIN: NavItem[] = [
   { key: 'nav.admin', href: '/admin', module: 'admin', icon: Shield },
   { key: 'nav.settings', href: '/admin/settings', module: 'admin', icon: Settings },
+  // carnet vaccinal : module métier dédié (calendrier + doses rattachées aux dossiers patients)
+  { key: 'nav.vaccination', href: '/admin/vaccination', module: 'vaccination', icon: Syringe },
 ];
 
 /** Revalidation de session d'un onglet ouvert : période, et délai minimal entre deux vérifications. */
@@ -202,14 +206,9 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
 
   const sidebar = (
     <nav className="flex h-full min-h-0 w-full flex-col gap-1 p-3" aria-label={t('nav.main')}>
+      {/* Identité visuelle : logo téléversé (Paramètres » Général) ou monogramme généré */}
       <Link href="/dashboard" className={cn('mb-2 flex items-center gap-2.5 rounded-xl px-2 py-2 font-bold', ui.sidebarCollapsed && 'lg:hidden')}>
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-[rgb(var(--c-primary))] text-[16px] text-[rgb(var(--c-primary-ink))] shadow-[var(--shadow-glow)]">S</span>
-        {!ui.sidebarCollapsed ? (
-          <span className="min-w-0">
-            <span className="block truncate text-[14.5px] leading-tight">sarDPI</span>
-            <span className="block text-[10.5px] font-medium uppercase tracking-wide text-[rgb(var(--c-muted))]">DPI · {license?.state === 'demo' ? t('app.demo') : t('app.name')}</span>
-          </span>
-        ) : null}
+        <AppLogo size={36} withText boxClassName="rounded-xl" nameSize={14.5} subtitle={`DPI · ${license?.state === 'demo' ? t('app.demo') : t('app.name')}`} />
       </Link>
       {items.vis.map((n) => (
         <NavLink key={n.href} item={n} pathname={pathname} collapsed={ui.sidebarCollapsed} t={t} />
@@ -282,9 +281,11 @@ export function Shell({ children }: { children: React.ReactNode }): React.ReactE
                 <button className="btn btn-ghost btn-sm btn-icon" title={t('ui.toggleDark')} onClick={() => ui.set({ themeMode: ui.themeMode === 'dark' ? 'light' : 'dark' })}>
                   {ui.themeMode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                <Link className="btn btn-ghost btn-sm btn-icon" href="/admin/themes" title={t('ui.theme')}>
-                  <Palette size={16} />
-                </Link>
+                {can(perms, 'theme', 'view') ? (
+                  <Link className="btn btn-ghost btn-sm btn-icon" href="/admin/themes" title={t('ui.theme')}>
+                    <Palette size={16} />
+                  </Link>
+                ) : null}
                 {LangSwitch}
                 <ProfileMenu />
               </div>

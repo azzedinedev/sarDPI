@@ -18,6 +18,7 @@ import { useAuth } from '@/stores/auth';
 import { useT, useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { Button, Field, Input } from '@/components/ui';
+import { AppLogo } from '@/components/app-logo';
 import { ExternalCaptcha } from '@/components/external-captcha';
 import { captchaNeedsToken, captchaPayload, type CaptchaInfo, type CaptchaProviderName } from '@/lib/captcha-client';
 import { cn } from '@/lib/utils';
@@ -123,13 +124,16 @@ function LoginForm(): React.ReactElement {
       <motion.div initial={{ opacity: 0, y: 18, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} className="w-full max-w-[420px]">
         <div className="glass-card relative p-6 shadow-[var(--shadow-lift)]">
           <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[rgb(var(--c-primary))] text-[19px] font-bold text-[rgb(var(--c-primary-ink))] shadow-[var(--shadow-glow)]">S</span>
-              <div>
-                <div className="text-[17px] font-bold leading-tight">sarDPI</div>
-                <div className="text-[11px] font-medium text-[rgb(var(--c-muted))]">{t('login.subtitle')}</div>
-              </div>
-            </div>
+            {/* Identité visuelle de l'établissement : logo téléversé dans Paramètres » Général,
+                sinon monogramme généré depuis le nom de l'application. */}
+            <AppLogo
+              size={40}
+              withText
+              boxClassName="rounded-2xl"
+              nameSize={17}
+              subtitle={t('login.subtitle')}
+              subtitleClassName="normal-case tracking-normal text-[11px]"
+            />
             <div className="flex gap-1">
               {languages.map((l) => (
                 <button

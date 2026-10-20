@@ -7,7 +7,7 @@ export const MODULES = [
   'record.lab', 'record.pharmacy', 'record.diagnosis', 'record.cardio', 'record.radio',
   'record.consultation', 'record.specialties', 'record.gynped', 'record.surgery',
   'record.care', 'record.anatpath', 'record.reeducation', 'record.certificates',
-  'prescription', 'ged', 'practitioner', 'location', 'message', 'drug', 'labref',
+  'prescription', 'ged', 'practitioner', 'location', 'message', 'drug', 'labref', 'vaccination',
   'user', 'role', 'setting', 'codification', 'category', 'interventionType',
   'theme', 'translation', 'job', 'audit', 'licence', 'backup', 'externalImport',
 ] as const;
@@ -71,7 +71,7 @@ export const SEED_ROLES: { key: string; name: { fr: string; ar: string; es: stri
       'patient.*', 'patient_case.*', 'movement.*', 'appointment.*',
       ...['lab', 'pharmacy', 'diagnosis', 'cardio', 'radio', 'consultation', 'specialties', 'gynped', 'surgery', 'care', 'anatpath', 'reeducation', 'certificates'].map((m) => `record.${m}.*`),
       'prescription.*', 'ged.view', 'ged.create', 'ged.update', 'practitioner.view', 'location.view',
-      'message.view', 'message.create', 'drug.view', 'labref.view',
+      'message.view', 'message.create', 'drug.view', 'labref.view', 'vaccination.*',
     ],
   },
   {
@@ -81,6 +81,8 @@ export const SEED_ROLES: { key: string; name: { fr: string; ar: string; es: stri
       'patient.view', 'patient_case.view', 'movement.*', 'appointment.view',
       'record.care.*', 'record.lab.view', 'record.consultation.view', 'record.surgery.view',
       'ged.view', 'ged.create', 'prescription.view', 'practitioner.view', 'location.view', 'drug.view',
+      // le carnet vaccinal est tenu au quotidien par l'infirmier(ère) : saisie + suivi, pas de suppression
+      'vaccination.view', 'vaccination.create', 'vaccination.update', 'vaccination.print',
     ],
   },
   {
@@ -108,6 +110,8 @@ export const SEED_ROLES: { key: string; name: { fr: string; ar: string; es: stri
       'patient.view', 'patient.create', 'patient.update', 'patient_case.view', 'patient_case.update',
       'movement.create', 'appointment.*', 'ged.view', 'ged.create', 'practitioner.view', 'location.view',
       'message.*', 'record.consultation.view', 'prescription.view',
+      // l'accueil planifie les séances de vaccination et consulte les carnets
+      'vaccination.view', 'vaccination.create',
     ],
   },
 ];

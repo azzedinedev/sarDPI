@@ -19,7 +19,11 @@ describe('catalogue des sections de paramètres', () => {
       expect(typeof s.icon).toBe('object');
       expect(['platform', 'clinical', 'communication', 'security', 'maintenance']).toContain(s.group);
     }
-    expect(SETTINGS_SECTIONS.length).toBe(15);
+    // 14 sections : « Vaccination (carnet) » a quitté Paramètres pour le menu Administration
+    // (/admin/vaccination) — le réglage reste éditable, mais depuis un écran métier qui gère aussi
+    // les doses rattachées aux dossiers patients.
+    expect(SETTINGS_SECTIONS.length).toBe(14);
+    expect(SETTINGS_SECTIONS.map((s) => s.key)).not.toContain('vaccination');
   });
 
   it('le regroupement conserve l’ordre déclaré et supprime les groupes vides', () => {
@@ -32,10 +36,10 @@ describe('catalogue des sections de paramètres', () => {
 
   it('le filtre cherche le libellé traduit OU la clé technique (espaces ignorés)', () => {
     const labelled = SETTINGS_SECTIONS.map((s) => ({ key: s.key as string, label: s.key === 'smtp' ? 'E-mail (SMTP)' : s.key, group: s.group }));
-    expect(filterSections(labelled, '').length).toBe(15);
+    expect(filterSections(labelled, '').length).toBe(SETTINGS_SECTIONS.length);
     expect(filterSections(labelled, 'smtp').map((x) => x.key)).toEqual(['smtp']);
     expect(filterSections(labelled, 'e-mail').map((x) => x.key)).toEqual(['smtp']);
-    expect(filterSections(labelled, '  ').length).toBe(15);
+    expect(filterSections(labelled, '  ').length).toBe(SETTINGS_SECTIONS.length);
     expect(filterSections(labelled, 'inexistant')).toEqual([]);
   });
 
@@ -53,7 +57,7 @@ describe('catalogue des sections de paramètres', () => {
     for (const s of SETTINGS_SECTIONS) expect(FORM_SECTIONS.has(s.key), s.key).toBe(true);
     expect(FORM_SECTIONS.size).toBe(SETTINGS_SECTIONS.length);
     // les modules autrefois éditables en JSON brut (ajoutés par les formulaires par champ)
-    for (const key of ['security', 'captcha', 'backups', 'license', 'gedTypes', 'workflowSteps', 'calendarKinds', 'vaccination', 'practitionerTypes']) {
+    for (const key of ['security', 'captcha', 'backups', 'license', 'gedTypes', 'workflowSteps', 'calendarKinds', 'practitionerTypes']) {
       expect(FORM_SECTIONS.has(key), key).toBe(true);
     }
     // chaque section a un libellé « sections.<clé> » : vérifié par tests/i18n-locales.test.ts

@@ -10,6 +10,7 @@
  * dans `entities.ts` ; celles-ci portent des LISTES éditables (CRUD) ou des champs imbriqués.
  */
 import { z } from 'zod';
+import type { VaccineScheduleEntry } from './vaccination';
 import { captchaProviders } from './entities';
 
 /* ------------------------------------------------------------------------- types de documents (GED) */
@@ -91,12 +92,18 @@ export const calendarKindsZ = z.object({
  * Une entrée de calendrier vaccinal. Le schéma précédent était `z.array(z.record(z.unknown()))` :
  * aucune contrainte, donc ni formulaire ni validation possibles. Les clés inconnues d'une entrée
  * historique sont PRÉSERVÉES (`passthrough`) pour ne rien perdre d'une configuration existante.
+ *
+ * `ageMonths` / `ageWeeks` sont les âges recommandés UTILISÉS PAR LE CALCUL d'échéance
+ * (naissance + mois + semaines, puis + `intervalDays` par dose suivante) ; `ageLabel` reste le
+ * texte affiché dans le carnet (« 6 semaines », « 9 mois »).
  */
 export const vaccinationEntryZ = z
   .object({
     key: z.string().regex(/^[a-z0-9_]{2,30}$/, 'vaccineKey'),
     label: z.record(z.string()).default({}),
     ageLabel: z.string().max(40).default(''),
+    ageMonths: z.number().int().min(0).max(300).default(0),
+    ageWeeks: z.number().int().min(0).max(1560).default(0),
     doses: z.number().int().min(1).max(10).default(1),
     intervalDays: z.number().int().min(0).max(3650).default(0),
     mandatory: z.boolean().default(false),
@@ -108,6 +115,28 @@ export const vaccinationSectionZ = z.object({
   enabled: z.boolean().default(true),
   schedule: z.array(vaccinationEntryZ).default([]),
 });
+
+/**
+ * Calendrier vaccinal par défaut — calendrier national algérien (profil pays DZ,
+ * `country-profiles/DZ.json` » vaccination.defaultSchedule) exprimé avec les âges structurés qui
+ * servent au calcul des échéances. Matérialisé à l'installation (`npm run db:sync` / premier
+ * démarrage) ; l'administrateur reste libre de le modifier ligne à ligne.
+ */
+export const DEFAULT_VACCINATION_SCHEDULE: VaccineScheduleEntry[] = [
+  { key: 'bcg', label: { fr: 'BCG (tuberculose)', ar: 'BCG (السل)', es: 'BCG (tuberculosis)', en: 'BCG (tuberculosis)' }, ageLabel: 'Naissance', ageMonths: 0, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'penta1', label: { fr: 'Pentavalent 1', ar: 'خماسي 1', es: 'Pentavalente 1', en: 'Pentavalent 1' }, ageLabel: '6 semaines', ageMonths: 0, ageWeeks: 6, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'penta2', label: { fr: 'Pentavalent 2', ar: 'خماسي 2', es: 'Pentavalente 2', en: 'Pentavalent 2' }, ageLabel: '10 semaines', ageMonths: 0, ageWeeks: 10, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'penta3', label: { fr: 'Pentavalent 3', ar: 'خماسي 3', es: 'Pentavalente 3', en: 'Pentavalent 3' }, ageLabel: '14 semaines', ageMonths: 0, ageWeeks: 14, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'pcv13_1', label: { fr: 'Pneumocoque 1', ar: 'مكورة رئوية 1', es: 'Neumococo 1', en: 'Pneumococcus 1' }, ageLabel: '6 semaines', ageMonths: 0, ageWeeks: 6, doses: 1, intervalDays: 0, mandatory: false, active: true },
+  { key: 'pcv13_2', label: { fr: 'Pneumocoque 2', ar: 'مكورة رئوية 2', es: 'Neumococo 2', en: 'Pneumococcus 2' }, ageLabel: '14 semaines', ageMonths: 0, ageWeeks: 14, doses: 1, intervalDays: 0, mandatory: false, active: true },
+  { key: 'rota1', label: { fr: 'Rotavirus 1', ar: 'روتافيروس 1', es: 'Rotavirus 1', en: 'Rotavirus 1' }, ageLabel: '6 semaines', ageMonths: 0, ageWeeks: 6, doses: 1, intervalDays: 0, mandatory: false, active: true },
+  { key: 'rota2', label: { fr: 'Rotavirus 2', ar: 'روتافيروس 2', es: 'Rotavirus 2', en: 'Rotavirus 2' }, ageLabel: '10 semaines', ageMonths: 0, ageWeeks: 10, doses: 1, intervalDays: 0, mandatory: false, active: true },
+  { key: 'polio1', label: { fr: 'Poliomyélite (VPO/VPI) 1', ar: 'شلل الأطفال 1', es: 'Poliomielitis 1', en: 'Polio 1' }, ageLabel: '6 semaines', ageMonths: 0, ageWeeks: 6, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'measles1', label: { fr: 'Rougeole 1', ar: 'حصبة 1', es: 'Sarampión 1', en: 'Measles 1' }, ageLabel: '9 mois', ageMonths: 9, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'mmr1', label: { fr: 'ROR 1 (rougeole-oreillons-rubéole)', ar: 'ثلاثي 1', es: 'SRP 1', en: 'MMR 1' }, ageLabel: '18 mois', ageMonths: 18, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'mmr2', label: { fr: 'ROR 2', ar: 'ثلاثي 2', es: 'SRP 2', en: 'MMR 2' }, ageLabel: '6 ans', ageMonths: 72, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: true, active: true },
+  { key: 'dtcap', label: { fr: 'Rappel DTC-Polio (6 ans)', ar: 'جرعة منشطة DTC 6 سنوات', es: 'Refuerzo DTC-Polio (6 años)', en: 'DTC-Polio booster (6 yo)' }, ageLabel: '6 ans', ageMonths: 72, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: true, active: true },
+];
 
 /* ------------------------------------------------------------------------- captcha */
 

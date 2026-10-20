@@ -359,6 +359,46 @@ async function main(): Promise<void> {
     await ins('patient_movements', { code, patient_id: pi, from_location_id: from, to_location_id: to, reason, status, at });
   }
 
+  /* ------------------------------------------------------------- 11bis. carnet vaccinal (enfant) */
+  /**
+   * Le calendrier vaccinal administrable (réglage « vaccination », calendrier national par défaut)
+   * est MATÉRIALISÉ pour la patiente pédiatrique : doses passées = administrées, rappels 6 ans
+   * laissés planifiés → le carnet de démonstration montre à la fois une couverture complète et un
+   * état « en retard ». Mêmes fonctions de calcul que l'application (`vaccinationPlan`), donc les
+   * échéances seedées sont exactement celles qu'affiche le dossier patient.
+   */
+  if (!(await db.count('patient_vaccinations'))) {
+    const { getSection } = await import('../apps/web/src/server/settings');
+    const { vaccinationPlan, DEFAULT_VACCINATION_SCHEDULE } = await import('@sardpi/shared');
+    const section = (await getSection('vaccination')) as { enabled?: boolean; schedule?: { key: string; label?: Record<string, string> }[] };
+    const schedule = section.schedule?.length ? section.schedule : DEFAULT_VACCINATION_SCHEDULE;
+    const childBirth = String(PATS[3]!.birth);
+    const pending = new Set(['mmr2', 'dtcap']); // rappels 6 ans non faits — état « en retard » visible
+    let n = 0;
+    for (const d of vaccinationPlan(schedule, childBirth)) {
+      const isPending = pending.has(d.vaccineKey);
+      const { code } = await allocateSuffixed('vaccination', 'VAX');
+      await ins('patient_vaccinations', {
+        code,
+        patient_id: pat4,
+        vaccine_key: d.vaccineKey,
+        dose_no: d.doseNo,
+        status: isPending ? 'planned' : 'done',
+        administered_at: isPending || !d.dueAt ? null : `${d.dueAt}T00:00:00.000Z`,
+        due_at: d.dueAt ? `${d.dueAt}T00:00:00.000Z` : null,
+        site: isPending ? null : 'Deltoïde gauche',
+        batch: isPending ? null : `LOT-${String(2015 + (n % 6))}-${String(100 + n)}`,
+        practitioner_id: pracIds[1],
+        location_id: locIds[0],
+        notes: null,
+        record_id: null,
+        created_by: userIds.sec,
+      });
+      n++;
+    }
+    console.log(`[seed] ${n} doses de vaccination — carnet de ${String(PATS[3]!.last)} (rappels 6 ans en attente)`);
+  }
+
   /* ------------------------------------------------------------- 12. GED : deux comptes rendus PDF générés via pdf-lib */
   try {
     const { PDFDocument, StandardFonts } = await import('pdf-lib');
@@ -401,6 +441,7 @@ async function main(): Promise<void> {
     records: await db.count('medical_records'),
     prescriptions: await db.count('prescriptions'),
     appointments: await db.count('appointments'),
+    vaccinations: await db.count('patient_vaccinations'),
     drugs: await db.count('drugs'),
   };
   console.table(counts);

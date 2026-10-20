@@ -24,13 +24,16 @@ sarDPI/
 │   │   ├── security/             #   crypto AES-256-GCM keyring, captcha interne, ratelimit, upload (magic bytes)
 │   │   ├── i18n/server.ts        #   lecture /locales, ETag mtime, fallback, rapport clés manquantes — hot reload
 │   │   ├── themes/               #   scan /themes, Zod sur theme.json, sha256 d’approbation pour scripts.js
-│   │   ├── settings/             #   13 sections typées (general, codification, languages, smtp, ui, gedTypes…)
+│   │   ├── branding.ts           #   logo + icône d’onglet (storage/branding, magic bytes, SVG assaini, CSP sandbox)
+│   │   ├── settings/             #   15 sections typées (general — dont logoPath/faviconPath, codification,
+│   │                             #   languages, smtp, ui, gedTypes, vaccination…) ; 14 affichées dans Paramètres
 │   │   ├── cache/ + jobs/        #   LRU in-process + table cache_versions (bump inter-processus) ;
 │   │   │                         #   file de jobs en base (FOR UPDATE SKIP LOCKED) — SANS Redis
 │   │   ├── storage/              #   fichiers (GED) + tokens de diffusion signés
 │   │   ├── pdf/ qr/ mail/        #   gabarit HTML unique (Puppeteer = option), qrcode+bwip-js, SMTP+historique
 │   │   └── modules/              #   endpoints par domaine (auth, patients, records, prescriptions,
-│   │                             #   pharmacyLab, catalog, ged, appointments, messages, public, admin)
+│   │                             #   pharmacyLab, catalog, ged, appointments, messages, vaccination,
+│   │                             #   branding, public, admin)
 ├── packages/shared/              # Zod + types + RBAC (MODULES/ACTIONS/can) + profils — imports front & back
 ├── locales/{fr,ar,es,en}/*.json  # dictionnaires plats, éditables à chaud (admin > Traductions)
 ├── country-profiles/*.json       # DZ complet ; ajouter un pays = déposer un JSON (zéro code)

@@ -4,7 +4,7 @@
  * Séparé de la page pour être testable et vérifiable : la navigation, le filtre et le mode
  * d'édition (formulaire ou JSON validé) découlent tous de ces quelques lignes.
  */
-import { Archive, CalendarClock, FileStack, Hash, HeartPulse, KeyRound, Languages, Mail, Palette, ShieldCheck, SlidersHorizontal, Stethoscope, Syringe, Workflow } from 'lucide-react';
+import { Archive, CalendarClock, FileStack, Hash, HeartPulse, KeyRound, Languages, Mail, Palette, ShieldCheck, SlidersHorizontal, Stethoscope, Workflow } from 'lucide-react';
 
 type Icon = React.ComponentType<{ size?: number; className?: string }>;
 export type SectionGroup = 'platform' | 'clinical' | 'communication' | 'security' | 'maintenance';
@@ -19,9 +19,9 @@ export const SECTION_GROUPS: SectionGroup[] = ['platform', 'clinical', 'communic
  * `form` signale l'existence d'un formulaire typé. Depuis l'ajout des formulaires pilotés par
  * spécification (`lib/settings-fields.ts` : champs par module + validation + CRUD des listes),
  * TOUTES les sections en ont un — y compris celles qui n'étaient éditables qu'en JSON (types de
- * GED, types de praticiens, étapes du circuit, étiquettes du calendrier, vaccination, sécurité,
- * captcha, sauvegardes, licence). Le JSON reste disponible comme mode avancé, avec la même
- * validation ; le drapeau est conservé pour que la page et les tests parlent le même langage.
+ * GED, types de praticiens, étapes du circuit, étiquettes du calendrier, sécurité, captcha,
+ * sauvegardes, licence). Le JSON reste disponible comme mode avancé, avec la même validation ; le
+ * drapeau est conservé pour que la page et les tests parlent le même langage.
  */
 export const SETTINGS_SECTIONS = [
   { key: 'general', icon: SlidersHorizontal, group: 'platform', form: true },
@@ -33,7 +33,13 @@ export const SETTINGS_SECTIONS = [
   { key: 'practitionerTypes', icon: Stethoscope, group: 'clinical', form: true },
   { key: 'workflowSteps', icon: Workflow, group: 'clinical', form: true },
   { key: 'calendarKinds', icon: CalendarClock, group: 'clinical', form: true },
-  { key: 'vaccination', icon: Syringe, group: 'clinical', form: true },
+  /*
+   * La section « Vaccination (carnet) » n'est PLUS ici : le carnet vaccinal est un module métier
+   * (calendrier administrable + doses rattachées au dossier patient), il vit dans le menu
+   * Administration » Vaccination (`/admin/vaccination`). Le réglage `vaccination` reste exposé par
+   * l'API (`/admin/settings/vaccination`) et conserve son formulaire par spécification — réutilisé
+   * tel quel par cette page, d'où sa présence dans `SECTION_FORMS` sans entrée au catalogue.
+   */
   { key: 'smtp', icon: Mail, group: 'communication', form: true },
   { key: 'security', icon: ShieldCheck, group: 'security', form: true },
   { key: 'captcha', icon: KeyRound, group: 'security', form: true },

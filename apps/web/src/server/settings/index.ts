@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { env, paths } from '../config';
 import { getDb } from '../data';
 import {
+  DEFAULT_VACCINATION_SCHEDULE,
   DEFAULT_GED_TYPES,
   DEFAULT_PRACTITIONER_TYPES,
   DEFAULT_BLOOD_GROUPS,
@@ -36,6 +37,16 @@ export const generalZ = z.object({
   orgEmail: z.string().max(120).default('contact@clinique-demo.dz'),
   legalNotice: z.string().max(600).default('Données protégées — loi 18-07 (Algérie), autorité ANPDP.'),
   country: z.string().length(2).default('DZ'),
+  /**
+   * IDENTITÉ VISUELLE (logo + icône d'onglet) : le fichier lui-même vit hors base (storage/branding/),
+   * comme la GED — la base ne stocke que le chemin relatif et une révision (empreinte SHA-256 courte)
+   * qui sert d'anti-cache (`?v=`). Chaîne vide = pas de logo personnalisé : l'application retombe sur
+   * son monogramme généré (aucun écran ne reste vide).
+   */
+  logoPath: z.string().max(255).default(''),
+  logoRev: z.string().max(16).default(''),
+  faviconPath: z.string().max(255).default(''),
+  faviconRev: z.string().max(16).default(''),
   // Format d'affichage des dates (les valeurs stockées restent ISO 8601 ; PDF/exports CSV bruts gardent l'ISO).
   dateDisplay: z.enum(['DD/MM/YYYY', 'DD-MM-YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).default('DD/MM/YYYY'),
   timeDisplay: z.boolean().default(true),
@@ -124,7 +135,9 @@ const SECTIONS = {
   security: { zod: securitySettingsZ.extend({ enforceTotpForAdmin: z.boolean().default(false) }) },
   backups: { zod: backupZ },
   license: { zod: licenseZ() },
-  vaccination: { zod: vaccinationSectionZ },
+  // Calendrier vaccinal national par défaut (profil pays DZ) — matérialisé à l'installation,
+  // jamais réécrit ensuite (l'administrateur garde la main sur son calendrier).
+  vaccination: { zod: vaccinationSectionZ, factory: () => ({ enabled: true, schedule: DEFAULT_VACCINATION_SCHEDULE.map((e) => ({ ...e })) }) },
 } as const;
 
 /**

@@ -358,5 +358,6 @@
   "records.perms.anatpath": "Histopathology",
   "records.perms.reeducation": "Rehabilitation",
   "records.perms.certificates": "Certificates",
-  "records.perms.prescription": "Prescriptions"
+  "records.perms.prescription": "Prescriptions",
+  "nav.vaccination": "Vaccination"
 }

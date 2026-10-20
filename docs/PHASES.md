@@ -1,7 +1,7 @@
 # Statut des phases — fait / restant / hypothèses / risques
 
 > Cette application n’est PAS prétendue « sans bugs » : chaque phase liste son état réel, vérifié
-> par `npm run typecheck`, `npm test` (34 tests) et un parcours API réel sur la démo seedée.
+> par `npm run typecheck`, `npm test` (218 tests) et un parcours API réel sur la démo seedée.
 
 ## Phase 1 — Fondations ✅ terminée
 **Fait** : monorepo npm workspaces ; design system (tokens, dark mode, densité, `prefers-reduced-motion`,
@@ -84,8 +84,14 @@ Chromium (lockfile + test d’échappement inclus dans `tests/pdf.test.ts`).
 langue du patient, variable d’aperçu), templates 4 langues (reset, RDV, notif fiche), quotas/anti-abus ;
 rappel : **aucune donnée médicale dans le sujet** — vérifié par le schéma d’envoi ; centre d’administration :
 hub + utilisateurs (reset de mot de passe dédié audité), **matrice rôles×modules×actions** avec cache invalidé,
-paramètres (13 sections Zod + aperçu codification live + édition JSON native), traductions (chaud + rapport),
-thèmes (scan/approbation/édition), base de données (test + bascule à chaud avec rollback, migration,
+paramètres (15 sections Zod — 14 écrans dans Paramètres, le calendrier vaccinal étant édité dans
+**Admin » Vaccination** — + aperçu codification live + édition JSON native), **identité visuelle**
+(logo + icône d’onglet téléversables, `storage/branding/`, magic bytes, SVG assaini + CSP `sandbox`,
+diffusion publique pour l’écran de connexion), traductions (chaud + rapport),
+thèmes (scan/approbation/édition, **sélecteur des thèmes découverts** dans Paramètres » Interface),
+**carnet vaccinal** (module RBAC `vaccination`, table `patient_vaccinations` rattachée au dossier
+patient, calendrier national par défaut, échéances calculées, couverture + retards, génération du
+plan, historique clinique `kind=vaccination`), base de données (test + bascule à chaud avec rollback, migration,
 export/import JSON portatif), système (jobs retry/purge, audit + vérification de chaîne, sauvegardes
 gzip + rétention + cron interne), sources externes (test/run) ; **pays : un JSON à déposer, zéro code**.
 **Restant** : facturation/tiers-payant complet (Chifa) — les champs existent, le module de télédéclaration

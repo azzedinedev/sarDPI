@@ -1690,6 +1690,143 @@ for (const [ns, keys] of Object.entries(EXTRA9)) {
   OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
 }
 
+/**
+ * EXTRA10 — trois évolutions d'écrans + une correction de dérive du générateur :
+ *   1. IDENTITÉ VISUELLE : logo et icône d'onglet téléversables (Paramètres » Général) ;
+ *   2. SÉLECTEUR DE THÈMES : le champ texte devient une liste des thèmes réellement découverts
+ *      dans /themes/ (Paramètres » Interface & thèmes) ;
+ *   3. CARNET VACCINAL : module d'administration (calendrier + carnets) et onglet du dossier
+ *      patient — nouveau module RBAC `vaccination`, table `patient_vaccinations` ;
+ *   4. les quatre clés « practitioner.* » utilisées par practitioner-quick-dialog.tsx avec
+ *      `defaultValue` figuraient dans les JSON sans être dans ce générateur : `npm run locales`
+ *      les supprimait. Les intégrer ici rend la régénération idempotente.
+ */
+const EXTRA10 = {
+  errors: {
+    "errors.duplicateDose": ["Cette dose est déjà enregistrée pour ce patient (même vaccin, même numéro de dose).", "هذه الجرعة مسجلة بالفعل لهذا المريض (نفس اللقاح ونفس رقم الجرعة).", "Esta dosis ya está registrada para este paciente (misma vacuna, mismo número de dosis).", "This dose is already recorded for this patient (same vaccine, same dose number)."],
+    "errors.vaccinationCalendarEmpty": ["Calendrier vaccinal vide ou carnet désactivé — configurez-le dans Administration » Vaccination.", "تقويم التطعيم فارغ أو الدفتر معطّل — اضبطه من الإدارة » التطعيم.", "Calendario vacunal vacío o cartilla desactivada — configúrelo en Administración » Vacunación.", "Vaccination schedule empty or record disabled — configure it in Administration » Vaccination."],
+  },
+  common: {
+    "nav.vaccination": ["Vaccination", "التطعيم", "Vacunación", "Vaccination"],
+  },
+  settings: {
+    "admin.vaccination": ["Vaccination (carnet)", "التطعيم (الدفتر)", "Vacunación (cartilla)", "Vaccination (record)"],
+    "vaccination.subtitle": ["Calendrier vaccinal administrable et carnets rattachés aux dossiers patients.", "تقويم تطعيم قابل للإدارة ودفاتر مرتبطة بملفات المرضى.", "Calendario vacunal configurable y cartillas vinculadas a las historias clínicas.", "Configurable vaccination schedule and records linked to patient files."],
+    "vaccination.disabled": ["Carnet vaccinal désactivé", "دفتر التطعيم معطّل", "Cartilla de vacunación desactivada", "Vaccination record disabled"],
+    "vaccination.tab.schedule": ["Calendrier vaccinal", "تقويم التطعيم", "Calendario vacunal", "Vaccination schedule"],
+    "vaccination.tab.doses": ["Carnets des patients", "دفاتر المرضى", "Cartillas de pacientes", "Patient records"],
+    "vaccination.dosesHint": ["Toutes les doses enregistrées, tous patients confondus — un clic sur la ligne ouvre le dossier patient.", "كل الجرعات المسجلة لجميع المرضى — نقرة على السطر تفتح ملف المريض.", "Todas las dosis registradas de todos los pacientes — un clic en la fila abre la historia clínica.", "All recorded doses across patients — click a row to open the patient file."],
+    "vaccination.scheduleHint": ["Une entrée = un vaccin recommandé : libellés traduits, âge (mois et semaines), nombre de doses et intervalle. Ces valeurs servent au calcul des échéances dans le carnet de chaque patient.", "كل سطر = لقاح موصى به: تسميات مترجمة، العمر (أشهر وأسابيع)، عدد الجرعات والفاصل الزمني. تُستخدم هذه القيم لحساب آجال دفتر كل مريض.", "Una entrada = una vacuna recomendada: etiquetas traducidas, edad (meses y semanas), número de dosis e intervalo. Estos valores permiten calcular los vencimientos de cada cartilla.", "One entry = one recommended vaccine: translated labels, age (months and weeks), number of doses and interval. Due dates in each patient record are computed from these values."],
+    "vaccination.restoreNational": ["Restaurer le calendrier national", "استعادة التقويم الوطني", "Restaurar calendario nacional", "Restore national schedule"],
+    "vaccination.restoreTitle": ["Restaurer le calendrier national ?", "استعادة التقويم الوطني؟", "¿Restaurar el calendario nacional?", "Restore the national schedule?"],
+    "vaccination.restoreHint": ["Les {count} vaccins du calendrier national (profil pays) remplaceront la liste actuelle. Les doses déjà saisies dans les dossiers patients sont conservées.", "ستستبدل لقاحات التقويم الوطني الـ{count} (ملف الدولة) القائمة الحالية. تبقى الجرعات المسجلة في ملفات المرضى محفوظة.", "Las {count} vacunas del calendario nacional (perfil de país) reemplazarán la lista actual. Las dosis ya registradas en las historias se conservan.", "The {count} vaccines of the national schedule (country profile) will replace the current list. Doses already recorded in patient files are kept."],
+    "vaccination.restored": ["Calendrier national restauré", "تمت استعادة التقويم الوطني", "Calendario nacional restaurado", "National schedule restored"],
+    "vaccination.forbidden": ["Droit « vaccination » requis pour consulter les carnets.", "مطلوب صلاحية «التطعيم» للاطلاع على الدفاتر.", "Se requiere el permiso «vacunación» para consultar las cartillas.", "The “vaccination” permission is required to view the records."],
+    "vaccination.forbiddenSettings": ["Droit « setting » requis pour modifier le calendrier vaccinal.", "مطلوب صلاحية «الإعدادات» لتعديل تقويم التطعيم.", "Se requiere el permiso «configuración» para modificar el calendario vacunal.", "The “setting” permission is required to edit the vaccination schedule."],
+    "vaccination.stat.schedule": ["Vaccins au calendrier", "اللقاحات في التقويم", "Vacunas en el calendario", "Vaccines in schedule"],
+    "vaccination.stat.scheduleHint": ["dont {count} obligatoire(s)", "منها {count} إلزامية", "de ellas {count} obligatorias", "including {count} mandatory"],
+    "vaccination.stat.done": ["Doses administrées", "الجرعات المعطاة", "Dosis administradas", "Doses given"],
+    "vaccination.stat.doneHint": ["{count} planifiée(s)", "{count} مخططة", "{count} planificadas", "{count} planned"],
+    "vaccination.stat.patients": ["Patients suivis", "المرضى المتابَعون", "Pacientes seguidos", "Patients tracked"],
+    "vaccination.stat.patientsHint": ["au moins une dose au carnet", "لديهم جرعة واحدة على الأقل", "con al menos una dosis registrada", "with at least one recorded dose"],
+    "vaccination.stat.expected": ["Doses attendues", "الجرعات المتوقعة", "Dosis esperadas", "Expected doses"],
+    "vaccination.stat.expectedHint": ["pour un carnet complet, selon le calendrier", "لدفتر كامل وفق التقويم", "para una cartilla completa, según el calendario", "for a complete record, per the schedule"],
+    "settings.groups.branding": ["Identité visuelle", "الهوية البصرية", "Identidad visual", "Branding"],
+    "settings.groups.branding.hint": ["Logo et icône d'onglet de l'application. Les fichiers restent sur le serveur (storage/branding/), jamais envoyés vers un service externe ; l'aperçu est immédiat et chaque changement est journalisé.", "شعار التطبيق وأيقونة التبويب. تبقى الملفات على الخادم (storage/branding/) ولا تُرسل إلى أي خدمة خارجية؛ المعاينة فورية وكل تغيير مُسجَّل.", "Logotipo e icono de pestaña de la aplicación. Los archivos permanecen en el servidor (storage/branding/), nunca se envían a un servicio externo; la vista previa es inmediata y cada cambio queda registrado.", "Application logo and tab icon. Files stay on the server (storage/branding/), never sent to an external service; preview is immediate and every change is logged."],
+    "settings.branding.logo": ["Logo de l'application", "شعار التطبيق", "Logotipo de la aplicación", "Application logo"],
+    "settings.branding.logo.hint": ["Affiché dans la barre latérale, sur l'écran de connexion et dans les en-têtes imprimés.", "يظهر في الشريط الجانبي وشاشة الدخول والترويسات المطبوعة.", "Se muestra en la barra lateral, la pantalla de acceso y los encabezados impresos.", "Shown in the sidebar, on the login screen and in printed headers."],
+    "settings.branding.favicon": ["Icône d'onglet (favicon)", "أيقونة التبويب (فافيكون)", "Icono de pestaña (favicon)", "Tab icon (favicon)"],
+    "settings.branding.favicon.hint": ["Petite image affichée dans l'onglet du navigateur et dans les favoris.", "صورة صغيرة تظهر في تبويب المتصفح وفي المفضلة.", "Imagen pequeña mostrada en la pestaña del navegador y en favoritos.", "Small image shown in the browser tab and in bookmarks."],
+    "settings.branding.choose": ["Choisir un fichier", "اختيار ملف", "Elegir archivo", "Choose file"],
+    "settings.branding.replace": ["Remplacer", "استبدال", "Reemplazar", "Replace"],
+    "settings.branding.remove": ["Retirer", "إزالة", "Quitar", "Remove"],
+    "settings.branding.removeTitle": ["Retirer cette image ?", "إزالة هذه الصورة؟", "¿Quitar esta imagen?", "Remove this image?"],
+    "settings.branding.removeHint": ["L'application reviendra à son apparence par défaut (monogramme pour le logo, icône intégrée pour l'onglet) et le fichier sera supprimé du stockage local.", "ستعود التطبيقات إلى المظهر الافتراضي (رمز حرفي للشعار وأيقونة مدمجة للتبويب) وسيُحذف الملف من التخزين المحلي.", "La aplicación volverá a su apariencia predeterminada (monograma para el logotipo, icono integrado para la pestaña) y el archivo se eliminará del almacenamiento local.", "The application reverts to its default look (monogram logo, built-in tab icon) and the file is deleted from local storage."],
+    "settings.branding.uploaded": ["Image appliquée", "تم تطبيق الصورة", "Imagen aplicada", "Image applied"],
+    "settings.branding.removed": ["Image retirée", "تمت إزالة الصورة", "Imagen quitada", "Image removed"],
+    "settings.branding.badType": ["Type refusé — PNG, JPEG, WEBP, GIF ou SVG attendu.", "النوع مرفوض — المطلوب PNG أو JPEG أو WEBP أو GIF أو SVG.", "Tipo no permitido — se espera PNG, JPEG, WEBP, GIF o SVG.", "Type refused — PNG, JPEG, WEBP, GIF or SVG expected."],
+    "settings.branding.tooLarge": ["Fichier trop volumineux (max {mb} Mo).", "الملف كبير جدًا (الحد {mb} ميغابايت).", "Archivo demasiado grande (máx. {mb} MB).", "File too large (max {mb} MB)."],
+    "settings.branding.inUse": ["Appliquée", "قيد الاستخدام", "En uso", "In use"],
+    "settings.branding.default": ["Par défaut (monogramme)", "افتراضي (رمز حرفي)", "Predeterminado (monograma)", "Default (monogram)"],
+    "settings.branding.readOnly": ["Lecture seule — droit « setting:update » requis.", "للقراءة فقط — مطلوبة صلاحية «setting:update».", "Solo lectura — se requiere el permiso «setting:update».", "Read-only — the “setting:update” permission is required."],
+    "settings.theme.hint": ["Thème visuel chargé depuis le dossier /themes/ (variables CSS par mode clair/sombre). La liste ci-dessous reflète les thèmes réellement découverts ; le thème est appliqué dès l'enregistrement.", "السمة البصرية المحمّلة من المجلد /themes/ (متغيرات CSS للوضع الفاتح والداكن). تعكس القائمة أدناه السمات المكتشفة فعلًا؛ وتُطبَّق السمة فور الحفظ.", "Tema visual cargado desde la carpeta /themes/ (variables CSS por modo claro/oscuro). La lista refleja los temas realmente detectados; el tema se aplica al guardar.", "Visual theme loaded from the /themes/ folder (CSS variables per light/dark mode). The list reflects the themes actually discovered; the theme is applied on save."],
+    "settings.theme.missing": ["introuvable dans /themes/", "غير موجود في /themes/", "no encontrado en /themes/", "not found in /themes/"],
+    "settings.theme.empty": ["Aucun thème valide dans /themes/", "لا توجد سمة صالحة في /themes/", "Ningún tema válido en /themes/", "No valid theme in /themes/"],
+    "settings.theme.none": ["Aucun thème", "بدون سمة", "Sin tema", "No theme"],
+    "settings.theme.modes": ["Modes", "الأوضاع", "Modos", "Modes"],
+    "settings.theme.manage": ["Gérer les thèmes", "إدارة السمات", "Gestionar temas", "Manage themes"],
+    "settings.vaccination.ageLabel.hint": ["Texte affiché dans le carnet (« 6 semaines », « 9 mois ») ; les calculs d'échéance utilisent les champs mois et semaines.", "النص المعروض في الدفتر («6 أسابيع»، «9 أشهر»)؛ تستخدم حسابات الآجال حقلي الأشهر والأسابيع.", "Texto mostrado en la cartilla («6 semanas», «9 meses»); los cálculos de vencimiento usan los campos de meses y semanas.", "Text shown in the record (“6 weeks”, “9 months”); due-date computation uses the months and weeks fields."],
+    "settings.vaccination.ageMonths": ["Âge recommandé (mois)", "العمر الموصى به (أشهر)", "Edad recomendada (meses)", "Recommended age (months)"],
+    "settings.vaccination.ageMonths.hint": ["0 = naissance. Ajouté à la date de naissance pour calculer l'échéance de la première dose.", "0 = عند الولادة. يُضاف إلى تاريخ الميلاد لحساب أجل الجرعة الأولى.", "0 = nacimiento. Se suma a la fecha de nacimiento para calcular el vencimiento de la primera dosis.", "0 = birth. Added to the birth date to compute the first dose due date."],
+    "settings.vaccination.ageWeeks": ["Âge recommandé (semaines)", "العمر الموصى به (أسابيع)", "Edad recomendada (semanas)", "Recommended age (weeks)"],
+    "settings.vaccination.ageWeeks.hint": ["Complète les mois pour le calendrier nourrisson (6, 10, 14 semaines).", "يكمل الأشهر لتقويم الرضّع (6، 10، 14 أسبوعًا).", "Complementa los meses para el calendario del lactante (6, 10, 14 semanas).", "Complements months for the infant schedule (6, 10, 14 weeks)."],
+    "themes.active": ["Thème actif", "السمة النشطة", "Tema activo", "Active theme"],
+  },
+  patient: {
+    "practitioner.new": ["Nouveau praticien", "ممارس جديد", "Nuevo profesional", "New practitioner"],
+    "practitioner.type": ["Type / Préfixe", "النوع / البادئة", "Tipo / Prefijo", "Type / Prefix"],
+    "practitioner.speciality": ["Spécialité", "التخصص", "Especialidad", "Speciality"],
+    "practitioner.orderNumber": ["N° Ordre médical", "رقم عمادة الأطباء", "Nº colegiado", "Medical order number"],
+    "tabs.vaccination": ["Vaccination", "التطعيم", "Vacunación", "Vaccination"],
+    "vax.title": ["Carnet vaccinal", "دفتر التطعيم", "Cartilla de vacunación", "Vaccination record"],
+    "vax.doses": ["Doses enregistrées", "الجرعات المسجلة", "Dosis registradas", "Recorded doses"],
+    "vax.dosesHint": ["Chaque dose est rattachée au dossier patient et inscrite dans son historique clinique.", "كل جرعة مرتبطة بملف المريض وتُسجَّل في تاريخه السريري.", "Cada dosis queda vinculada a la historia del paciente y registrada en su historial clínico.", "Each dose is linked to the patient file and written to their clinical history."],
+    "vax.new": ["Nouvelle dose", "جرعة جديدة", "Nueva dosis", "New dose"],
+    "vax.patient": ["Patient", "المريض", "Paciente", "Patient"],
+    "vax.patient.hint": ["Dossier patient auquel la dose est rattachée (obligatoire).", "ملف المريض الذي ترتبط به الجرعة (إلزامي).", "Historia del paciente a la que se vincula la dosis (obligatorio).", "Patient file the dose is linked to (required)."],
+    "vax.patient.search": ["Rechercher un patient (nom, code…)", "ابحث عن مريض (الاسم، الرمز…)", "Buscar un paciente (nombre, código…)", "Search a patient (name, code…)"],
+    "vax.vaccine": ["Vaccin", "اللقاح", "Vacuna", "Vaccine"],
+    "vax.vaccine.hint": ["Choisi dans le calendrier vaccinal (Administration » Vaccination).", "يُختار من تقويم التطعيم (الإدارة » التطعيم).", "Se elige del calendario vacunal (Administración » Vacunación).", "Picked from the vaccination schedule (Administration » Vaccination)."],
+    "vax.dose": ["N° de dose", "رقم الجرعة", "N.º de dosis", "Dose no."],
+    "vax.dose.hint": ["Une seule ligne active par patient, vaccin et numéro de dose.", "سطر نشط واحد فقط لكل مريض ولقاح ورقم جرعة.", "Solo una línea activa por paciente, vacuna y número de dosis.", "Only one active row per patient, vaccine and dose number."],
+    "vax.status": ["Statut", "الحالة", "Estado", "Status"],
+    "vax.status.done": ["Administrée", "تم إعطاؤها", "Administrada", "Given"],
+    "vax.status.planned": ["Planifiée", "مخططة", "Planificada", "Planned"],
+    "vax.status.refused": ["Refusée", "مرفوضة", "Rechazada", "Refused"],
+    "vax.status.missed": ["Manquée", "فائتة", "No administrada", "Missed"],
+    "vax.administeredAt": ["Date d'administration", "تاريخ الإعطاء", "Fecha de administración", "Administration date"],
+    "vax.administeredAt.hint": ["Renseignée automatiquement (date du jour) pour une dose administrée sans date.", "تُملأ تلقائيًا (تاريخ اليوم) للجرعة المعطاة دون تاريخ.", "Se completa automáticamente (fecha de hoy) para una dosis administrada sin fecha.", "Filled automatically (today) for a dose recorded without a date."],
+    "vax.dueAt": ["Échéance", "الأجل", "Vencimiento", "Due date"],
+    "vax.dueAt.hint": ["Calculée depuis la date de naissance et le calendrier vaccinal si laissée vide.", "تُحسب من تاريخ الميلاد وتقويم التطعيم إذا تُركت فارغة.", "Se calcula desde la fecha de nacimiento y el calendario si se deja vacía.", "Computed from the birth date and the schedule when left empty."],
+    "vax.site": ["Site d'injection", "موضع الحقن", "Sitio de inyección", "Injection site"],
+    "vax.batch": ["Lot du vaccin", "دفعة اللقاح", "Lote de la vacuna", "Vaccine batch"],
+    "vax.practitioner": ["Praticien", "الممارس", "Profesional", "Practitioner"],
+    "vax.location": ["Lieu", "المكان", "Lugar", "Location"],
+    "vax.mandatory": ["Obligatoire", "إلزامي", "Obligatoria", "Mandatory"],
+    "vax.ageUnspecified": ["Âge libre", "عمر غير محدد", "Edad no especificada", "Age unspecified"],
+    "vax.coverage": ["Couverture vaccinale", "التغطية التطعيمية", "Cobertura de vacunación", "Vaccination coverage"],
+    "vax.coverage.empty": ["Aucun vaccin au calendrier", "لا توجد لقاحات في التقويم", "Ninguna vacuna en el calendario", "No vaccine in the schedule"],
+    "vax.coverage.emptyHint": ["Ajoutez des vaccins dans Administration » Vaccination pour suivre la couverture.", "أضف لقاحات في الإدارة » التطعيم لمتابعة التغطية.", "Añada vacunas en Administración » Vacunación para seguir la cobertura.", "Add vaccines in Administration » Vaccination to track coverage."],
+    "vax.nextDue": ["Dose {dose} attendue le {date}", "الجرعة {dose} متوقعة في {date}", "Dosis {dose} prevista el {date}", "Dose {dose} due {date}"],
+    "vax.summary.doses": ["{done}/{expected} doses", "{done}/{expected} جرعة", "{done}/{expected} dosis", "{done}/{expected} doses"],
+    "vax.summary.complete": ["{count}/{total} vaccins complets", "{count}/{total} لقاحات مكتملة", "{count}/{total} vacunas completas", "{count}/{total} vaccines complete"],
+    "vax.summary.overdue": ["{count} en retard", "{count} متأخرة", "{count} con retraso", "{count} overdue"],
+    "vax.state.complete": ["Complet", "مكتمل", "Completo", "Complete"],
+    "vax.state.in_progress": ["En cours", "قيد التنفيذ", "En curso", "In progress"],
+    "vax.state.due": ["À faire", "مستحقة", "Pendiente", "Due"],
+    "vax.state.upcoming": ["À venir", "قادمة", "Próxima", "Upcoming"],
+    "vax.state.not_started": ["Non commencé", "لم يبدأ", "Sin iniciar", "Not started"],
+    "vax.state.refused": ["Refusé", "مرفوض", "Rechazado", "Refused"],
+    "vax.state.overdue": ["En retard", "متأخر", "Con retraso", "Overdue"],
+    "vax.birthDate": ["Né(e) le {date} — échéances calculées", "تاريخ الميلاد {date} — تُحتسب الآجال", "Nacido/a el {date} — vencimientos calculados", "Born {date} — due dates computed"],
+    "vax.noBirthDate": ["Date de naissance absente — échéances non calculées", "تاريخ الميلاد غير متوفر — لا تُحتسب الآجال", "Falta la fecha de nacimiento — vencimientos no calculados", "Birth date missing — due dates not computed"],
+    "vax.manageCalendar": ["Calendrier", "التقويم", "Calendario", "Schedule"],
+    "vax.disabledNotice": ["Carnet vaccinal désactivé (Administration » Vaccination) — les doses saisies restent consultables.", "دفتر التطعيم معطّل (الإدارة » التطعيم) — تبقى الجرعات المسجلة قابلة للاطلاع.", "Cartilla de vacunación desactivada (Administración » Vacunación) — las dosis registradas siguen visibles.", "Vaccination record disabled (Administration » Vaccination) — recorded doses remain visible."],
+    "vax.forbidden": ["Carnet vaccinal non autorisé", "دفتر التطعيم غير مصرّح", "Cartilla de vacunación no autorizada", "Vaccination record not allowed"],
+    "vax.forbiddenHint": ["Votre rôle ne dispose pas du droit « vaccination:view ».", "دورك لا يملك صلاحية «vaccination:view».", "Su rol no tiene el permiso «vaccination:view».", "Your role lacks the “vaccination:view” permission."],
+    "vax.refresh": ["Actualiser le carnet", "تحديث الدفتر", "Actualizar la cartilla", "Refresh the record"],
+    "vax.generate": ["Générer le calendrier", "إنشاء التقويم", "Generar calendario", "Generate schedule"],
+    "vax.generate.hint": ["Crée les doses manquantes en « planifié », avec leur échéance calculée. Les doses déjà saisies ne sont ni modifiées ni dupliquées.", "ينشئ الجرعات الناقصة كـ«مخططة» مع آجالها المحسوبة. لا تُعدَّل الجرعات المسجلة ولا تُكرَّر.", "Crea las dosis faltantes como «planificadas», con su vencimiento calculado. Las dosis ya registradas no se modifican ni se duplican.", "Creates the missing doses as “planned”, with computed due dates. Recorded doses are neither changed nor duplicated."],
+    "vax.generate.done": ["{count} dose(s) planifiée(s) ajoutée(s)", "تمت إضافة {count} جرعة مخططة", "{count} dosis planificadas añadidas", "{count} planned dose(s) added"],
+    "vax.generate.none": ["Calendrier déjà complet pour ce patient", "التقويم مكتمل بالفعل لهذا المريض", "El calendario ya está completo para este paciente", "Schedule already complete for this patient"],
+    "vax.generate.conflict": ["Calendrier vaccinal vide ou carnet désactivé — configurez-le d'abord (Administration » Vaccination).", "تقويم التطعيم فارغ أو الدفتر معطّل — اضبطه أولًا (الإدارة » التطعيم).", "Calendario vacunal vacío o cartilla desactivada — configúrelo primero (Administración » Vacunación).", "Vaccination schedule empty or record disabled — configure it first (Administration » Vaccination)."],
+    "vax.generate.error": ["Génération impossible", "تعذّر الإنشاء", "No se pudo generar", "Generation failed"],
+  },
+};
+for (const [ns, keys] of Object.entries(EXTRA10)) {
+  OVERRIDE[ns] = { ...(OVERRIDE[ns] ?? {}), ...keys };
+}
+
 for (const lang of LANGS) {
   const dir = join(ROOT, 'locales', lang);
   mkdirSync(dir, { recursive: true });

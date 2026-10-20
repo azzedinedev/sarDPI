@@ -358,5 +358,6 @@
   "records.perms.anatpath": "Anatomopatología",
   "records.perms.reeducation": "Reeducación",
   "records.perms.certificates": "Certificados",
-  "records.perms.prescription": "Recetas"
+  "records.perms.prescription": "Recetas",
+  "nav.vaccination": "Vacunación"
 }

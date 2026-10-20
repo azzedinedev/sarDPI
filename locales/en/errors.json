@@ -16,5 +16,7 @@
   "errors.licenseRequired": "Expired or invalid license — access blocked.",
   "errorBoundary.title": "This section hit a problem.",
   "errorBoundary.reset": "Reload section",
-  "errorBoundary.detail": "Technical detail"
+  "errorBoundary.detail": "Technical detail",
+  "errors.duplicateDose": "This dose is already recorded for this patient (same vaccine, same dose number).",
+  "errors.vaccinationCalendarEmpty": "Vaccination schedule empty or record disabled — configure it in Administration » Vaccination."
 }

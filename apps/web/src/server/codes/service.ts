@@ -86,7 +86,7 @@ export async function allocateRecordCode(
 }
 
 /** Codes « {PFX}-{NNNNNN} » : GED (par préfixe de type), intervenants (par type), lieux, rdv, messages… */
-export type SuffixedKind = 'ged' | 'practitioner' | 'location' | 'appointment' | 'movement' | 'message' | 'drug' | 'template' | 'case';
+export type SuffixedKind = 'ged' | 'practitioner' | 'location' | 'appointment' | 'movement' | 'message' | 'drug' | 'template' | 'case' | 'vaccination';
 
 const PADDING_FOR: Record<SuffixedKind, keyof CodificationConfig> = {
   ged: 'gedPadding',
@@ -98,6 +98,7 @@ const PADDING_FOR: Record<SuffixedKind, keyof CodificationConfig> = {
   drug: 'patientPadding',
   template: 'genericPadding',
   case: 'genericPadding',
+  vaccination: 'genericPadding',
 };
 
 export async function allocateSuffixed(kind: SuffixedKind, prefix: string, tx?: DataAdapter): Promise<CodeAllocation> {

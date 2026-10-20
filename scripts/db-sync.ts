@@ -8,10 +8,14 @@
  *   2. créer une « consultation générale » par catégorie qui n'a encore aucun type d'intervention
  *      (une catégorie sans type est inutilisable côté saisie) ;
  *   3. matérialiser en base les sections de réglages absentes avec leurs valeurs par défaut
- *      (général, ui, codification, référentiels médicaux, GED, types de praticiens, workflow) —
- *      visibles et modifiables immédiatement dans Réglages, sans jamais écraser une section déjà
- *      enregistrée par l'administrateur ;
- *   4. afficher un rapport (inséré / déjà présent).
+ *      (général, ui, codification, référentiels médicaux, GED, types de praticiens, workflow,
+ *      calendrier vaccinal national) — visibles et modifiables immédiatement dans Réglages, sans
+ *      jamais écraser une section déjà enregistrée par l'administrateur ;
+ *   4. AJOUTER aux rôles système les permissions des modules apparus depuis leur création (un
+ *      module nouveau — ex. `vaccination` — n'existe pas dans les rôles d'une base installée avant
+ *      lui : sans cette étape, personne d'autre que l'administrateur ne verrait l'écran). Les
+ *      permissions accordées par l'administrateur ne sont JAMAIS retirées ;
+ *   5. afficher un rapport (inséré / déjà présent).
  * À lancer après une montée de version qui ajoute de nouveaux codes ou réglages :
  *   npm run db:sync      (idempotent — deux exécutions = même état).
  */
@@ -71,11 +75,45 @@ async function main(): Promise<void> {
     report.push({ step: `réglages ${name}`, detail: 'valeurs par défaut initialisées', done: 'créé' });
   }
 
+  /* 4. rôles système : permissions des modules ajoutés depuis (union, jamais de retrait) */
+  const { SEED_ROLES } = await import('@sardpi/shared');
+  const { invalidateRoleCache } = await import('../apps/web/src/server/auth/guard');
+  let rolesTouched = 0;
+  for (const seed of SEED_ROLES) {
+    const row = await db.findOne<{ id: number; perms_json: unknown }>('roles', { role_key: seed.key });
+    if (!row) {
+      // rôle supprimé volontairement par l'administrateur : on ne le recrée pas (db:sync n'insère que
+      // des droits manquants, jamais des comptes/paramétrages retirés à dessein)
+      report.push({ step: `rôle ${seed.key}`, detail: 'rôle absent (supprimé ?) — ignoré', done: 'en place' });
+      continue;
+    }
+    const current = Array.isArray(row.perms_json)
+      ? (row.perms_json as string[]).map(String)
+      : typeof row.perms_json === 'string'
+        ? (JSON.parse(row.perms_json) as string[]).map(String)
+        : [];
+    const missing = seed.perms.filter((p) => !current.includes(p));
+    if (!missing.length) {
+      report.push({ step: `rôle ${seed.key}`, detail: 'permissions à jour', done: 'en place' });
+      continue;
+    }
+    await db.update('roles', Number(row.id), { perms_json: [...current, ...missing], updated_at: NOW });
+    rolesTouched++;
+    report.push({
+      step: `rôle ${seed.key}`,
+      detail: `+${missing.length} : ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`,
+      done: 'inséré',
+    });
+  }
+  // les permissions sont mises en cache 60 s par rôle (tag « perms ») : purge inter-processus
+  await invalidateRoleCache();
+  if (rolesTouched) console.log(`[db:sync] ${rolesTouched} rôle(s) système complété(s) — nouveaux modules accessibles.`);
+
   /* rapport */
   const fresh = report.filter((r) => r.done !== 'déjà présent' && r.done !== 'en place');
   console.log(`[db:sync] ${report.length} élément(s) vérifié(s), ${fresh.length} nouveauté(s).`);
   if (fresh.length) console.table(fresh);
-  console.log('[db:sync] ✓ aucune donnée existante modifiée.');
+  console.log('[db:sync] ✓ terminée — aucune donnée existante supprimée ou réécrite (ajouts uniquement).');
   await db.close();
 }
 

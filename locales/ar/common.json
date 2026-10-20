@@ -358,5 +358,6 @@
   "records.perms.anatpath": "التشريح المرضي",
   "records.perms.reeducation": "إعادة التأهيل",
   "records.perms.certificates": "الشهادات الطبية",
-  "records.perms.prescription": "الوصفات"
+  "records.perms.prescription": "الوصفات",
+  "nav.vaccination": "التطعيم"
 }

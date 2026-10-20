@@ -3,8 +3,9 @@
  * (Chaque module enregistre ses endpoints au chargement ; ordre = priorité en cas d'égalité de spécificité.)
  */
 export async function registerRoutes(): Promise<void> {
-  const [{ registerAuth }, { registerPatients }, { registerPractitioners }, { registerLocations }, { registerCatalog }, { registerRecords }, { registerGed }, { registerPrescriptions }, { registerAppointments }, { registerWorkflow }, { registerPharmacyLab }, { registerMessages }, { registerAdmin }, { registerPublic }] = await Promise.all([
+  const [{ registerAuth }, { registerBranding }, { registerPatients }, { registerPractitioners }, { registerLocations }, { registerCatalog }, { registerRecords }, { registerGed }, { registerPrescriptions }, { registerAppointments }, { registerWorkflow }, { registerPharmacyLab }, { registerMessages }, { registerAdmin }, { registerPublic }, { registerVaccination }] = await Promise.all([
     import('./modules/auth'),
+    import('./modules/branding'),
     import('./modules/patients'),
     import('./modules/practitioners'),
     import('./modules/locations'),
@@ -18,8 +19,10 @@ export async function registerRoutes(): Promise<void> {
     import('./modules/messages'),
     import('./modules/admin'),
     import('./modules/public'),
+    import('./modules/vaccination'),
   ]);
   registerAuth();
+  registerBranding();
   registerPatients();
   registerPractitioners();
   registerLocations();
@@ -33,4 +36,5 @@ export async function registerRoutes(): Promise<void> {
   registerMessages();
   registerAdmin();
   registerPublic();
+  registerVaccination();
 }

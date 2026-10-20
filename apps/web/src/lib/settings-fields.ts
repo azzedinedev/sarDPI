@@ -244,11 +244,14 @@ export const SECTION_FORMS: Record<string, SectionFormSpec> = {
         hintKey: 'settings.vaccination.schedule.hint',
         keyField: 'key',
         orderField: undefined,
-        template: () => ({ key: '', label: { fr: '', ar: '', es: '', en: '' }, ageLabel: '', doses: 1, intervalDays: 0, mandatory: false, active: true }),
+        template: () => ({ key: '', label: { fr: '', ar: '', es: '', en: '' }, ageLabel: '', ageMonths: 0, ageWeeks: 0, doses: 1, intervalDays: 0, mandatory: false, active: true }),
         itemFields: [
           { path: 'key', kind: 'text', labelKey: 'settings.field.key', hintKey: 'settings.field.key.hint', lockedOnExisting: true },
           labelField(),
-          { path: 'ageLabel', kind: 'text', labelKey: 'settings.vaccination.ageLabel', placeholder: '2 mois' },
+          { path: 'ageLabel', kind: 'text', labelKey: 'settings.vaccination.ageLabel', hintKey: 'settings.vaccination.ageLabel.hint', placeholder: '6 semaines' },
+          // âges STRUCTURÉS : ils pilotent le calcul des échéances du carnet (naissance + mois + semaines)
+          { path: 'ageMonths', kind: 'number', labelKey: 'settings.vaccination.ageMonths', hintKey: 'settings.vaccination.ageMonths.hint', min: 0, max: 300 },
+          { path: 'ageWeeks', kind: 'number', labelKey: 'settings.vaccination.ageWeeks', hintKey: 'settings.vaccination.ageWeeks.hint', min: 0, max: 1560 },
           { path: 'doses', kind: 'number', labelKey: 'settings.vaccination.doses', min: 1, max: 10 },
           { path: 'intervalDays', kind: 'number', labelKey: 'settings.vaccination.intervalDays', min: 0, max: 3650, hintKey: 'settings.vaccination.intervalDays.hint' },
           { path: 'mandatory', kind: 'switch', labelKey: 'settings.vaccination.mandatory' },

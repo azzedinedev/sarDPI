@@ -76,7 +76,7 @@ inscrite dans le journal d’audit chaîné (`users.reset_password_cli`, acteur 
 
 ## Configuration
 
-Tout passe par env (voir `.env.example`) ou **Admin » Paramètres** (15 sections Zod-validées,
+Tout passe par env (voir `.env.example`) ou **Admin » Paramètres** (14 sections Zod-validées,
 formulaires par champ + listes en CRUD, aperçu live des codes, base de données à chaud avec test +
 rollback). Chaque section s'édite au formulaire **ou** en JSON validé (mode avancé) : les deux
 passent par le même schéma, donc les mêmes contraintes. Points clés :
@@ -88,6 +88,16 @@ passent par le même schéma, donc les mêmes contraintes. Points clés :
 - `SMTP_ENABLED=1` + host/port/user/pass — sinon les e-mails restent en file (statut « skipped » visible
   dans Admin » Système).
 - Pays : déposer `country-profiles/XX.json` (d’après `_TEMPLATE.json`) — **aucun code à écrire**.
+- **Identité visuelle** : Paramètres » Général » *Identité visuelle* — logo et icône d'onglet
+  téléversables (PNG/JPEG/WEBP/GIF/SVG). Les fichiers restent sur le serveur (`storage/branding/`,
+  type vérifié par *magic bytes*, SVG assaini + servi sous CSP `sandbox`), la base ne garde que le
+  chemin et l'empreinte ; sans logo, l'application retombe sur son monogramme (nom de l'app).
+- **Thème visuel** : Paramètres » Interface & thèmes propose la liste des thèmes **réellement
+  découverts** dans `/themes/` (nom d'affichage traduit, accent, modes) — un thème enregistré mais
+  introuvable est signalé au lieu d'être réécrit en silence. Application immédiate après enregistrement.
+- **Carnet vaccinal** : `Admin » Vaccination` (calendrier national administrable + tous les carnets)
+  et onglet *Vaccination* du dossier patient (couverture, échéances calculées depuis la date de
+  naissance, doses `VAX-000001…`, génération du plan en un clic). Module RBAC dédié `vaccination`.
 - Mise à niveau d’une base existante : `npm run db:migrate` (ou bouton **Migrer** dans l’admin)
   applique `migrations/*.sql` — les variantes `.mysql.sql` / `.postgres.sql` ne sont exécutées que
   sur le dialecte concerné, et « déjà appliqué » n’est pas une erreur (rejeu sûr).

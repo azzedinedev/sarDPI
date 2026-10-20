@@ -19,7 +19,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Hash, Pencil, Plus, RefreshCw, RotateCcw, Save, Search, Trash2 } from 'lucide-react';
+import { Hash, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { Badge, Button, Card, Field, Input, Select, Switch, Textarea } from '@/components/ui';
@@ -29,6 +29,10 @@ import { cn } from '@/lib/utils';
 import { FORM_SECTIONS, SETTINGS_SECTIONS, filterSections, groupSections, nextSection, sectionDirty, type SettingsSection as Section } from '@/lib/settings-sections';
 import { SECTION_FORMS, issuesByPath, issuesVarsByPath, sectionSchema, validateJsonText } from '@/lib/settings-fields';
 import { SettingsForm, hasFormSpec } from '@/components/settings-form';
+import { SaveBar } from '@/components/save-bar';
+import { ThemeSelect } from '@/components/theme-select';
+import { BrandingField } from '@/components/branding-field';
+import { applyActiveThemeCss } from '@/lib/theme-css';
 
 
 export default function SettingsPage(): React.ReactElement {
@@ -249,6 +253,9 @@ function SectionEditor({ section, onDirtyChange }: { section: Section; onDirtyCh
       // formats d'affichage & libellés de préfixes recalculés immédiatement (lists, infobulles)
       void qc.invalidateQueries({ queryKey: ['refs', 'display'] });
       void qc.invalidateQueries({ queryKey: ['refs', 'prefixes'] });
+      // thème visuel : appliqué à l'écran sans rechargement (variables CSS + styles.css du thème)
+      if (section === 'ui') void applyActiveThemeCss();
+      if (section === 'general') void qc.invalidateQueries({ queryKey: ['branding'] });
     },
     onError: (e: unknown) => {
       const x = e as { details?: Record<string, string> | null; code?: string; status?: number };
@@ -455,6 +462,13 @@ function FormEditor({ section, data, onChange }: { section: Section; data: Recor
             </Grid>
           </Group>
 
+          <Group title={t('settings.groups.branding')} hint={t('settings.groups.branding.hint')}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <BrandingField kind="logo" />
+              <BrandingField kind="favicon" />
+            </div>
+          </Group>
+
           <Group title={t('settings.groups.contact')}>
             <Grid cols={3}>
               <Field label={t('settings.orgAddress')}>
@@ -500,8 +514,8 @@ function FormEditor({ section, data, onChange }: { section: Section; data: Recor
         <div className="flex flex-col gap-5">
           <Group title={t('settings.groups.appearance')}>
             <Grid cols={4}>
-              <Field label={t('settings.theme')}>
-                <Input value={s('theme')} title="medical-blue · clinical-green · /themes/" onChange={(e) => set('theme', e.target.value)} />
+              <Field label={t('settings.theme')} hint={t('settings.theme.hint')}>
+                <ThemeSelect value={s('theme')} onChange={(v) => set('theme', v)} />
               </Field>
               <Field label={t('settings.density')}>
                 <Select
@@ -670,30 +684,6 @@ function describeIssues(errors: Record<string, string>, vars: Record<string, Rec
   return Object.entries(errors)
     .map(([path, code]) => `${path === '_' ? '' : `${path} : `}${t(`settings.validation.${code}`, vars[path] ?? {})}`)
     .join(' · ');
-}
-
-/**
- * Barre d'enregistrement collante : l'état du formulaire est toujours visible (« à jour » /
- * « modifications non enregistrées »), le retour à la version serveur est à un clic, et le bouton
- * Enregistrer ne s'active que s'il y a réellement quelque chose à écrire.
- */
-function SaveBar({ dirty, saving, invalidCount = 0, onSave, onReset }: { dirty: boolean; saving: boolean; invalidCount?: number; onSave: () => void; onReset: () => void }): React.ReactElement {
-  const { t } = useT('settings');
-  const { t: tc } = useT('common');
-  return (
-    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto flex flex-wrap items-center gap-2 rounded-b-[var(--r-card)] border-t border-[rgb(var(--c-line)/0.7)] bg-[rgb(var(--c-surface)/0.93)] px-4 py-2.5 backdrop-blur">
-      <Badge tone={dirty ? 'warn' : 'ok'}>{dirty ? t('settings.save.dirty') : t('settings.save.upToDate')}</Badge>
-      {invalidCount > 0 ? <Badge tone="danger">{t('settings.save.invalid', { n: invalidCount })}</Badge> : null}
-      <div className="ms-auto flex items-center gap-2">
-        <Button onClick={onReset} disabled={!dirty} title={t('settings.save.discard')}>
-          <RotateCcw size={14} /> {t('settings.save.discard')}
-        </Button>
-        <Button variant="primary" loading={saving} disabled={!dirty || invalidCount > 0} title={invalidCount > 0 ? t('settings.save.invalidHint') : undefined} onClick={onSave}>
-          <Save size={14} /> {tc('save')}
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 /** Liste CRUD de référence (groupes sanguins, caisses SS) : table + tiroir créer/éditer, activation, suppression. */

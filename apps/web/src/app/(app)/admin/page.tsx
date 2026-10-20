@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Blocks, CalendarClock, Database, FolderCog, KeyRound, Languages, Mail, Palette, Plug, Settings2, ShieldCheck, Users } from 'lucide-react';
+import { Blocks, CalendarClock, Database, FolderCog, KeyRound, Languages, Mail, Palette, Plug, Settings2, ShieldCheck, Syringe, Users } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/stores/auth';
 import { can } from '@sardpi/shared';
@@ -16,6 +16,7 @@ const SECTIONS = [
   { href: '/admin/themes', icon: Palette, perm: 'theme', key: 'admin.themes' },
   { href: '/admin/database', icon: Database, perm: 'setting', key: 'admin.database' },
   { href: '/admin/catalog', icon: Blocks, perm: 'catalog', key: 'admin.catalog' },
+  { href: '/admin/vaccination', icon: Syringe, perm: 'vaccination', key: 'admin.vaccination' },
   { href: '/admin/system', icon: CalendarClock, perm: 'job', key: 'admin.system' },
   { href: '/admin/sources', icon: Plug, perm: 'externalImport', key: 'admin.sources' },
 ];

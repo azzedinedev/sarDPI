@@ -7,7 +7,7 @@ import type { MultiLabel } from '@sardpi/shared';
 
 export interface HistoryWrite {
   patientId: number;
-  kind: 'profile' | 'record' | 'rx' | 'ged' | 'case' | 'movement' | 'appointment' | 'note' | 'consent' | 'message';
+  kind: 'profile' | 'record' | 'rx' | 'ged' | 'case' | 'movement' | 'appointment' | 'note' | 'consent' | 'message' | 'vaccination';
   refId?: number | null;
   refCode?: string | null;
   summary?: MultiLabel | null;

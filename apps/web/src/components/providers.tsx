@@ -11,6 +11,7 @@ import { setCountryProfile } from '@/lib/format';
 import type { CountryProfile } from '@sardpi/shared';
 import { ToastProvider } from '@/components/toast';
 import { I18nProvider } from '@/lib/i18n';
+import { BrandingProvider, type BrandingValue } from '@/lib/branding';
 
 export function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -38,6 +39,7 @@ export function Providers({
   languages,
   profile,
   serverPrefs,
+  branding,
 }: {
   children: React.ReactNode;
   initialLang: string;
@@ -45,6 +47,8 @@ export function Providers({
   languages: { code: string; label: string; dir: 'rtl' | 'ltr' }[];
   profile: CountryProfile | null;
   serverPrefs: { density: string | null; nav: string | null; theme: string | null };
+  /** identité visuelle lue côté serveur (nom de l'app, logo, icône) — aucun fetch au démarrage */
+  branding: BrandingValue;
 }): React.ReactElement {
   const [client] = useMemo(() => [makeQueryClient()], []);
   const init = useAuth((s) => s.init);
@@ -73,9 +77,11 @@ export function Providers({
 
   return (
     <QueryClientProvider client={client}>
-      <I18nProvider initialLang={initialLang} initialDicts={initialDicts} languages={languages}>
-        <ToastProvider>{children}</ToastProvider>
-      </I18nProvider>
+      <BrandingProvider value={branding}>
+        <I18nProvider initialLang={initialLang} initialDicts={initialDicts} languages={languages}>
+          <ToastProvider>{children}</ToastProvider>
+        </I18nProvider>
+      </BrandingProvider>
     </QueryClientProvider>
   );
 }

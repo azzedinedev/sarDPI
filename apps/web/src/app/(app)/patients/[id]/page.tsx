@@ -22,6 +22,7 @@ import { useAuth } from '@/stores/auth';
 import { age } from '@/lib/format';
 import { useFmtDate } from '@/lib/display';
 import { CaseStepper } from '@/components/case-stepper';
+import { VaccinationTab } from '@/components/vaccination-tab';
 
 export default function PatientPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
@@ -126,6 +127,8 @@ export default function PatientPage(): React.ReactElement {
           { key: 'dossiers', label: t('tabs.dossiers') },
           { key: 'history', label: t('tabs.history') },
           { key: 'records', label: t('tabs.records') },
+          // le carnet vaccinal n'apparaît qu'avec le droit de lecture du module (RBAC côté API aussi)
+          ...(has('vaccination', 'view') ? [{ key: 'vaccination', label: t('tabs.vaccination') }] : []),
           { key: 'ged', label: t('tabs.ged') },
           { key: 'workflow', label: t('tabs.workflow') },
           { key: 'movements', label: t('tabs.movements') },
@@ -138,6 +141,7 @@ export default function PatientPage(): React.ReactElement {
       {tab === 'dossiers' ? <DossiersTab pid={pid} /> : null}
       {tab === 'history' ? <HistoryTab pid={pid} data={history.data?.rows ?? []} loading={history.isLoading} /> : null}
       {tab === 'records' ? <PatientRecords pid={pid} /> : null}
+      {tab === 'vaccination' ? <VaccinationTab pid={pid} /> : null}
       {tab === 'ged' ? (
         <CrudModule
           resource="ged"
@@ -346,6 +350,7 @@ function HistoryTab({ pid, data, loading }: { pid: number; data: { id: number; k
     note: <BadgeCheck size={13} />,
     movement: <WorkflowIcon size={13} />,
     case: <WorkflowIcon size={13} />,
+    vaccination: <Syringe size={13} />,
   };
   // tonalité → icône + couleur : annulation (coral + Undo2), succès (ok + check), en cours (ambre)
   const toneIcon = (tone?: string | null): React.ReactNode | null =>

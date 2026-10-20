@@ -66,13 +66,24 @@ function referencedKeys(): string[] {
 }
 
 describe('couverture des modules', () => {
+  /**
+   * Sections pilotées par le moteur MAIS affichées hors de la page Paramètres : le calendrier
+   * vaccinal est édité dans Administration » Vaccination (`/admin/vaccination`), qui réutilise
+   * exactement la même spécification et le même endpoint (`PUT /admin/settings/vaccination`).
+   */
+  const DEDICATED_SCREENS = ['vaccination'];
+
   it('chaque section sans schéma JSON brut dispose d’un formulaire (plus aucune section « JSON seul »)', () => {
     const withForm = new Set(SETTINGS_SECTIONS.filter((s) => s.form).map((s) => s.key as string));
     for (const key of SPEC_SECTIONS) {
-      expect(withForm.has(key), `section ${key} absente du catalogue`).toBe(true);
+      if (DEDICATED_SCREENS.includes(key)) {
+        expect(withForm.has(key), `${key} ne doit plus figurer au catalogue Paramètres`).toBe(false);
+      } else {
+        expect(withForm.has(key), `section ${key} absente du catalogue`).toBe(true);
+      }
       expect(SECTION_FORMS[key], `spécification manquante pour ${key}`).toBeTruthy();
     }
-    // les neuf modules autrefois en JSON brut sont tous couverts
+    // les modules autrefois en JSON brut sont tous couverts (calendrier vaccinal compris)
     for (const key of ['gedTypes', 'practitionerTypes', 'workflowSteps', 'calendarKinds', 'vaccination', 'security', 'captcha', 'backups', 'license']) {
       expect(SPEC_SECTIONS).toContain(key);
     }

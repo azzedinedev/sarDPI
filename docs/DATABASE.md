@@ -104,6 +104,8 @@ erDiagram
   appointments }o--|| patients : "patient_id"
   appointments { varchar code UK "RDV-00001", datetime start_at "conflits vérifiés côté serveur" }
   patient_movements { varchar code UK "MOV-00001" }
+  patient_vaccinations }o--|| patients : "patient_id"
+  patient_vaccinations { varchar code UK "VAX-000001", varchar vaccine_key "clé du calendrier admin", int dose_no, varchar status "done|planned|refused|missed", date due_at "naissance + âge recommandé" }
   history_events }o--|| patients : "patient_id" "timeline réduite + détail JSON"
   verify_tokens { varchar token UK "base64url 22ch", varchar entity_type, json meta_json "non nominatif" }
   audit_log { varchar action, json diff_json "secrets masqués", varchar prev_hash, varchar hash "chaîne sha256" }

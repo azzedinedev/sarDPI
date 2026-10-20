@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { userCreateZ, userUpdateZ, roleUpdateZ, multiLabelZ, can, compactDate } from '@sardpi/shared';
+import { userCreateZ, userUpdateZ, roleUpdateZ, multiLabelZ, can, compactDate, pickLabel } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
 import { registerCrud, sanitizeRow } from '../http/crud';
 import { ApiError, notFound } from '../http/errors';
@@ -409,7 +409,49 @@ export function registerAdmin(): void {
   route({ method: 'POST', path: '/admin/translations/missing/clear', perm: ['translation', 'update'], handler: async () => ((clearMissingKeysReport(), { ok: true })) });
 
   /* ---------------------------------------------------------------- thèmes */
-  route({ method: 'GET', path: '/admin/themes', perm: ['theme', 'view'], handler: async () => await scanThemes() });
+  // Scan du dossier /themes/ + thème ACTIF (settings.ui.theme) : la page marque le thème en place
+  // et ne propose pas de « ré-activer » un thème déjà appliqué.
+  route({
+    method: 'GET',
+    path: '/admin/themes',
+    perm: ['theme', 'view'],
+    handler: async () => {
+      const [scan, ui] = await Promise.all([scanThemes(), getSection('ui') as Promise<{ theme?: string }>]);
+      return { ...scan, active: String(ui.theme ?? '') };
+    },
+  });
+  /**
+   * Liste légère des thèmes DÉCOUVERTS dans /themes/ — consommée par le sélecteur de
+   * Paramètres » Interface & thèmes. Permission `setting:view` (et non `theme:view`) : choisir son
+   * thème fait partie de l'édition des réglages, alors que la page Administration » Thèmes
+   * (rescan, édition de manifeste, approbation du JS) reste réservée au module `theme`.
+   */
+  route({
+    method: 'GET',
+    path: '/admin/themes/names',
+    perm: ['setting', 'view'],
+    cacheable: true,
+    async handler(ctx: Ctx) {
+      const scan = await scanThemes();
+      const ui = (await getSection('ui')) as { theme?: string };
+      const lang = ctx.user?.locale ?? 'fr';
+      return {
+        active: String(ui.theme ?? ''),
+        themes: scan.themes.map((t) => ({
+          name: t.manifest.name,
+          label: pickLabel(t.manifest.displayName ?? {}, lang) || t.manifest.name,
+          accent: t.manifest.accent ?? null,
+          modes: t.manifest.modes ?? [],
+          version: t.manifest.version,
+          author: t.manifest.author ?? null,
+          jsApproved: t.jsApproved,
+          hasCustomCss: Boolean(t.css),
+        })),
+        issues: scan.issues.map((i) => ({ dir: i.dir, error: i.error })),
+        scannedAt: scan.scannedAt,
+      };
+    },
+  });
   route({ method: 'POST', path: '/admin/themes/rescan', perm: ['theme', 'update'], handler: async () => ((await rescanThemes()), await scanThemes(true)) });
   route({
     method: 'POST',

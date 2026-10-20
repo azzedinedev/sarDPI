@@ -16,5 +16,7 @@
   "errors.licenseRequired": "الترخيص منتهٍ أو غير صالح — الوصول محظور.",
   "errorBoundary.title": "حدث خطأ في هذا القسم.",
   "errorBoundary.reset": "إعادة تحميل القسم",
-  "errorBoundary.detail": "تفصيل تقني"
+  "errorBoundary.detail": "تفصيل تقني",
+  "errors.duplicateDose": "هذه الجرعة مسجلة بالفعل لهذا المريض (نفس اللقاح ونفس رقم الجرعة).",
+  "errors.vaccinationCalendarEmpty": "تقويم التطعيم فارغ أو الدفتر معطّل — اضبطه من الإدارة » التطعيم."
 }

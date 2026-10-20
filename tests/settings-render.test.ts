@@ -81,7 +81,9 @@ const CALENDAR_KINDS = {
   ],
   statuses: [{ key: 'pending', order: 1, color: '#f59e0b', label: { fr: 'En attente', ar: 'قيد الانتظار', es: 'Pendiente', en: 'Pending' } }],
 };
-const PAYLOADS: Record<string, Record<string, unknown>> = { general: GENERAL, security: SECURITY, calendarKinds: CALENDAR_KINDS };
+/** Interface & thèmes : le thème actif est « medical-blue » (dossier /themes/medical-blue). */
+const UI = { theme: 'medical-blue', density: 'comfortable', nav: 'sidebar', animations: 'full', parallax: true, arabicDigits: false, hijriEnabled: true };
+const PAYLOADS: Record<string, Record<string, unknown>> = { general: GENERAL, security: SECURITY, calendarKinds: CALENDAR_KINDS, ui: UI };
 
 /**
  * Faux serveur : la lecture renvoie l'état courant, l'écriture le met à jour. C'est indispensable
@@ -200,7 +202,8 @@ describe('page Paramètres — structure (pleine largeur, sous-menu collant)', (
     expect(el.querySelector('.nav-scroll-x')).toBeTruthy();
     expect(el.querySelector('.nav-scroll-y')).toBeTruthy();
     const tablist = el.querySelector('[role="tablist"][aria-orientation="vertical"]')!;
-    expect(tablist.querySelectorAll('[role="tab"]').length).toBe(15);
+    // 14 sections : le carnet vaccinal a quitté Paramètres pour Administration » Vaccination
+    expect(tablist.querySelectorAll('[role="tab"]').length).toBe(14);
     for (const label of ['Plateforme', 'Activité clinique', 'Communication', 'Sécurité & conformité', 'Exploitation']) {
       expect(el.textContent, `regroupement « ${label} » absent`).toContain(label);
     }
@@ -264,7 +267,10 @@ describe('page Paramètres — enregistrement (barre collante, état, garde-fou)
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     // la saisie est intacte (le champ est contrôlé : sa valeur n'apparaît pas dans textContent)
     expect([...document.querySelectorAll('input')].some((i) => i.value === 'Brouillon non enregistré')).toBe(true);
-    expect(get).toHaveBeenCalledTimes(1); // aucune relecture n'a écrasé la saisie
+    // aucune RELECTURE DE LA SECTION n'a écrasé la saisie (les autres appels — identité visuelle,
+    // liste des thèmes — portent sur d'autres chemins et ne touchent pas au formulaire)
+    const sectionCalls = (get.mock.calls as unknown[][]).filter((c) => String(c[0]).startsWith('/admin/settings/'));
+    expect(sectionCalls).toHaveLength(1);
 
     await click(tab('smtp'));
     await click(byText('[role="dialog"] button', dicts.settings['settings.save.leaveGo']!));
@@ -349,5 +355,87 @@ describe('page Paramètres — modules autrefois en JSON brut', () => {
     const [, body2] = put.mock.calls[1]! as [string, { kinds: { key: string; order: number }[] }];
     expect(body2.kinds.map((k) => k.key)).toEqual(['radio', 'consultation']);
     expect(body2.kinds.map((k) => k.order)).toEqual([1, 2]);
+  });
+});
+
+/* ----------------------------------------------------------------------------------------
+ * Identité visuelle (logo / icône) et sélecteur de thème visuel.
+ * Deux champs autrefois muets ou libres :
+ *   - le thème était une ZONE DE TEXTE (nom de dossier à taper, aucune liste, aucun contrôle) ;
+ *   - le logo n'existait pas (monogramme « S » codé en dur dans la barre latérale et la connexion).
+ * -------------------------------------------------------------------------------------- */
+describe('Paramètres — identité visuelle et thème', () => {
+  it('le champ « Thème » est un sélecteur alimenté par les thèmes découverts dans /themes/', async () => {
+    store['names'] = {
+      active: 'medical-blue',
+      themes: [
+        { name: 'medical-blue', label: 'Bleu médical', accent: '#0ea5b7', modes: ['light', 'dark'], version: '1.0.0' },
+        { name: 'clinical-green', label: 'Vert clinique', accent: '#16a06e', modes: ['light'], version: '1.0.0' },
+      ],
+      issues: [],
+    };
+    const el = await mount();
+    await click(tab('ui'));
+
+    const theme = [...el.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'clinical-green'));
+    expect(theme, 'sélecteur de thème absent').toBeTruthy();
+    expect([...theme!.options].map((o) => o.value)).toEqual(['medical-blue', 'clinical-green']);
+    expect(theme!.value).toBe('medical-blue');
+    expect(el.textContent).toContain('Bleu médical'); // nom d'affichage traduit, pas seulement le dossier
+    // plus aucune saisie libre du nom de dossier
+    expect([...el.querySelectorAll('input')].some((i) => i.value === 'medical-blue')).toBe(false);
+  });
+
+  it('un thème enregistré mais introuvable reste sélectionné et signalé (pas de réécriture muette)', async () => {
+    store['names'] = { active: 'vieux-theme', themes: [{ name: 'medical-blue', label: 'Bleu médical' }], issues: [] };
+    store['ui'] = { ...UI, theme: 'vieux-theme' };
+    const el = await mount();
+    await click(tab('ui'));
+
+    const theme = [...el.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'vieux-theme'));
+    expect(theme, 'valeur enregistrée perdue du sélecteur').toBeTruthy();
+    expect(theme!.value).toBe('vieux-theme');
+    expect(el.textContent).toContain(dicts.settings['settings.theme.missing']!);
+  });
+
+  it('les dossiers rejetés par le scan sont signalés (un thème invalide est ignoré, pas appliqué)', async () => {
+    store['names'] = {
+      active: 'medical-blue',
+      themes: [{ name: 'medical-blue', label: 'Bleu médical' }],
+      issues: [{ dir: 'casse', error: 'manifeste invalide — version: requis' }],
+    };
+    const el = await mount();
+    await click(tab('ui'));
+    expect(el.textContent).toContain('/themes/casse');
+    expect(el.textContent).toContain('manifeste invalide');
+  });
+
+  it('section Général : logo ET icône d’onglet téléversables, types image imposés', async () => {
+    store['branding'] = { appName: 'sarDPI', orgName: 'Cabinet Boumerdès', logo: null, favicon: null };
+    const el = await mount(); // la section par défaut est « general »
+    expect(el.textContent).toContain(dicts.settings['settings.groups.branding']!);
+    const files = [...el.querySelectorAll<HTMLInputElement>('input[type="file"]')];
+    expect(files, 'champs de téléversement absents').toHaveLength(2);
+    for (const f of files) {
+      expect(f.accept).toContain('image/png');
+      expect(f.accept).toContain('image/svg+xml');
+    }
+    // sans logo personnalisé : l’état « par défaut » est affiché, aucune image cassée
+    expect(el.textContent).toContain(dicts.settings['settings.branding.default']!);
+    expect(el.querySelectorAll('img[src^="/api/v1/branding/"]').length).toBe(0);
+  });
+
+  it('un logo déjà en place est prévisualisé avec son empreinte de diffusion (?v=)', async () => {
+    store['branding'] = {
+      appName: 'sarDPI',
+      orgName: 'Cabinet Boumerdès',
+      logo: { kind: 'logo', path: 'branding/logo-ab12.png', rev: 'ab12', mime: 'image/png', sizeBytes: 20480, url: '/api/v1/branding/logo?v=ab12' },
+      favicon: null,
+    };
+    const el = await mount();
+    const img = el.querySelector<HTMLImageElement>('img[src="/api/v1/branding/logo?v=ab12"]');
+    expect(img, 'aperçu du logo absent').toBeTruthy();
+    expect(el.textContent).toContain(dicts.settings['settings.branding.inUse']!);
+    expect(el.textContent).toContain('20 Ko');
   });
 });

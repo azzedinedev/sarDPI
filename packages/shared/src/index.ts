@@ -8,5 +8,6 @@ export * from './medicalRefs';
 export * from './permissions';
 export * from './entities';
 export * from './settingsSections';
+export * from './vaccination';
 export * from './manifest';
 export * from './types';

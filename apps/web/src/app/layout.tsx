@@ -11,15 +11,41 @@ import { fetchNamespaceDicts } from '@/lib/i18n.server';
 import { getLanguages, getFallbackLanguage } from '@/server/i18n/server';
 import { activeThemeCss } from '@/server/themes';
 import { getActiveProfile } from '@/server/country';
+import { brandingState } from '@/server/branding';
+// `lib/branding-shared` (et non `lib/branding`, marqué 'use client') : un composant serveur ne peut
+// pas importer les VALEURS d'un module client — il n'en reçoit que des références de composant.
+import { DEFAULT_BRANDING, type BrandingValue } from '@/lib/branding-shared';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: { default: 'sarDPI — DPI médical', template: '%s · sarDPI' },
-  description: 'Dossier Patient Informatique — multi-langue, multi-thèmes, hébergeable 100 % en interne (loi 18-07).',
-  manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg' },
-};
+/**
+ * Métadonnées dynamiques : le titre de l'onglet et l'icône suivent l'identité visuelle configurée
+ * (Paramètres » Général). Un échec de lecture (base injoignable au démarrage) retombe sur les
+ * valeurs par défaut plutôt que de casser toute l'application.
+ */
+async function readBranding(): Promise<BrandingValue> {
+  try {
+    const state = await brandingState();
+    return {
+      appName: state.appName || DEFAULT_BRANDING.appName,
+      orgName: state.orgName,
+      logoUrl: state.logo?.url ?? null,
+      faviconUrl: state.favicon?.url ?? null,
+    };
+  } catch {
+    return DEFAULT_BRANDING;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await readBranding();
+  return {
+    title: { default: `${branding.appName} — DPI médical`, template: `%s · ${branding.appName}` },
+    description: 'Dossier Patient Informatique — multi-langue, multi-thèmes, hébergeable 100 % en interne (loi 18-07).',
+    manifest: '/manifest.webmanifest',
+    icons: { icon: branding.faviconUrl ?? '/icon.svg' },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -43,6 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const activeProfile = await getActiveProfile().catch(() => null);
   const profile = activeProfile?.profile ?? null;
   const serverPrefs = { density: null, nav: null, theme: null }; // affinées côté client via /auth/me
+  const branding = await readBranding();
 
   return (
     <html lang={entry.code} dir={entry.dir} data-motion="on" className="motion-on">
@@ -61,7 +88,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {themeCss ? <style id="sardpi-theme" dangerouslySetInnerHTML={{ __html: themeCss }} /> : null}
       </head>
       <body>
-        <Providers initialLang={entry.code} initialDicts={dicts} languages={languages.map((l) => ({ code: l.code, label: l.name, dir: l.dir }))} profile={profile} serverPrefs={serverPrefs}>
+        <Providers
+          initialLang={entry.code}
+          initialDicts={dicts}
+          languages={languages.map((l) => ({ code: l.code, label: l.name, dir: l.dir }))}
+          profile={profile}
+          serverPrefs={serverPrefs}
+          branding={branding}
+        >
           {children}
         </Providers>
       </body>

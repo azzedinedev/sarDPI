@@ -5,13 +5,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Palette, RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
+import { pickLabel } from '@sardpi/shared';
+import { cn } from '@/lib/utils';
 import { Badge, Button, Card, Field, Textarea } from '@/components/ui';
 import { Dialog } from '@/components/dialogs';
 import { useToast } from '@/components/toast';
 import { useAuth } from '@/stores/auth';
+import { applyActiveThemeCss } from '@/lib/theme-css';
 
 interface ThemeEntry {
-  manifest: { name: string; label?: Record<string, string>; colors?: Record<string, string>; fontStack?: Record<string, string> };
+  /**
+   * Manifeste validé (schéma `themeManifestZ`) : le nom d'affichage multilingue est `displayName`
+   * et les couleurs vivent dans `variables.light|dark` sous forme de triplets RGB (« 14 165 183 »)
+   * — les lire sous d'autres clés laissait les cartes muettes (nom de dossier seul, aucune pastille).
+   */
+  manifest: {
+    name: string;
+    displayName?: Record<string, string>;
+    version?: string;
+    author?: string;
+    modes?: string[];
+    accent?: string;
+    variables?: Partial<Record<'light' | 'dark', Record<string, string>>>;
+  };
   css: string;
   js: string | null;
   sha256: string;
@@ -21,6 +37,22 @@ interface Scan {
   themes: ThemeEntry[];
   issues: { dir: string; error: string }[];
   scannedAt: string;
+  /** nom du thème actif (settings.ui.theme) — '' si aucun réglage enregistré */
+  active?: string;
+}
+
+/** Triplets RGB du manifeste (« 14 165 183 », « 255 255 255 / 0.62 ») → couleur CSS affichable. */
+function swatches(entry: ThemeEntry): { key: string; color: string }[] {
+  const vars = entry.manifest.variables?.light ?? {};
+  const out: { key: string; color: string }[] = [];
+  if (entry.manifest.accent) out.push({ key: 'accent', color: entry.manifest.accent });
+  for (const [key, value] of Object.entries(vars)) {
+    const v = String(value).trim();
+    if (/^[\d.\s]+(\/[\d.]+)?$/.test(v)) out.push({ key, color: `rgb(${v})` });
+    else if (v.startsWith('#')) out.push({ key, color: v });
+    if (out.length >= 9) break;
+  }
+  return out;
 }
 
 export default function ThemesAdminPage(): React.ReactElement {
@@ -33,23 +65,16 @@ export default function ThemesAdminPage(): React.ReactElement {
   const q = useQuery({ queryKey: ['themes-scan'], queryFn: () => api.get<Scan>('/admin/themes') });
   const [edit, setEdit] = useState<{ name: string; json: string; css: string } | null>(null);
 
-  const active = q.data?.themes.find((x) => x.manifest.name === 'medical-blue');
-  void active;
+  const activeName = q.data?.active ?? '';
 
   const activate = useMutation({
     mutationFn: (name: string) => api.post('/admin/themes/activate', { name }),
     onSuccess: async () => {
       toast.success(tc('saved'));
-      try {
-        const css = await api.get<{ css: string }>('/admin/themes/active-css');
-        const el = document.getElementById('sardpi-theme') ?? document.createElement('style');
-        el.id = 'sardpi-theme';
-        el.textContent = css.css;
-        if (!el.parentNode) document.head.appendChild(el);
-      } catch {
-        /* l'API applique au prochain rendu */
-      }
+      // application immédiate (variables CSS + styles.css) — helper partagé avec Paramètres » Interface
+      await applyActiveThemeCss();
       void qc.invalidateQueries({ queryKey: ['themes-scan'] });
+      void qc.invalidateQueries({ queryKey: ['themes-names'] });
     },
     onError: () => toast.error(t('themes.rejected')),
   });
@@ -84,18 +109,21 @@ export default function ThemesAdminPage(): React.ReactElement {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {(q.data?.themes ?? []).map((th) => {
           const pendingJs = jsPendingDirs.has(th.dir);
+          const isActive = activeName === th.manifest.name;
+          const colors = swatches(th);
           return (
-            <Card key={th.dir} className="flex flex-col gap-2">
+            <Card key={th.dir} className={cn('flex flex-col gap-2', isActive && 'ring-1 ring-[rgb(var(--c-primary)/0.45)]')}>
               <div className="flex items-center gap-2">
-                <b className="text-[14px]">{th.manifest.label?.[lang] ?? th.manifest.label?.fr ?? th.manifest.name}</b>
+                <b className="text-[14px]">{pickLabel(th.manifest.displayName ?? {}, lang) || th.manifest.name}</b>
+                {isActive ? <Badge tone="ok"><CheckCircle2 size={11} /> {t('themes.active')}</Badge> : null}
                 <Badge tone="neutral" className="ms-auto font-mono">{th.manifest.name}</Badge>
               </div>
-              <div className="flex gap-1">
-                {(th.manifest.colors ? Object.entries(th.manifest.colors).slice(0, 8) : []).map(([k, v]) => (
-                  <span key={k} title={k} className="h-5 w-5 rounded-full border border-black/10" style={{ background: String(v) }} />
+              <div className="flex flex-wrap gap-1">
+                {colors.map(({ key, color }) => (
+                  <span key={key} title={key} className="h-5 w-5 rounded-full border border-black/10" style={{ background: color }} />
                 ))}
               </div>
-              {th.manifest.colors?.['--c-bg'] === undefined && th.css ? (
+              {!colors.length && th.css ? (
                 <p dir="ltr" className="line-clamp-2 rounded-lg bg-[rgb(var(--c-surface-2))] p-2 font-mono text-[10px] leading-tight text-[rgb(var(--c-muted))]">
                   {th.css.slice(0, 160)}…
                 </p>
@@ -108,7 +136,7 @@ export default function ThemesAdminPage(): React.ReactElement {
                 ) : pendingJs ? (
                   <>
                     <Badge tone="warn">{t('themes.jsPending')}</Badge>
-                    {has('themes', 'update') ? (
+                    {has('theme', 'update') ? (
                       <button className="ms-2 font-bold text-[rgb(var(--c-primary))] underline-offset-2 hover:underline" onClick={() => approve.mutate({ name: th.dir, sha256: th.sha256 })}>
                         {t('themes.approve')}
                       </button>
@@ -119,7 +147,9 @@ export default function ThemesAdminPage(): React.ReactElement {
                 )}
               </div>
               <div className="mt-auto flex gap-1.5 pt-1">
-                {has('themes', 'update') ? (
+                {/* `theme` est le module RBAC déclaré (MODULES) — « themes » ne correspondait à
+                    aucune permission et masquait les boutons à tout rôle autre qu'administrateur. */}
+                {has('theme', 'update') && !isActive ? (
                   <Button size="sm" variant="primary" onClick={() => activate.mutate(th.manifest.name)} loading={activate.isPending}>
                     <CheckCircle2 size={13} /> {t('themes.activate')}
                   </Button>
