@@ -20,18 +20,23 @@
 import { z } from 'zod';
 import {
   coverageSummary,
+  nextDoseInSeries,
   pickLabel,
   vaccinationCoverage,
+  vaccinationDoseStatusZ,
   vaccinationDoseUpdateZ,
   vaccinationDoseZ,
+  vaccinationFollowUps,
   vaccinationPlan,
   type MultiLabel,
   type VaccineCoverage,
   type VaccineScheduleEntry,
 } from '@sardpi/shared';
 import { route, type Ctx } from '../http/router';
-import { registerCrud } from '../http/crud';
+import { registerCrud, sanitizeRow } from '../http/crud';
 import { ApiError, notFound } from '../http/errors';
+import { audit } from '../audit';
+import { shallowDiff } from '../util';
 import { getDb } from '../data';
 import { getSection } from '../settings';
 import { allocateSuffixed } from '../codes/service';
@@ -177,6 +182,12 @@ export function registerVaccination(): void {
         enabled,
         summary: coverageSummary(coverage),
         coverage: coverage.map((c) => ({ ...c, label: pickLabel(c.label as MultiLabel, lang), labelJson: c.label })),
+        /**
+         * « Quelle est la suite ? » — les lignes du carnet qui demandent une action (retard, refus,
+         * rendez-vous manqué), triées par ancienneté du retard. Calculées ici plutôt que côté écran
+         * pour que le dossier patient et l'API racontent exactement la même histoire.
+         */
+        followUps: vaccinationFollowUps(coverage).map((f) => ({ ...f, label: pickLabel(f.label as MultiLabel, lang), labelJson: f.label })),
         doses,
         /** clés du calendrier — un carnet peut contenir une dose dont le vaccin a été retiré */
         knownKeys: [...byKey.keys()],
@@ -245,6 +256,158 @@ export function registerVaccination(): void {
       ctx.resultId = createdRows[0]?.id;
       await bumpTag('vaccinations');
       return { ok: true, created, skipped: plan.length - created, plan: plan.length, rows: createdRows };
+    },
+  });
+
+  /* ------------------------------------------------------------------ transitions rapides */
+  /**
+   * `POST /vaccinations/:id/status` — ADMINISTRER / REPORTER / REFUSER / MARQUER MANQUÉE une dose
+   * sans ouvrir le formulaire complet. C'est la réponse à « on voit l'étiquette *en retard*, quelle
+   * est la suite ? » : depuis la ligne du carnet (ou la carte de couverture), l'infirmier clique,
+   * précise la date/le lot, et la suite est enchaînée automatiquement.
+   *
+   * Deux règles métier vivent ici (et nulle part ailleurs) :
+   *   1. une dose administrée SANS date prend la date du jour (saisie en consultation) ;
+   *   2. la DOSE SUIVANTE de la série est planifiée dans le même mouvement (échéance = date
+   *      d'administration + intervalle du calendrier, sinon échéance théorique depuis la naissance) —
+   *      sinon le carnet reste « en cours » sans prochain rendez-vous et le retard se perd.
+   * Une dose déjà administrée ne peut pas être « reportée » : on passerait par la fiche complète,
+   * ce qui laisse la trace d'une correction plutôt qu'une perte silencieuse d'information.
+   */
+  route({
+    method: 'POST',
+    path: '/vaccinations/:id/status',
+    perm: ['vaccination', 'update'],
+    async handler(ctx: Ctx) {
+      const db = ctx.db;
+      const id = Number(ctx.params.id);
+      const before = await db.findOne<Record<string, unknown>>('patient_vaccinations', { id });
+      if (!before || before.archived_at) throw notFound();
+      const input = await ctx.body(vaccinationDoseStatusZ);
+
+      const patient = await patientOf(Number(before.patient_id));
+      if (!patient) throw new ApiError(400, 'errors.validation', 'patient du carnet introuvable', { patientId: true });
+      const byKey = await scheduleByKey();
+      const vaccineKey = String(before.vaccine_key);
+      const entry = byKey.get(vaccineKey) ?? null;
+      const label = pickLabel((entry?.label ?? {}) as MultiLabel, ctx.user?.locale ?? 'fr') || vaccineKey;
+      const doseNo = Number(before.dose_no ?? 1);
+      const today = new Date().toISOString().slice(0, 10);
+
+      /** date du jour acceptée (ISO ou `AAAA-MM-JJ`) ; `noFuture` = une injection n'est pas à venir */
+      const dayOf = (v: string, field: string, noFuture: boolean): string => {
+        const iso = v.length <= 10 ? v : v.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(new Date(`${iso}T12:00:00`).getTime())) {
+          throw new ApiError(422, 'errors.validation', 'date invalide (AAAA-MM-JJ attendu)', { [field]: 'date' });
+        }
+        if (noFuture && iso > today) {
+          throw new ApiError(422, 'errors.dateInFuture', `${field} ne peut pas être dans le futur`, { [field]: 'date' });
+        }
+        return iso;
+      };
+
+      const reason = input.reason ? String(input.reason).trim().slice(0, 500) : '';
+      const patch: Record<string, unknown> = { status: input.action };
+      if (reason) {
+        const prevNotes = before.notes ? String(before.notes).trim() : '';
+        patch.notes = prevNotes ? `${prevNotes}\n${reason}` : reason;
+      }
+      if (input.action === 'done') {
+        patch.administered_at = dayOf(input.administeredAt ?? today, 'administeredAt', true);
+        if (input.batch !== undefined) patch.batch = input.batch ? String(input.batch).slice(0, 60) : null;
+        if (input.site !== undefined) patch.site = input.site ? String(input.site).slice(0, 40) : null;
+        if (input.practitionerId !== undefined) patch.practitioner_id = input.practitionerId ? Number(input.practitionerId) : null;
+        if (input.locationId !== undefined) patch.location_id = input.locationId ? Number(input.locationId) : null;
+      } else {
+        // report, refus, rendez-vous manqué : aucune date d'administration
+        patch.administered_at = null;
+        if (input.action === 'planned') {
+          if (String(before.status) === 'done') {
+            throw new ApiError(409, 'errors.doseAlreadyAdministered', 'dose déjà administrée — corrigez-la depuis sa fiche complète');
+          }
+          patch.due_at = dayOf(String(input.dueAt ?? ''), 'dueAt', false);
+        } else if (input.dueAt) {
+          patch.due_at = dayOf(String(input.dueAt), 'dueAt', false);
+        }
+      }
+
+      const after = { ...before, ...patch };
+      await db.update('patient_vaccinations', id, patch);
+      ctx.resultId = id;
+      await pushHistory(ctx.user?.uid ?? null, {
+        patientId: patient.id,
+        kind: 'vaccination',
+        refId: id,
+        refCode: String(before.code ?? ''),
+        summary: summaryOf(after, label, doseNo),
+        detail: { vaccineKey, doseNo, status: input.action, previousStatus: before.status, reason: reason || undefined },
+      });
+
+      /* --- la suite : dose suivante planifiée automatiquement (sauf série terminée) --- */
+      let next: { id: number; code: string; doseNo: number; dueAt: string | null } | null = null;
+      if (input.action === 'done' && input.planNext !== false && entry) {
+        const siblings = (await dosesOfPatient(patient.id)).filter((r) => String(r.vaccine_key) === vaccineKey);
+        const planned = nextDoseInSeries(entry, siblings as unknown as import('@sardpi/shared').VaccineDose[], doseNo, {
+          birthISO: patient.birthDate,
+          administeredAt: String(patch.administered_at ?? today),
+        });
+        const already = planned
+          ? siblings.some((r) => Number(r.dose_no) === planned.doseNo && r.archived_at == null)
+          : false;
+        if (planned && !already) {
+          const created = await db.transaction(async (tx) => {
+            const { code } = await allocateSuffixed('vaccination', 'VAX', tx);
+            const ins = await tx.insert('patient_vaccinations', {
+              code,
+              patient_id: patient.id,
+              vaccine_key: vaccineKey,
+              dose_no: planned.doseNo,
+              status: 'planned',
+              administered_at: null,
+              due_at: planned.dueAt,
+              site: null,
+              batch: null,
+              practitioner_id: null,
+              location_id: null,
+              record_id: null,
+              notes: null,
+              created_by: ctx.user?.uid ?? null,
+            });
+            return { id: Number(ins.id), code };
+          });
+          next = { id: created.id, code: created.code, doseNo: planned.doseNo, dueAt: planned.dueAt };
+          await pushHistory(ctx.user?.uid ?? null, {
+            patientId: patient.id,
+            kind: 'vaccination',
+            refId: created.id,
+            refCode: created.code,
+            summary: summaryOf({ status: 'planned', administered_at: null, due_at: planned.dueAt }, label, planned.doseNo),
+            detail: { vaccineKey, doseNo: planned.doseNo, generated: true, afterDoseId: id },
+          });
+          await audit({
+            actorId: ctx.user?.uid ?? null,
+            action: 'vaccinations.create',
+            entity: 'patient_vaccinations',
+            entityId: created.id,
+            ip: ctx.ip,
+            ua: ctx.req.headers.get('user-agent'),
+            diff: { auto_planned: true, after_dose: id },
+          });
+        }
+      }
+
+      await audit({
+        actorId: ctx.user?.uid ?? null,
+        action: 'vaccinations.status',
+        entity: 'patient_vaccinations',
+        entityId: id,
+        ip: ctx.ip,
+        ua: ctx.req.headers.get('user-agent'),
+        diff: shallowDiff(sanitizeRow(before), sanitizeRow({ ...before, ...patch })),
+      });
+      await bumpTag('vaccinations');
+      const stored = (await db.findOne<Record<string, unknown>>('patient_vaccinations', { id }))!;
+      return { ok: true, row: sanitizeRow(stored), next, patientId: patient.id };
     },
   });
 

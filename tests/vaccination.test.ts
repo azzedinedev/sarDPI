@@ -11,7 +11,9 @@
  *   2. le schéma Zod des doses (patient obligatoire, bornes, statuts) ;
  *   3. le calendrier national par défaut (clés conformes, libellés 4 langues) ;
  *   4. le RBAC du nouveau module `vaccination` (qui saisit, qui consulte, qui supprime) ;
- *   5. la table et son rattachement au patient (soft delete, recherche, index).
+ *   5. la table et son rattachement au patient (soft delete, recherche, index) ;
+ *   6. LA SUITE d'une dose : la dose suivante planifiée après une injection, et les lignes
+ *      « à traiter » (retards, refus, rendez-vous manqués) qui portent un geste à l'écran.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -22,6 +24,7 @@ import {
   coverageSummary,
   DEFAULT_VACCINATION_SCHEDULE,
   dosesOf,
+  nextDoseInSeries,
   MODULES,
   SEED_ROLES,
   vaccineDueDate,
@@ -29,6 +32,8 @@ import {
   vaccinationDoseUpdateZ,
   vaccinationDoseZ,
   vaccinationEntryZ,
+  vaccinationDoseStatusZ,
+  vaccinationFollowUps,
   vaccinationPlan,
   vaccinationSectionZ,
   VACCINATION_STATUSES,
@@ -160,6 +165,71 @@ describe('plan de vaccination (génération des doses manquantes)', () => {
   });
 });
 
+describe('la suite d\'une dose (dose suivante + lignes à traiter)', () => {
+  it('dose administrée → la suivante est planifiée à date d\'administration + intervalle', () => {
+    const e = entry({ key: 'penta', doses: 3, intervalDays: 60 });
+    const next = nextDoseInSeries(e, [{ vaccine_key: 'penta', dose_no: 1, status: 'done' }], 1, {
+      birthISO: '2026-01-01',
+      administeredAt: '2026-03-01',
+    });
+    expect(next).toEqual({ doseNo: 2, dueAt: '2026-04-30' }); // 01/03 + 60 jours
+  });
+
+  it('rattrapage en désordre : la première dose MANQUANTE est proposée (pas simplement la suivante)', () => {
+    const e = entry({ key: 'penta', doses: 3, intervalDays: 30 });
+    const next = nextDoseInSeries(e, [{ vaccine_key: 'penta', dose_no: 2, status: 'done' }], 2, { administeredAt: '2026-05-01' });
+    expect(next?.doseNo).toBe(1); // la dose 1 n'a jamais été faite
+  });
+
+  it('série terminée, vaccin inconnu du calendrier, ou dose hors série → rien à planifier', () => {
+    const e = entry({ key: 'bcg', doses: 1 });
+    expect(nextDoseInSeries(e, [], 1, { administeredAt: '2026-01-01' })).toBeNull();
+    expect(nextDoseInSeries(null, [], 1, { administeredAt: '2026-01-01' })).toBeNull();
+    expect(nextDoseInSeries(e, [], 4, { administeredAt: '2026-01-01' })).toBeNull();
+  });
+
+  it('jamais de date inventée : sans intervalle ni date de naissance, aucune échéance n\'est proposée', () => {
+    const e = entry({ key: 'ror', doses: 2, intervalDays: 0 });
+    expect(nextDoseInSeries(e, [], 1, { administeredAt: '2026-01-01' })).toBeNull();
+    // avec la date de naissance et un âge recommandé, l'échéance théorique du calendrier prend le relais
+    const withAge = entry({ key: 'ror', doses: 2, intervalDays: 0, ageMonths: 6 });
+    const byCalendar = nextDoseInSeries(withAge, [], 1, { birthISO: '2025-01-01', administeredAt: '2026-01-01' });
+    expect(byCalendar).toEqual({ doseNo: 2, dueAt: '2025-07-01' }); // naissance + 6 mois
+  });
+
+  it('lignes « à traiter » : retards triés du plus ancien, refus et rendez-vous manqués inclus, doses faites exclues', () => {
+    const cov = vaccinationCoverage(
+      [
+        { key: 'bcg', label: { fr: 'BCG' }, doses: 1 },
+        { key: 'penta', label: { fr: 'Penta' }, doses: 1 },
+        { key: 'ror', label: { fr: 'ROR' }, doses: 1 },
+      ],
+      [
+        { id: 1, vaccine_key: 'bcg', dose_no: 1, status: 'done', administered_at: '2026-01-01', due_at: '2026-01-01' },
+        { id: 2, vaccine_key: 'penta', dose_no: 1, status: 'planned', due_at: '2026-02-01' },
+        { id: 3, vaccine_key: 'ror', dose_no: 1, status: 'refused', due_at: '2026-03-01' },
+      ],
+      { now: '2026-06-01' },
+    );
+    const ups = vaccinationFollowUps(cov, { now: '2026-06-01' });
+    expect(ups.map((u) => u.vaccineKey)).toEqual(['penta', 'ror']); // le plus ancien retard d'abord
+    expect(ups[0]).toMatchObject({ overdue: true, doseId: 2, doseCode: null, daysLate: 120 });
+    expect(ups[1]).toMatchObject({ refused: true, overdue: true, doseId: 3 });
+  });
+
+  it('vaccin sans aucune dose saisie : la ligne à traiter propose une CRÉATION (doseId nul)', () => {
+    const cov = vaccinationCoverage([{ key: 'mmr', label: { fr: 'ROR' }, doses: 1 }], [], { birthISO: '2020-01-01', now: '2026-06-01' });
+    const ups = vaccinationFollowUps(cov, { now: '2026-06-01' });
+    expect(ups).toHaveLength(1);
+    expect(ups[0]).toMatchObject({ vaccineKey: 'mmr', doseId: null, doseNo: 1, overdue: true });
+  });
+
+  it('carnet à jour : aucune ligne à traiter (le panneau ne s\'affiche pas)', () => {
+    const cov = vaccinationCoverage([{ key: 'bcg', label: { fr: 'BCG' }, doses: 1 }], [{ vaccine_key: 'bcg', dose_no: 1, status: 'done' }], { now: '2026-06-01' });
+    expect(vaccinationFollowUps(cov, { now: '2026-06-01' })).toEqual([]);
+  });
+});
+
 describe('schémas partagés (mêmes règles côté écran et côté API)', () => {
   it('une dose exige un patient — le rattachement au dossier n’est pas optionnel', () => {
     expect(vaccinationDoseZ.safeParse({ vaccineKey: 'bcg', doseNo: 1 }).success).toBe(false);
@@ -176,6 +246,22 @@ describe('schémas partagés (mêmes règles côté écran et côté API)', () =
     for (const status of VACCINATION_STATUSES) {
       expect(vaccinationDoseZ.safeParse({ patientId: 1, vaccineKey: 'bcg', doseNo: 1, status }).success, status).toBe(true);
     }
+  });
+
+  it('transition rapide : un report exige une échéance, une injection accepte la date du jour', () => {
+    // « done » sans date → autorisé (le serveur date du jour)
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'done' }).success).toBe(true);
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'done', administeredAt: '2026-01-10', batch: 'LOT-1', planNext: false }).success).toBe(true);
+    // « planned » (report) sans nouvelle échéance → refusé, avec le champ fautif nommé
+    const report = vaccinationDoseStatusZ.safeParse({ action: 'planned' });
+    expect(report.success).toBe(false);
+    if (!report.success) expect(report.error.issues[0]?.path).toContain('dueAt');
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'planned', dueAt: '2026-09-01', reason: 'report famille' }).success).toBe(true);
+    // refus / rendez-vous manqué : motif libre borné
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'refused', reason: 'x'.repeat(501) }).success).toBe(false);
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'missed', reason: 'absent' }).success).toBe(true);
+    // aucun statut inventé
+    expect(vaccinationDoseStatusZ.safeParse({ action: 'annulee' }).success).toBe(false);
   });
 
   it('mise à jour partielle : le patient ne peut pas être déplacé vers un autre dossier', () => {

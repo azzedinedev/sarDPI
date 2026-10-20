@@ -18,5 +18,7 @@
   "errorBoundary.reset": "Reload section",
   "errorBoundary.detail": "Technical detail",
   "errors.duplicateDose": "This dose is already recorded for this patient (same vaccine, same dose number).",
+  "errors.dateInFuture": "This date cannot be in the future.",
+  "errors.doseAlreadyAdministered": "This dose is already recorded as given — edit it from its full record.",
   "errors.vaccinationCalendarEmpty": "Vaccination schedule empty or record disabled — configure it in Administration » Vaccination."
 }

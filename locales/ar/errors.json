@@ -18,5 +18,7 @@
   "errorBoundary.reset": "إعادة تحميل القسم",
   "errorBoundary.detail": "تفصيل تقني",
   "errors.duplicateDose": "هذه الجرعة مسجلة بالفعل لهذا المريض (نفس اللقاح ونفس رقم الجرعة).",
+  "errors.dateInFuture": "لا يمكن أن يكون هذا التاريخ في المستقبل.",
+  "errors.doseAlreadyAdministered": "هذه الجرعة أُعطيت بالفعل — عدّلها من بطاقتها الكاملة.",
   "errors.vaccinationCalendarEmpty": "تقويم التطعيم فارغ أو الدفتر معطّل — اضبطه من الإدارة » التطعيم."
 }

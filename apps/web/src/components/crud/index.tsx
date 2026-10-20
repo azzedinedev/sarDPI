@@ -124,6 +124,19 @@ export function CrudModule(props: CrudProps): React.ReactElement {
 
   useEffect(() => setSelected([]), [page, qDeb, scope, filters, JSON.stringify(extraQuery ?? {})]);
 
+  /**
+   * Poignée d'édition exposée à l'écran hôte (`editRowRef`) : les actions métier d'une ligne
+   * (« Modifier » d'une dose vaccinale depuis le panneau de suivi, par exemple) ouvrent le MÊME
+   * tiroir de formulaire — une seule définition du formulaire, aucune duplication de validation.
+   */
+  useEffect(() => {
+    if (!props.editRowRef) return;
+    props.editRowRef.current = (row: RowData) => setDrawer({ mode: 'edit', row });
+    return () => {
+      if (props.editRowRef) props.editRowRef.current = null;
+    };
+  }, [props.editRowRef]);
+
   const sortState = sort[0] ?? (props.defaultSort ? { id: props.defaultSort.id, desc: props.defaultSort.desc } : { id: undefined as unknown as string, desc: false });
 
   const query = useQuery({
@@ -675,13 +688,28 @@ export function CrudModule(props: CrudProps): React.ReactElement {
   );
 }
 
+/**
+ * Action métier d'une ligne (`props.rowAction`) rendue EN CLAIR à côté du crayon : l'élément fourni
+ * reçoit `close()` injecté pour pouvoir refermer un menu qu'il aurait ouvert. Un fragment ou un
+ * groupe de boutons est accepté tel quel.
+ */
+function renderRowAction(props: CrudProps, row: RowData, close: () => void): React.ReactNode {
+  const el = props.rowAction?.(row, close);
+  if (!el) return null;
+  return React.isValidElement(el) ? React.cloneElement(el as React.ReactElement<{ close?: () => void }>, { close }) : el;
+}
+
 /* ------------------------------------------------------------------ actions ligne */
 function RowActions({ row, props, setDrawer, setConfirm, t, softDelete, detail, router, act }: { row: RowData; props: CrudProps; setDrawer: (d: { mode: 'create' | 'edit' | 'view'; row?: RowData } | null) => void; setConfirm: (c: { action: () => Promise<void>; label: string } | null) => void; t: (k: string) => string; softDelete: boolean; detail?: (r: RowData) => React.ReactNode; router: ReturnType<typeof useRouter>; act: { mutate: (v: { row: RowData; action: 'archive' | 'restore' | 'toggle-active' }) => void } }): React.ReactElement {
   const pop = usePop();
   const ref = useRef<HTMLDivElement>(null);
+  // `visibleActions` : les gestes d'un écran métier ne doivent pas dépendre d'un survol (tactile,
+  // découverte de la fonction) — le crayon reste alors lisible en permanence.
+  const hoverOnly = props.visibleActions ? '' : 'md:opacity-0 md:transition-opacity md:group-hover:opacity-100';
   return (
-    <div className="relative flex justify-end" ref={ref}>
-      <div className="flex gap-0.5">
+    <div className="relative flex justify-end" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-0.5">
+        {renderRowAction(props, row, pop.close)}
         {rowHrefGuard(props, row) ? (
           <Button
             size="sm"
@@ -697,7 +725,7 @@ function RowActions({ row, props, setDrawer, setConfirm, t, softDelete, detail, 
           <Button
             size="sm"
             variant="ghost"
-            className="btn-icon !min-h-8 !min-w-8 hover:opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100"
+            className={cn('btn-icon !min-h-8 !min-w-8 hover:opacity-100', hoverOnly)}
             onClick={() => setDrawer({ mode: detail ? 'view' : 'edit', row })}
             title={detail ? t('view') : t('edit')}
           >

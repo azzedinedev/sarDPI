@@ -48,6 +48,38 @@ export const vaccinationDoseZ = z.object({
 export const vaccinationDoseUpdateZ = vaccinationDoseZ.omit({ patientId: true }).partial();
 export type VaccinationDoseInput = z.infer<typeof vaccinationDoseZ>;
 
+/**
+ * Transition rapide d'une dose (`POST /vaccinations/:id/status`) — « Administrer », « Reporter »,
+ * « Refus », « Rendez-vous manqué » depuis la ligne du carnet, sans ouvrir le formulaire complet.
+ * Un seul schéma pour les quatre : le SERVEUR décide ce que chaque transition impose (une dose
+ * administrée porte une date et déclenche la planification de la suivante ; un report exige une
+ * nouvelle échéance ; un refus/rendez-vous manqué efface la date d'administration). L'écran n'a donc
+ * jamais à rejouer ces règles métier — et ne peut pas les oublier.
+ */
+export const vaccinationDoseStatusZ = z
+  .object({
+    action: z.enum(['done', 'planned', 'refused', 'missed']),
+    /** date d'administration (action « done ») — ISO ou `YYYY-MM-DD` ; absente = aujourd'hui */
+    administeredAt: z.string().min(8).max(32).optional().nullable(),
+    /** nouvelle échéance (action « planned » = report) — obligatoire dans ce cas */
+    dueAt: z.string().min(8).max(32).optional().nullable(),
+    /** lot / site / praticien / lieu : saisis au moment de l'injection, sans rouvrir la fiche */
+    batch: z.string().max(60).optional().nullable(),
+    site: z.string().max(40).optional().nullable(),
+    practitionerId: idZ.optional().nullable(),
+    locationId: idZ.optional().nullable(),
+    /** motif (refus, report, rendez-vous manqué) — tracé dans l'historique clinique */
+    reason: z.string().max(500).optional().nullable(),
+    /** planifier automatiquement la dose suivante (défaut : oui, si le calendrier la connaît) */
+    planNext: z.boolean().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.action === 'planned' && !v.dueAt) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['dueAt'], message: 'dueAt requis pour un report' });
+    }
+  });
+export type VaccinationDoseStatusInput = z.input<typeof vaccinationDoseStatusZ>;
+
 /** Une entrée du calendrier vaccinal (settings.vaccination.schedule[]) — lecture tolérante. */
 export interface VaccineScheduleEntry {
   key: string;
@@ -313,4 +345,127 @@ export function vaccinationPlan(schedule: VaccineScheduleEntry[], birthISO: stri
     }
   }
   return out;
+}
+
+/**
+ * DOSE SUIVANTE d'une série — « quelle est la suite ? » après une dose administrée.
+ * --------------------------------------------------------------------------------
+ * Le calendrier fixe le nombre de doses et l'intervalle qui les sépare ; quand une dose passe à
+ * « administrée », la suivante doit être planifiée avec son échéance (date d'administration +
+ * intervalle). Sans cette règle, un carnet se retrouve « en cours » sans prochain rendez-vous :
+ * l'écran affiche un retard mais personne ne sait quoi faire ensuite.
+ *
+ * La fonction est PURE (comme le reste du module) pour que le serveur et l'écran partagent exactement
+ * le même calcul, et pour rester testable sans base :
+ *   - la dose suivante est la première dose ATTENDUE (non administrée) après celle qui vient d'être
+ *     faite — un carnet rattrapé en désordre (dose 2 avant la dose 1) renvoie donc la dose 1 ;
+ *   - `null` quand la série est terminée, que la dose faite est hors série, ou qu'aucune échéance ne
+ *     peut être calculée (date de naissance absente) : on ne planifie JAMAIS une date inventée.
+ */
+export interface NextDosePlan {
+  doseNo: number;
+  dueAt: string | null;
+}
+
+export function nextDoseInSeries(
+  entry: VaccineScheduleEntry | null | undefined,
+  doses: VaccineDose[],
+  doneDoseNo: number,
+  opts: { birthISO?: string | null; administeredAt?: string | null; now?: Date | string } = {},
+): NextDosePlan | null {
+  if (!entry) return null;
+  const total = dosesOf(entry);
+  const no = Math.trunc(Number(doneDoseNo));
+  if (!Number.isFinite(no) || no < 1 || no > total) return null;
+
+  const doneNos = new Set<number>();
+  for (const d of doses ?? []) {
+    if (statusOf(d) === 'done') doneNos.add(Number(d.dose_no ?? 1));
+  }
+  doneNos.add(no); // la dose que l'on vient d'administrer n'est peut-être pas encore écrite en base
+
+  let next: number | null = null;
+  for (let i = 1; i <= total; i++) {
+    if (!doneNos.has(i)) {
+      next = i;
+      break;
+    }
+  }
+  if (next === null) return null; // série complète
+
+  const interval = intervalOf(entry);
+  const from = opts.administeredAt ?? isoDay(toDate(opts.now) ?? new Date());
+  const byInterval = interval > 0 ? addDays(from, interval) : null;
+  const byCalendar = opts.birthISO ? vaccineDueDate(opts.birthISO, entry, next) : null;
+  // l'intervalle depuis la dose réellement administrée l'emporte (rattrapage : les échéances
+  // théoriques du calendrier sont déjà dépassées) ; à défaut, échéance théorique ; sinon rien.
+  const dueAt = byInterval ?? byCalendar;
+  return dueAt ? { doseNo: next, dueAt } : null;
+}
+
+/**
+ * Suivi d'un carnet : les lignes qui demandent une action (retards, doses à faire, refus, rendez-vous
+ * manqués). C'est la réponse écran à « on voit l'étiquette *en retard*, quelle est la suite ? » :
+ * chaque ligne renvoyée porte une action possible (administrer, reporter, ouvrir la fiche complète).
+ * Tri : les retards les plus anciens d'abord, puis les échéances à venir.
+ */
+export interface VaccineFollowUp {
+  vaccineKey: string;
+  label: MultiLabel | Record<string, string>;
+  mandatory: boolean;
+  ageLabel: string;
+  doseNo: number | null;
+  status: VaccinationStatus;
+  dueAt: string | null;
+  /** nombre de jours de dépassement de l'échéance (> 0 = en retard) */
+  daysLate: number;
+  overdue: boolean;
+  refused: boolean;
+  missed: boolean;
+  /** dose déjà enregistrée (id) — sinon la ligne appelle une création */
+  doseId: number | null;
+  doseCode: string | null;
+}
+
+export function vaccinationFollowUps(coverage: VaccineCoverage[], opts: { now?: Date | string } = {}): VaccineFollowUp[] {
+  const today = isoDay(toDate(opts.now) ?? new Date());
+  const out: VaccineFollowUp[] = [];
+  for (const c of coverage ?? []) {
+    const pending = (c.doses ?? [])
+      .filter((d) => statusOf(d) !== 'done')
+      .sort((a, b) => Number(a.dose_no ?? 1) - Number(b.dose_no ?? 1));
+    // aucune dose saisie : la prochaine attendue du calendrier reste à créer
+    const rows: { doseNo: number | null; dose: VaccineDose | null; status: VaccinationStatus; dueAt: string | null }[] = pending.length
+      ? pending.map((d) => ({ doseNo: Number(d.dose_no ?? 1), dose: d, status: statusOf(d), dueAt: d.due_at ? String(d.due_at).slice(0, 10) : null }))
+      : c.nextDoseNo
+        ? [{ doseNo: c.nextDoseNo, dose: null, status: 'planned', dueAt: c.nextDueAt }]
+        : [];
+    for (const r of rows) {
+      const late = r.dueAt && r.dueAt <= today ? Math.round((toDate(today)!.getTime() - toDate(r.dueAt)!.getTime()) / DAY_MS) : 0;
+      const overdue = r.status === 'planned' ? Boolean(late > 0) : Boolean(r.dueAt && r.dueAt < today);
+      const refused = r.status === 'refused';
+      const missed = r.status === 'missed';
+      if (!overdue && !refused && !missed) continue;
+      out.push({
+        vaccineKey: c.key,
+        label: c.label,
+        mandatory: c.mandatory,
+        ageLabel: c.ageLabel,
+        doseNo: r.doseNo,
+        status: r.status,
+        dueAt: r.dueAt,
+        daysLate: Math.max(0, late),
+        overdue,
+        refused,
+        missed,
+        doseId: r.dose?.id != null ? Number(r.dose.id) : null,
+        doseCode: r.dose?.code ? String(r.dose.code as string) : null,
+      });
+    }
+  }
+  return out.sort((a, b) => {
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    if (a.daysLate !== b.daysLate) return b.daysLate - a.daysLate;
+    return String(a.dueAt ?? '9999').localeCompare(String(b.dueAt ?? '9999'));
+  });
 }

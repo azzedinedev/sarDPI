@@ -106,6 +106,11 @@ const CARNET = {
     { key: 'mmr1', label: 'ROR 1', ageLabel: '18 mois', mandatory: true, dosesTotal: 1, done: 0, state: 'upcoming', overdue: false, nextDoseNo: 1, nextDueAt: '2016-07-19' },
   ],
   doses: DOSES.rows,
+  /** lignes « À traiter » calculées côté serveur (retards, refus, rendez-vous manqués) */
+  followUps: [
+    { vaccineKey: 'penta1', label: 'Pentavalent 1', mandatory: true, ageLabel: '6 semaines', doseNo: 1, status: 'planned', dueAt: '2015-03-02', daysLate: 4244, overdue: true, refused: false, missed: false, doseId: 2, doseCode: 'VAX-000002' },
+    { vaccineKey: 'mmr1', label: 'ROR 1', mandatory: true, ageLabel: '18 mois', doseNo: 1, status: 'planned', dueAt: '2016-07-19', daysLate: 0, overdue: false, refused: false, missed: false, doseId: null, doseCode: null },
+  ],
 };
 
 const routes: Record<string, unknown> = {
@@ -143,6 +148,13 @@ async function click(el: HTMLElement): Promise<void> {
 function byText(sel: string, text: string): HTMLElement {
   const el = [...document.querySelectorAll<HTMLElement>(sel)].find((n) => (n.textContent ?? '').includes(text));
   if (!el) throw new Error(`introuvable : ${sel} contenant « ${text} »`);
+  return el;
+}
+
+/** Bouton icône : identifié par son `title` (les versions compactes n'affichent pas de libellé). */
+function byTitle(sel: string, title: string): HTMLElement {
+  const el = [...document.querySelectorAll<HTMLElement>(sel)].find((n) => n.getAttribute('title') === title);
+  if (!el) throw new Error(`introuvable : ${sel} titré « ${title} »`);
   return el;
 }
 
@@ -280,8 +292,8 @@ describe('Dossier patient » onglet Vaccination', () => {
     expect(el.textContent).toContain(tk('patient', 'vax.state.upcoming'));
     // retard signalé explicitement
     expect(el.textContent).toContain(tk('patient', 'vax.summary.overdue').replace('{count}', '1'));
-    // date de naissance rappelée (source des échéances)
-    expect(el.textContent).toContain('2015-01-19');
+    // date de naissance rappelée (source des échéances), au format d'affichage configuré
+    expect(el.textContent).toContain('19/01/2015');
   });
 
   it('« Générer le calendrier » appelle l’endpoint du patient', async () => {
@@ -308,5 +320,96 @@ describe('Dossier patient » onglet Vaccination', () => {
     expect(el.textContent).toContain(tk('patient', 'vax.forbiddenHint'));
     const called = (get.mock.calls as unknown[][]).some((c) => String(c[0]).includes('/vaccination'));
     expect(called, 'le carnet ne doit même pas être demandé').toBe(false);
+  });
+
+  it('panneau « À traiter » : retards et doses à venir, avec la suite proposée', async () => {
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(20);
+    expect(el.textContent).toContain(tk('patient', 'vax.followUp.title'));
+    // retard explicite, pas seulement une pastille de couleur
+    expect(el.textContent).toContain(tk('patient', 'vax.followUp.late').replace('{days}', '4244'));
+    // le geste possible est proposé sur la ligne (bouton icône titré dans le panneau compact)
+    const titles = [...document.querySelectorAll<HTMLElement>('button')].map((b) => b.getAttribute('title') ?? '');
+    expect(titles).toContain(tk('patient', 'vax.quick.done'));
+    expect(titles).toContain(tk('patient', 'vax.quick.reschedule'));
+  });
+
+  it('« Administrer » : petite fiche (date/lot/site), transition POST /status et dose suivante annoncée', async () => {
+    post.mockImplementation(async (p: string) =>
+      String(p).endsWith('/status')
+        ? { ok: true, row: { ...DOSES.rows[1], status: 'done', administered_at: '2026-01-10' }, next: { id: 9, code: 'VAX-000009', doseNo: 2, dueAt: '2026-03-11' } }
+        : { ok: true, created: 1, skipped: 0, plan: 1 },
+    );
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(20);
+    await click(byTitle('button', tk('patient', 'vax.quick.done')));
+    // la fiche rapide propose la date (défaut : aujourd'hui), le lot et le site
+    expect(document.body.textContent).toContain(tk('patient', 'vax.quick.confirmDone'));
+    expect(document.body.textContent).toContain(tk('patient', 'vax.batch'));
+    await click(byText('button', tk('patient', 'vax.quick.confirmDone')));
+    const call = (post.mock.calls as unknown[][]).find((c) => String(c[0]).endsWith('/status'));
+    expect(call, 'la transition doit passer par /vaccinations/:id/status').toBeTruthy();
+    expect(call![0]).toBe('/vaccinations/2/status');
+    expect((call![1] as Record<string, unknown>).action).toBe('done');
+    // la planification automatique de la suite est ANNONCÉE à l'écran
+    await flush(20);
+    expect(document.body.textContent).toContain(tk('patient', 'vax.nextPlanned').replace('{dose}', '2').replace('{date}', '2026-03-11'));
+    expect(el.textContent).toBeTruthy();
+  });
+
+  it('« Reporter » exige une nouvelle échéance et envoie le motif', async () => {
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(20);
+    await click(byTitle('button', tk('patient', 'vax.quick.reschedule')));
+    expect(document.body.textContent).toContain(tk('patient', 'vax.quick.newDue'));
+    // raccourcis de report proposés (+7/+15/+30/+90 jours) — le choix explicite remplace la saisie
+    await click(byText('button', tk('patient', 'vax.reschedule.plus').replace('{days}', '30')));
+    await click(byText('button', tk('patient', 'vax.quick.rescheduleConfirm')));
+    const call = (post.mock.calls as unknown[][]).find((c) => String(c[0]).endsWith('/status'));
+    expect(call).toBeTruthy();
+    const body = call![1] as Record<string, unknown>;
+    expect(body.action).toBe('planned');
+    expect(String(body.dueAt)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(el.textContent).toBeTruthy();
+  });
+
+  it('carte de couverture d\'un vaccin non commencé : « Planifier la dose suivante » (aucune ligne à ouvrir)', async () => {
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(20);
+    await click(byText('button', tk('patient', 'vax.planNext')));
+    const call = (post.mock.calls as unknown[][]).find((c) => String(c[0]).endsWith('/vaccination/generate'));
+    expect(call, 'la planification passe par l\'endpoint du patient').toBeTruthy();
+    expect(call![0]).toBe('/patients/4/vaccination/generate');
+    expect(el.textContent).toBeTruthy();
+  });
+
+  it('impression du carnet réservée au droit « vaccination:print »', async () => {
+    setPerms(['vaccination.view', 'vaccination.create', 'vaccination.update']);
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    expect(el.textContent).not.toContain(tk('patient', 'vax.print'));
+  });
+});
+
+describe('Dossier patient » doses : gestes sur chaque ligne', () => {
+  it('Administrer / Reporter / Manquée visibles EN CLAIR sur la ligne (pas seulement au survol)', async () => {
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(30);
+    // la ligne planifiée porte ses gestes ; la ligne administrée ne propose plus d'injection
+    const labels = [...document.querySelectorAll<HTMLElement>('button')].map((b) => b.getAttribute('title') ?? '');
+    expect(labels).toContain(tk('patient', 'vax.quick.done'));
+    expect(labels).toContain(tk('patient', 'vax.quick.reschedule'));
+    expect(labels).toContain(tk('patient', 'vax.quick.missed'));
+    expect(el.textContent).toContain(tk('patient', 'vax.quick.alreadyDone'));
+  });
+
+  it('sans « vaccination:update » : aucun geste rapide (pas de bouton mort), le suivi reste lisible', async () => {
+    setPerms(['vaccination.view', 'vaccination.create']);
+    const el = await mount(React.createElement(VaccinationTab, { pid: 4 }));
+    await flush(30);
+    expect(el.textContent).not.toContain(tk('patient', 'vax.quick.reschedule'));
+    expect(el.textContent).not.toContain(tk('patient', 'vax.quick.done'));
+    // l'accueil (view + create) voit la liste des retards et peut planifier, sans pouvoir modifier
+    expect(el.textContent).toContain(tk('patient', 'vax.followUp.title'));
+    expect(el.textContent).toContain(tk('patient', 'vax.planNext'));
   });
 });

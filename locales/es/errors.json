@@ -18,5 +18,7 @@
   "errorBoundary.reset": "Recargar sección",
   "errorBoundary.detail": "Detalle técnico",
   "errors.duplicateDose": "Esta dosis ya está registrada para este paciente (misma vacuna, mismo número de dosis).",
+  "errors.dateInFuture": "Esta fecha no puede estar en el futuro.",
+  "errors.doseAlreadyAdministered": "Esta dosis ya fue administrada — corríjala desde su ficha completa.",
   "errors.vaccinationCalendarEmpty": "Calendario vacunal vacío o cartilla desactivada — configúrelo en Administración » Vacunación."
 }

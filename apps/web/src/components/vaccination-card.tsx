@@ -111,7 +111,20 @@ export interface CoverageLine {
   nextDueAt: string | null;
 }
 
-export function CoverageList({ coverage, className }: { coverage: CoverageLine[]; className?: string }): React.ReactElement {
+export function CoverageList({
+  coverage,
+  className,
+  actionFor,
+}: {
+  coverage: CoverageLine[];
+  className?: string;
+  /**
+   * Gestes possibles sur la carte (Administrer / Reporter / Planifier la dose suivante) : une pastille
+   * « En retard » sans action laisse l'écran au milieu du gué — c'est l'écran hôte qui fournit les
+   * boutons, ce composant reste un simple afficheur.
+   */
+  actionFor?: (line: CoverageLine) => React.ReactNode;
+}): React.ReactElement {
   const { t } = useT('patient');
   const fmt = useFmtDate();
   if (!coverage.length) return <EmptyState icon={Syringe} title={t('vax.coverage.empty')} hint={t('vax.coverage.emptyHint')} />;
@@ -154,6 +167,7 @@ export function CoverageList({ coverage, className }: { coverage: CoverageLine[]
                   {t('vax.nextDue', { dose: String(c.nextDoseNo ?? 1), date: fmt(c.nextDueAt, true) })}
                 </p>
               ) : null}
+              {actionFor ? <div className="mt-0.5 flex flex-wrap items-center gap-1">{actionFor(c)}</div> : null}
             </Card>
           </li>
         );

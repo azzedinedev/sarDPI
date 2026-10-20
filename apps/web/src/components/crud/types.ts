@@ -85,6 +85,16 @@ export interface CrudProps {
   transformCreate?: (values: Record<string, unknown>) => Record<string, unknown>;
   transformUpdate?: (values: Record<string, unknown>, row: RowData) => Record<string, unknown>;
   rowHref?: (row: RowData) => string;
+  /**
+   * Action(s) métier affichée(s) EN CLAIR sur la ligne, avant le crayon d'édition (ex. « Administrer »
+   * une dose vaccinale, « Reporter » un rendez-vous). Le crayon et le menu « … » restent visibles au
+   * survol : sans ce crochet, les gestes les plus fréquents d'un écran sont cachés derrière un point
+   * de suspension et l'utilisateur ne les trouve pas. L'élément reçu est cloné avec `close()` pour que
+   * l'action puisse refermer son propre menu.
+   */
+  rowAction?: (row: RowData, close: () => void) => React.ReactElement | null;
+  /** actions de ligne toujours visibles (défaut : révélées au survol du rang) */
+  visibleActions?: boolean;
   /** détails repliables sous la ligne (chevron ▸) — vue table uniquement */
   expand?: (row: RowData) => React.ReactNode; // clic ligne → page
   detail?: (row: RowData) => React.ReactNode; // aperçu dans le tiroir « voir »
@@ -98,6 +108,12 @@ export interface CrudProps {
   toolbarExtra?: React.ReactNode;
   onCreated?: (row: RowData) => void;
   onSaved?: () => void;
+  /**
+   * Demande d'ouverture du formulaire d'édition depuis l'extérieur du module (ex. « Modifier » dans
+   * les actions rapides d'une ligne, ou depuis un panneau de suivi) : l'écran hôte rappelle
+   * `editRow()` avec la ligne — le tiroir du CRUD s'ouvre alors avec toutes ses validations.
+   */
+  editRowRef?: React.MutableRefObject<((row: RowData) => void) | null>;
 }
 
 export interface SavedFilter {

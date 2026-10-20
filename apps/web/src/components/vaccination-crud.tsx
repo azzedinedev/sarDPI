@@ -24,7 +24,8 @@ import { AsyncAutocomplete, type ComboOption } from '@/components/combo';
 import { useToast } from '@/components/toast';
 import { useAuth } from '@/stores/auth';
 import { useVaccinationCalendar, vaccineOptions } from '@/components/vaccination-card';
-import type { FieldDef, ColDef } from '@/components/crud/types';
+import { DoseQuickActions, type DoseRow } from '@/components/vaccination-actions';
+import type { FieldDef, ColDef, RowData } from '@/components/crud/types';
 
 interface PatientRow {
   id: number;
@@ -77,6 +78,8 @@ export function VaccinationDosesModule({
   createLabel,
   onSaved,
   rowHrefToPatient,
+  quickActions = true,
+  editRowRef,
 }: {
   /** scope patient (dossier) — absent = vue transversale de tous les carnets */
   pid?: number;
@@ -88,6 +91,14 @@ export function VaccinationDosesModule({
   onSaved?: () => void;
   /** vue transversale : un clic sur la ligne ouvre le dossier patient correspondant */
   rowHrefToPatient?: boolean;
+  /**
+   * Gestes rapides EN CLAIR sur chaque ligne (Administrer / Reporter / Manquée) + crayon et menu
+   * toujours visibles : sans eux, modifier ou supprimer une dose exige de deviner le survol d'un
+   * point de suspension — le carnet doit rendre la suite évidente.
+   */
+  quickActions?: boolean;
+  /** poignée pour ouvrir le formulaire d'édition depuis l'extérieur (panneau de suivi du dossier) */
+  editRowRef?: React.MutableRefObject<((row: RowData) => void) | null>;
 }): React.ReactElement {
   const { t } = useT('patient');
   const { t: tc } = useT('common');
@@ -226,6 +237,9 @@ export function VaccinationDosesModule({
       cardSubtitle={(r) => <BizCode code={r.code as string} />}
       cardBadges={(r) => <Badge tone={String(r.status) === 'done' ? 'ok' : 'info'}>{t(`vax.status.${String(r.status ?? 'planned')}`)}</Badge>}
       extraQuery={pid ? { patientId: pid } : undefined}
+      visibleActions={quickActions}
+      rowAction={quickActions && has('vaccination', 'update') ? (r) => <DoseQuickActions row={r as unknown as DoseRow} patientId={pid} showEdit={false} onDone={onSaved} compact /> : undefined}
+      editRowRef={editRowRef}
       canCreate={has('vaccination', 'create')}
       canUpdate={has('vaccination', 'update')}
       canDelete={has('vaccination', 'delete')}

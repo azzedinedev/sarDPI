@@ -91,7 +91,11 @@ diffusion publique pour l’écran de connexion), traductions (chaud + rapport),
 thèmes (scan/approbation/édition, **sélecteur des thèmes découverts** dans Paramètres » Interface),
 **carnet vaccinal** (module RBAC `vaccination`, table `patient_vaccinations` rattachée au dossier
 patient, calendrier national par défaut, échéances calculées, couverture + retards, génération du
-plan, historique clinique `kind=vaccination`), base de données (test + bascule à chaud avec rollback, migration,
+plan, historique clinique `kind=vaccination`, **transitions rapides par dose** —
+`POST /vaccinations/:id/status` : administrer / reporter / refus / rendez-vous manqué, avec
+planification AUTOMATIQUE de la dose suivante (date d'administration + intervalle du calendrier),
+panneau « À traiter » (retards, refus, rendez-vous manqués) et gestes visibles sur chaque ligne du
+carnet, impression du carnet), base de données (test + bascule à chaud avec rollback, migration,
 export/import JSON portatif), système (jobs retry/purge, audit + vérification de chaîne, sauvegardes
 gzip + rétention + cron interne), sources externes (test/run) ; **pays : un JSON à déposer, zéro code**.
 **Restant** : facturation/tiers-payant complet (Chifa) — les champs existent, le module de télédéclaration
